@@ -12,6 +12,10 @@ import {
 export default function BottomNav() {
   const pathname = usePathname();
 
+  if (pathname.startsWith("/drive")) {
+    return null;
+  }
+
   const menus = [
     {
       label: "서재",
