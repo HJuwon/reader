@@ -499,56 +499,8 @@ export default function Home() {
         </button>
       )}
 
-      {/* 하단 네비게이션 */}
+
       
-      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t bg-white">
-        <div className="mx-auto flex max-w-2xl items-center justify-around px-4 py-2.5 sm:py-3">
-          <button className="flex flex-col items-center gap-1 text-xs font-medium text-gray-900 sm:text-sm">
-            <BookOpen
-              className="h-4 w-4 sm:h-5 sm:w-5"
-              strokeWidth={1.75}
-            />
-
-            <span>서재</span>
-          </button>
-
-          <Link
-            href="/bookmarks"
-            className="flex flex-col items-center gap-1 text-xs text-gray-400 transition hover:text-gray-900 sm:text-sm"
-          >
-            <Bookmark
-              className="h-4 w-4 sm:h-5 sm:w-5"
-              strokeWidth={1.75}
-            />
-
-            <span>북마크</span>
-          </Link>
-
-          <Link
-            href="/highlights"
-            className="flex flex-col items-center gap-1 text-xs text-gray-400 transition hover:text-gray-900 sm:text-sm"
-          >
-            <Highlighter
-              className="h-4 w-4 sm:h-5 sm:w-5"
-              strokeWidth={1.75}
-            />
-
-            <span>하이라이트</span>
-          </Link>
-
-          <Link
-            href="/history"
-            className="flex flex-col items-center gap-1 text-xs text-gray-400 transition hover:text-gray-900 sm:text-sm"
-          >
-            <History
-              className="h-4 w-4 sm:h-5 sm:w-5"
-              strokeWidth={1.75}
-            />
-
-            <span>읽기 이력</span>
-          </Link>
-        </div>
-      </nav>
     </main>
   );
 }
