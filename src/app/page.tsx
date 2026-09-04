@@ -163,7 +163,8 @@ export default function Home() {
         </div>
       </header>
 
-      <section className="mx-auto max-w-6xl px-5 py-8 sm:px-6 sm:py-10">
+
+      <section className="mx-auto max-w-6xl px-5 pb-24 pt-8 sm:px-6 sm:pb-28 sm:pt-10">
         {/* 페이지 제목 */}
         <div>
           <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
@@ -499,7 +500,8 @@ export default function Home() {
       )}
 
       {/* 하단 네비게이션 */}
-      <nav className="sticky bottom-0 border-t bg-white">
+      
+      <nav className="fixed bottom-0 left-0 right-0 z-30 border-t bg-white">
         <div className="mx-auto flex max-w-2xl items-center justify-around px-4 py-2.5 sm:py-3">
           <button className="flex flex-col items-center gap-1 text-xs font-medium text-gray-900 sm:text-sm">
             <BookOpen
