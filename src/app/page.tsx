@@ -79,17 +79,10 @@ export default function Home() {
   useEffect(() => {
     async function initializeBooks() {
       try {
-        // Google Drive와 DB를 비교해서
-        // DB에 없는 새 TXT 파일만 추가
         await fetch("/api/books/sync");
-
-        // 동기화가 끝난 뒤 DB의 최신 목록을 가져옴
         await loadBooks();
       } catch (error) {
         console.error("책 동기화 실패:", error);
-
-        // 동기화가 실패하더라도
-        // 기존 DB 목록은 보여주도록 함
         await loadBooks();
       }
     }
@@ -127,6 +120,7 @@ export default function Home() {
   }, [books, filter, search]);
 
   // 최근 읽은 소설
+  // 최근 수정된 순서대로 정렬하고 최대 3개만 표시
   const recentBooks = useMemo(() => {
     return [...books]
       .filter(
@@ -139,7 +133,7 @@ export default function Home() {
           new Date(b.updated_at).getTime() -
           new Date(a.updated_at).getTime()
       )
-      .slice(0, 6);
+      .slice(0, 3);
   }, [books]);
 
   function scrollToTop() {
@@ -225,7 +219,7 @@ export default function Home() {
                 최근 읽은 소설이 없습니다.
               </div>
             ) : (
-              <div className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-3">
                 {recentBooks.map((book) => (
                   <Link
                     key={book.id}
@@ -236,32 +230,37 @@ export default function Home() {
                     )}`}
                     className="block rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5"
                   >
+                    {/* 아이콘 + 상태 + 제목 */}
                     <div className="flex items-start gap-3">
-                      {/* 아이콘 */}
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100">
-                        <BookOpen
-                          className="h-4 w-4 text-gray-400"
-                          strokeWidth={1.75}
-                        />
-                      </div>
+                      <div className="flex w-9 shrink-0 flex-col items-center">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100">
+                          <BookOpen
+                            className="h-4 w-4 text-gray-400"
+                            strokeWidth={1.75}
+                          />
+                        </div>
 
-                      <div className="min-w-0 flex-1">
-                        <h4 className="line-clamp-2 text-sm font-semibold leading-5 sm:text-base">
-                          {book.title}
-                        </h4>
-
-                        <p className="mt-1 text-xs text-gray-400">
-                          Google Drive
-                        </p>
-
+                        {/* 상태를 아이콘 아래에 배치 */}
                         <span
-                          className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium sm:text-[11px] ${statusStyle[book.status]}`}
+                          className={`mt-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[book.status]}`}
                         >
                           {book.status}
                         </span>
                       </div>
+
+                      {/* 제목 */}
+                      <div className="min-w-0 flex-1">
+                        <h4 className="line-clamp-2 text-sm font-semibold leading-5 sm:text-[15px]">
+                          {book.title}
+                        </h4>
+
+                        <p className="mt-1.5 text-xs text-gray-400">
+                          Google Drive
+                        </p>
+                      </div>
                     </div>
 
+                    {/* 진행률 */}
                     <div className="mt-5">
                       <div className="flex items-center justify-between text-xs sm:text-sm">
                         <span className="text-gray-500">
@@ -286,6 +285,7 @@ export default function Home() {
                       </div>
                     </div>
 
+                    {/* 하단 */}
                     <div className="mt-4 flex items-center justify-between">
                       <span className="text-[11px] text-gray-400">
                         마지막 수정 ·{" "}
@@ -335,7 +335,7 @@ export default function Home() {
             </button>
           </div>
 
-          {/* 소설 검색 */}
+          {/* 검색창 */}
           <div className="relative mt-3 sm:mt-4">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
@@ -401,7 +401,7 @@ export default function Home() {
                         : ""
                     }`}
                   >
-                    {/* 왼쪽 아이콘 영역 */}
+                    {/* 아이콘 + 상태 */}
                     <div className="flex w-10 shrink-0 flex-col items-center sm:w-11">
                       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 sm:h-10 sm:w-10">
                         <BookOpen
@@ -410,7 +410,6 @@ export default function Home() {
                         />
                       </div>
 
-                      {/* 상태를 아이콘 아래에 배치 */}
                       <span
                         className={`mt-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[book.status]}`}
                       >
@@ -418,13 +417,13 @@ export default function Home() {
                       </span>
                     </div>
 
-                    {/* 제목 + 회차 + 진행률 */}
+                    {/* 제목 + 회차 */}
                     <div className="min-w-0 flex-1">
                       <h4 className="line-clamp-2 text-sm font-medium leading-5 sm:text-[15px]">
                         {book.title}
                       </h4>
 
-                      <div className="mt-1.5 flex items-center gap-2">
+                      <div className="mt-1.5">
                         <span className="text-xs text-gray-400">
                           {book.last_episode > 0
                             ? `${book.last_episode}화`
@@ -483,7 +482,7 @@ export default function Home() {
         </section>
       </section>
 
-      {/* 맨 위로 버튼 */}
+      {/* 맨 위로 */}
       {showScrollTop && (
         <button
           onClick={scrollToTop}
