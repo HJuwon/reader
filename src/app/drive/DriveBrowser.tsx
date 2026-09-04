@@ -330,7 +330,7 @@ export default function DriveBrowser() {
     selectedEpisodeIndex,
   ]);
 
-  // 회차 변경 시 모바일 선택 상태 초기화
+  // 회차 변경 시 모바일 선택 하이라이트 초기화
   useEffect(() => {
     setShowHighlightButton(false);
     setSelectedTextForHighlight("");
@@ -1338,48 +1338,53 @@ export default function DriveBrowser() {
     }
   }
 
-  async function saveHighlightFromSelection() {
-    const selectionData =
-      getSelectionData();
-
-    if (!selectionData) {
-      return;
-    }
-
-    // 모바일에서는 바로 저장하지 않고
-    // 하이라이트 버튼을 보여준다.
-    if (
-      window.innerWidth < 768
-    ) {
-      setSelectedTextForHighlight(
-        selectionData.text
-      );
-
-      setSelectedHighlightRange({
-        startOffset:
-          selectionData.startOffset,
-        endOffset:
-          selectionData.endOffset,
-      });
-
-      setShowHighlightButton(true);
-
-      return;
-    }
-
-    // 데스크톱에서는 기존처럼
-    // 텍스트 선택 즉시 저장
-    await saveHighlight(
-      selectionData.text,
-      selectionData.startOffset,
-      selectionData.endOffset
-    );
-  }
-
   function handleTextSelection() {
     window.setTimeout(() => {
-      saveHighlightFromSelection();
-    }, 0);
+      const selectionData =
+        getSelectionData();
+
+      // 선택이 풀렸거나 선택된 텍스트가 없으면
+      // 모바일 하이라이트 버튼도 제거
+      if (!selectionData) {
+        if (
+          window.innerWidth < 768
+        ) {
+          setShowHighlightButton(false);
+          setSelectedTextForHighlight("");
+          setSelectedHighlightRange(null);
+        }
+
+        return;
+      }
+
+      // 모바일
+      if (
+        window.innerWidth < 768
+      ) {
+        setSelectedTextForHighlight(
+          selectionData.text
+        );
+
+        setSelectedHighlightRange({
+          startOffset:
+            selectionData.startOffset,
+          endOffset:
+            selectionData.endOffset,
+        });
+
+        setShowHighlightButton(true);
+
+        return;
+      }
+
+      // 데스크톱은 기존처럼
+      // 선택 즉시 저장
+      saveHighlight(
+        selectionData.text,
+        selectionData.startOffset,
+        selectionData.endOffset
+      );
+    }, 50);
   }
 
   async function savePendingHighlight() {
@@ -1580,14 +1585,6 @@ export default function DriveBrowser() {
         episode.episode
       );
     }
-  }
-
-  async function selectEpisodeFromSearch(
-    index: number
-  ) {
-    await changeEpisode(index);
-
-    setEpisodeSearch("");
   }
 
   useEffect(() => {
@@ -2108,6 +2105,7 @@ export default function DriveBrowser() {
           <>
             {/* 모바일 회차 선택 */}
             <div className="mb-5 md:hidden">
+              {/* 회차 검색 */}
               <div
                 className="flex items-center gap-2 rounded-[4px] px-3 py-2"
                 style={{
@@ -2155,100 +2153,99 @@ export default function DriveBrowser() {
                 )}
               </div>
 
-              {episodeSearch.trim() && (
-                <div
-                  className="mt-2 max-h-64 overflow-y-auto rounded-[4px]"
-                  style={{
-                    boxShadow: `0 0 0 0.5px ${theme.divider}`,
-                  }}
-                >
-                  {filteredEpisodes.length ===
-                  0 ? (
-                    <p
-                      className="px-4 py-5 text-center text-xs"
-                      style={{
-                        color:
-                          theme.muted,
-                      }}
-                    >
-                      검색 결과가 없습니다.
-                    </p>
-                  ) : (
-                    filteredEpisodes.map(
-                      (episode) => {
-                        const index =
-                          parsedNovel.episodes.indexOf(
-                            episode
-                          );
-
-                        const isSelected =
-                          index ===
-                          selectedEpisodeIndex;
-
-                        return (
-                          <button
-                            key={`${episode.startLine}-${index}`}
-                            onClick={() =>
-                              selectEpisodeFromSearch(
-                                index
-                              )
-                            }
-                            disabled={
-                              progressSaving
-                            }
-                            className="w-full border-b px-4 py-3 text-left last:border-b-0 disabled:opacity-50"
-                            style={{
-                              borderColor:
-                                theme.divider,
-                              backgroundColor:
-                                isSelected
-                                  ? `${theme.accent}10`
-                                  : "transparent",
-                            }}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span
-                                className="shrink-0 text-xs"
-                                style={{
-                                  color:
-                                    isSelected
-                                      ? theme.accent
-                                      : theme.muted,
-                                }}
-                              >
-                                {
-                                  episode.episode
-                                }
-                                화
-                              </span>
-
-                              <span
-                                className="min-w-0 truncate text-sm"
-                                style={{
-                                  fontFamily:
-                                    SERIF,
-                                  color:
-                                    isSelected
-                                      ? theme.title
-                                      : theme.text,
-                                  fontWeight:
-                                    isSelected
-                                      ? 500
-                                      : 400,
-                                }}
-                              >
-                                {
-                                  episode.title
-                                }
-                              </span>
-                            </div>
-                          </button>
+              {/* 모바일 회차 목록 */}
+              <div
+                className="mt-2 max-h-72 overflow-y-auto rounded-[4px]"
+                style={{
+                  boxShadow: `0 0 0 0.5px ${theme.divider}`,
+                }}
+              >
+                {filteredEpisodes.length ===
+                0 ? (
+                  <p
+                    className="px-4 py-5 text-center text-xs"
+                    style={{
+                      color:
+                        theme.muted,
+                    }}
+                  >
+                    검색 결과가 없습니다.
+                  </p>
+                ) : (
+                  filteredEpisodes.map(
+                    (episode) => {
+                      const index =
+                        parsedNovel.episodes.indexOf(
+                          episode
                         );
-                      }
-                    )
-                  )}
-                </div>
-              )}
+
+                      const isSelected =
+                        index ===
+                        selectedEpisodeIndex;
+
+                      return (
+                        <button
+                          key={`${episode.startLine}-${index}`}
+                          onClick={() =>
+                            changeEpisode(
+                              index
+                            )
+                          }
+                          disabled={
+                            progressSaving
+                          }
+                          className="w-full border-b px-4 py-3 text-left transition last:border-b-0 disabled:opacity-50"
+                          style={{
+                            borderColor:
+                              theme.divider,
+                            backgroundColor:
+                              isSelected
+                                ? `${theme.accent}10`
+                                : "transparent",
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span
+                              className="shrink-0 text-xs"
+                              style={{
+                                color:
+                                  isSelected
+                                    ? theme.accent
+                                    : theme.muted,
+                              }}
+                            >
+                              {
+                                episode.episode
+                              }
+                              화
+                            </span>
+
+                            <span
+                              className="min-w-0 truncate text-sm"
+                              style={{
+                                fontFamily:
+                                  SERIF,
+                                color:
+                                  isSelected
+                                    ? theme.title
+                                    : theme.text,
+                                fontWeight:
+                                  isSelected
+                                    ? 500
+                                    : 400,
+                              }}
+                            >
+                              {
+                                episode.title
+                              }
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    }
+                  )
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
@@ -2799,8 +2796,8 @@ export default function DriveBrowser() {
                           </div>
                         </div>
 
-                        {/* 본문 하단 이전 / 다음 */}
-                        <div className="mx-auto mt-10 flex max-w-2xl items-center justify-between">
+                        {/* 데스크톱 이전 / 다음만 표시 */}
+                        <div className="mx-auto mt-10 hidden max-w-2xl items-center justify-between md:flex">
                           <button
                             onClick={
                               goToPrevEpisode
@@ -2809,10 +2806,12 @@ export default function DriveBrowser() {
                               isFirstEpisode ||
                               progressSaving
                             }
-                            className="text-sm font-medium hover:opacity-70 disabled:opacity-30"
+                            className="rounded-[4px] px-4 py-2 text-sm font-medium transition hover:opacity-80 disabled:opacity-30"
                             style={{
+                              backgroundColor:
+                                theme.divider,
                               color:
-                                theme.muted,
+                                theme.title,
                             }}
                           >
                             ← 이전화
@@ -2826,10 +2825,12 @@ export default function DriveBrowser() {
                               isLastEpisode ||
                               progressSaving
                             }
-                            className="text-sm font-medium hover:opacity-70 disabled:opacity-30"
+                            className="rounded-[4px] px-4 py-2 text-sm font-medium transition hover:opacity-80 disabled:opacity-30"
                             style={{
+                              backgroundColor:
+                                theme.divider,
                               color:
-                                theme.muted,
+                                theme.title,
                             }}
                           >
                             다음화 →
@@ -2838,7 +2839,8 @@ export default function DriveBrowser() {
                       </div>
                     </div>
 
-                    {/* 모바일 이전 / 다음 */}
+                    {/* 모바일 이전 / 다음
+                        모바일에서는 이 한 세트만 표시 */}
                     <div className="mt-4 flex items-center justify-between gap-3 md:hidden">
                       <button
                         onClick={
@@ -2848,11 +2850,12 @@ export default function DriveBrowser() {
                           isFirstEpisode ||
                           progressSaving
                         }
-                        className="flex flex-1 items-center justify-center gap-1 rounded-[4px] px-3 py-3 text-sm font-medium disabled:opacity-30"
+                        className="flex flex-1 items-center justify-center gap-1 rounded-[4px] px-3 py-3 text-sm font-medium transition hover:opacity-80 disabled:opacity-30"
                         style={{
+                          backgroundColor:
+                            theme.divider,
                           color:
-                            theme.muted,
-                          boxShadow: `0 0 0 0.5px ${theme.divider}`,
+                            theme.title,
                         }}
                       >
                         <ChevronLeft className="h-4 w-4" />
@@ -2867,11 +2870,12 @@ export default function DriveBrowser() {
                           isLastEpisode ||
                           progressSaving
                         }
-                        className="flex flex-1 items-center justify-center gap-1 rounded-[4px] px-3 py-3 text-sm font-medium disabled:opacity-30"
+                        className="flex flex-1 items-center justify-center gap-1 rounded-[4px] px-3 py-3 text-sm font-medium transition hover:opacity-80 disabled:opacity-30"
                         style={{
+                          backgroundColor:
+                            theme.divider,
                           color:
-                            theme.muted,
-                          boxShadow: `0 0 0 0.5px ${theme.divider}`,
+                            theme.title,
                         }}
                       >
                         다음화
