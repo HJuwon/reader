@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     } = body;
 
     // --------------------------------------------------
-    // 기본값 검증
+    // 1. 기본값 검증
     // --------------------------------------------------
 
     if (!drive_file_id) {
@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     }
 
     // --------------------------------------------------
-    // 1. 기존 책 확인
+    // 2. 기존 책 확인
     // --------------------------------------------------
 
     const {
@@ -67,10 +67,7 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (findBookError) {
-      console.error(
-        "BOOK FIND ERROR:",
-        findBookError
-      );
+      console.error("BOOK FIND ERROR:", findBookError);
 
       return Response.json(
         { error: findBookError.message },
@@ -81,10 +78,22 @@ export async function POST(request: Request) {
     let book = existingBook;
 
     // --------------------------------------------------
-    // 2. 책이 없으면 생성
+    // 3. 책이 없으면 생성
     // --------------------------------------------------
 
     if (!book) {
+      // restart=true인데 책 자체가 없다면
+      // 정상적인 상황이 아니므로 오류 처리
+      if (restart) {
+        return Response.json(
+          {
+            error:
+              "다시 읽기를 시작할 책 정보를 찾을 수 없습니다.",
+          },
+          { status: 404 }
+        );
+      }
+
       const {
         data: newBook,
         error: bookInsertError,
@@ -118,12 +127,13 @@ export async function POST(request: Request) {
       book = newBook;
     } else {
       // --------------------------------------------------
-      // 2-1. 기존 책 정보만 최신화
+      // 3-1. 기존 책 정보만 최신화
       //
       // 중요:
-      // 여기서 status를 무조건 "읽는 중"으로 바꾸면 안 됨.
+      // 여기서는 status를 변경하지 않는다.
+      //
       // 완독 책을 단순히 다시 열었을 때
-      // "완독" 상태를 유지해야 함.
+      // "완독" 상태를 유지해야 하기 때문.
       // --------------------------------------------------
 
       const {
@@ -157,7 +167,7 @@ export async function POST(request: Request) {
     }
 
     // --------------------------------------------------
-    // 3. 기존 회차 조회
+    // 4. 기존 독서 회차 조회
     // --------------------------------------------------
 
     const {
@@ -185,10 +195,23 @@ export async function POST(request: Request) {
     let rounds = existingRounds ?? [];
 
     // --------------------------------------------------
-    // 4. 최초 독서
+    // 5. 최초 독서
+    //
+    // 중요:
+    // restart=true일 때는 여기서 1회차를 만들지 않는다.
+    //
+    // 정상적인 최초 진입:
+    // rounds = []
+    // restart = false
+    // → 1회차 생성
+    //
+    // 다시 읽기:
+    // rounds가 이미 존재
+    // restart = true
+    // → 아래 6번에서 다음 회차 생성
     // --------------------------------------------------
 
-    if (rounds.length === 0) {
+    if (rounds.length === 0 && !restart) {
       const {
         data: newRound,
         error: roundInsertError,
@@ -216,6 +239,7 @@ export async function POST(request: Request) {
       }
 
       const {
+        data: newProgress,
         error: progressInsertError,
       } = await supabase
         .from("reading_progress")
@@ -224,7 +248,9 @@ export async function POST(request: Request) {
           episode: 0,
           progress: 0,
           scroll_position: 0,
-        });
+        })
+        .select()
+        .single();
 
       if (progressInsertError) {
         console.error(
@@ -239,26 +265,84 @@ export async function POST(request: Request) {
       }
 
       rounds = [newRound];
+
+      // 최초 독서이므로 books 상태도 읽는 중으로 설정
+      const {
+        data: initialBook,
+        error: initialBookError,
+      } = await supabase
+        .from("books")
+        .update({
+          status: "읽는 중",
+          last_episode: 0,
+          progress: 0,
+          scroll_position: 0,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", book.id)
+        .eq("user_id", userId)
+        .eq("drive_file_id", drive_file_id)
+        .select()
+        .single();
+
+      if (initialBookError) {
+        console.error(
+          "INITIAL BOOK UPDATE ERROR:",
+          initialBookError
+        );
+
+        return Response.json(
+          { error: initialBookError.message },
+          { status: 500 }
+        );
+      }
+
+      book = initialBook;
+
+      return Response.json({
+        success: true,
+        data: {
+          book,
+          rounds,
+          current_round: newRound,
+          progress: newProgress,
+        },
+      });
     }
 
     // --------------------------------------------------
-    // 5. 다시 읽기
+    // 6. 다시 읽기
     //
-    // restart=true일 때만 새로운 회차 생성
+    // restart=true일 때만 실행된다.
     //
     // 예:
-    // 1회차 completed
-    // → 2회차 reading
     //
-    // 기존 회차는 절대 수정하지 않음.
+    // 1회차 completed
+    //       ↓
+    // 다시 읽기
+    //       ↓
+    // 2회차 reading
+    //
+    // 다시 완독
+    //       ↓
+    // 다시 읽기
+    //       ↓
+    // 3회차 reading
+    //
+    // 기존 completed 회차는 절대 수정하지 않는다.
     // --------------------------------------------------
 
     if (restart) {
-      const latestRound =
-        rounds[rounds.length - 1];
+      // ------------------------------------------------
+      // 혹시 마지막 회차가 이미 reading이면
+      // 새로운 회차를 중복 생성하지 않는다.
+      // ------------------------------------------------
 
-      // 이미 읽는 중인 회차가 있다면
-      // 새로운 회차를 만들지 않고 기존 회차 사용
+      const latestRound =
+        rounds.length > 0
+          ? rounds[rounds.length - 1]
+          : null;
+
       if (
         latestRound &&
         latestRound.status === "reading"
@@ -273,6 +357,11 @@ export async function POST(request: Request) {
           .maybeSingle();
 
         if (existingProgressError) {
+          console.error(
+            "EXISTING PROGRESS FIND ERROR:",
+            existingProgressError
+          );
+
           return Response.json(
             { error: existingProgressError.message },
             { status: 500 }
@@ -295,6 +384,11 @@ export async function POST(request: Request) {
           .single();
 
         if (readingBookError) {
+          console.error(
+            "READING BOOK UPDATE ERROR:",
+            readingBookError
+          );
+
           return Response.json(
             { error: readingBookError.message },
             { status: 500 }
@@ -318,14 +412,23 @@ export async function POST(request: Request) {
         });
       }
 
-      // 마지막 회차가 완독이면
-      // 다음 번호로 새 회차 생성
+      // ------------------------------------------------
+      // 마지막 회차가 completed라면
+      // 다음 회차 번호 생성
+      // ------------------------------------------------
+
       const nextRoundNumber =
-        Math.max(
-          ...rounds.map(
-            (round) => round.round
-          )
-        ) + 1;
+        rounds.length > 0
+          ? Math.max(
+              ...rounds.map(
+                (round) => round.round
+              )
+            ) + 1
+          : 1;
+
+      // ------------------------------------------------
+      // 새 회차 생성
+      // ------------------------------------------------
 
       const {
         data: newRound,
@@ -352,6 +455,10 @@ export async function POST(request: Request) {
           { status: 500 }
         );
       }
+
+      // ------------------------------------------------
+      // 새 회차 진행상황 생성
+      // ------------------------------------------------
 
       const {
         data: newProgress,
@@ -384,8 +491,12 @@ export async function POST(request: Request) {
         newRound,
       ];
 
-      // 새 회차가 시작됐으므로
-      // books의 현재 상태만 새 회차 기준으로 변경
+      // ------------------------------------------------
+      // books는 현재 읽고 있는 회차 기준으로 변경
+      //
+      // 기존 reading_rounds 데이터는 건드리지 않는다.
+      // ------------------------------------------------
+
       const {
         data: restartedBook,
         error: restartedBookError,
@@ -428,10 +539,22 @@ export async function POST(request: Request) {
     }
 
     // --------------------------------------------------
-    // 6. 일반적으로 책 열기
+    // 7. 일반적으로 책 열기
     //
-    // reading 회차가 있으면 그 회차를 계속 읽음.
-    // 없으면 마지막 completed 회차를 보여줌.
+    // reading 회차가 있으면 그 회차를 계속 읽는다.
+    //
+    // 예:
+    //
+    // 1회차 completed
+    // 2회차 reading
+    // → 2회차 사용
+    //
+    // 1회차 completed
+    // 2회차 completed
+    // → 2회차 사용
+    //
+    // 즉, 완독 책을 단순히 열었다고
+    // 새로운 회차가 자동 생성되지 않는다.
     // --------------------------------------------------
 
     const currentRound =
@@ -443,8 +566,18 @@ export async function POST(request: Request) {
         ) ??
       rounds[rounds.length - 1];
 
+    if (!currentRound) {
+      return Response.json(
+        {
+          error:
+            "현재 독서 회차를 찾을 수 없습니다.",
+        },
+        { status: 500 }
+      );
+    }
+
     // --------------------------------------------------
-    // 7. 현재 회차 진행상황 조회
+    // 8. 현재 회차 진행상황 조회
     // --------------------------------------------------
 
     const {
@@ -469,10 +602,14 @@ export async function POST(request: Request) {
     }
 
     // --------------------------------------------------
-    // 8. books 상태 동기화
+    // 9. books 상태 동기화
     //
-    // reading → 읽는 중
+    // reading   → 읽는 중
     // completed → 완독
+    //
+    // 중요:
+    // 여기서는 현재 회차의 상태만 반영한다.
+    // 과거 회차의 상태는 변경하지 않는다.
     // --------------------------------------------------
 
     const bookStatus =
@@ -510,7 +647,7 @@ export async function POST(request: Request) {
     book = finalBook;
 
     // --------------------------------------------------
-    // 9. 결과 반환
+    // 10. 결과 반환
     // --------------------------------------------------
 
     return Response.json({
@@ -519,12 +656,13 @@ export async function POST(request: Request) {
         book,
         rounds,
         current_round: currentRound,
-        progress: progress ?? {
-          round_id: currentRound.id,
-          episode: 0,
-          progress: 0,
-          scroll_position: 0,
-        },
+        progress:
+          progress ?? {
+            round_id: currentRound.id,
+            episode: 0,
+            progress: 0,
+            scroll_position: 0,
+          },
       },
     });
   } catch (error) {
