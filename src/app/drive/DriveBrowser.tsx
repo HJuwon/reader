@@ -198,12 +198,6 @@ export default function DriveBrowser() {
   const [bookId, setBookId] =
     useState<string | null>(null);
 
-  /*
-   * 현재 읽기 회차
-   *
-   * 1회차를 읽고 완독하면 round = 1, status = completed
-   * 다시 읽을 때 round = 2가 됨.
-   */
   const [roundId, setRoundId] =
     useState<string | null>(null);
 
@@ -264,9 +258,6 @@ export default function DriveBrowser() {
     useRef<ReturnType<typeof setTimeout> | null>(
       null
     );
-
-  const lastSavedEpisodeIndexRef =
-    useRef<number | null>(null);
 
   const restoreScrollPositionRef =
     useRef(0);
@@ -447,14 +438,7 @@ export default function DriveBrowser() {
   }
 
   /*
-   * 책을 열 때 현재 읽기 회차를 가져온다.
-   *
-   * POST /api/books
-   *
-   * - books에 책이 없으면 책 생성
-   * - reading_rounds 1회차 생성
-   * - reading_progress 생성
-   * - 이미 존재하면 현재 reading 회차 반환
+   * 책을 열 때 읽기 상태 초기화/조회
    */
   async function initializeReadingState(
     fileId: string,
@@ -493,25 +477,35 @@ export default function DriveBrowser() {
         );
       }
 
+      const stateData =
+        data?.data;
+
       /*
-       * API가 아래 구조로 반환하는 것을 기준으로 한다.
-       *
-       * {
-       *   data: {
-       *     book,
-       *     round,
-       *     progress
-       *   }
-       * }
+       * API에서 round 또는 current_round
+       * 어느 이름으로 반환하더라도 처리
        */
-      const state =
-        data.data as ReadingState;
+      const round =
+        stateData?.round ??
+        stateData?.current_round;
+
+      const state: ReadingState = {
+        book:
+          stateData?.book,
+        round,
+        progress:
+          stateData?.progress,
+      };
 
       if (
-        !state?.book ||
-        !state?.round ||
-        !state?.progress
+        !state.book ||
+        !state.round ||
+        !state.progress
       ) {
+        console.error(
+          "읽기 상태 응답:",
+          data
+        );
+
         throw new Error(
           "읽기 정보 응답 형식이 올바르지 않습니다."
         );
@@ -909,10 +903,7 @@ export default function DriveBrowser() {
   ]);
 
   /*
-   * 현재 회차의 진행상황 저장
-   *
-   * 이제 books가 아니라
-   * reading_progress를 업데이트한다.
+   * 현재 위치 저장
    */
   async function saveScrollPosition(
     position?: number
@@ -965,6 +956,8 @@ export default function DriveBrowser() {
                 "application/json",
             },
             body: JSON.stringify({
+              drive_file_id:
+                selectedFile.id,
               round_id:
                 roundId,
               episode:
@@ -991,18 +984,11 @@ export default function DriveBrowser() {
         );
       }
 
-      if (isCompleted) {
-        setRoundStatus(
-          "completed"
-        );
-      } else {
-        setRoundStatus(
-          "reading"
-        );
-      }
-
-      lastSavedEpisodeIndexRef.current =
-        selectedEpisodeIndex;
+      setRoundStatus(
+        isCompleted
+          ? "completed"
+          : "reading"
+      );
     } catch (error) {
       console.error(
         "스크롤 위치 저장 실패:",
@@ -1011,6 +997,9 @@ export default function DriveBrowser() {
     }
   }
 
+  /*
+   * 스크롤 감지 → 1초 후 저장
+   */
   useEffect(() => {
     if (
       !selectedFile ||
@@ -1074,12 +1063,6 @@ export default function DriveBrowser() {
 
   /*
    * 브라우저 종료 시 마지막 위치 저장
-   *
-   * sendBeacon은 POST이므로
-   * /api/books POST가 progress 저장 payload도
-   * 처리할 수 있어야 한다.
-   *
-   * 안정성을 위해 여기서는 fetch keepalive를 사용한다.
    */
   useEffect(() => {
     function handleBeforeUnload() {
@@ -1118,6 +1101,8 @@ export default function DriveBrowser() {
         totalEpisodes - 1;
 
       const payload = JSON.stringify({
+        drive_file_id:
+          selectedFile.id,
         round_id:
           roundId,
         episode:
@@ -1531,16 +1516,26 @@ export default function DriveBrowser() {
   }
 
   /*
-   * 현재 회차의 특정 회차 진행상황 저장
+   * 특정 회차의 진행상황 저장
+   *
+   * targetRoundId를 받을 수 있도록 수정.
+   *
+   * 최초 소설 진입 시 React의 roundId state가
+   * 아직 갱신되지 않은 상태에서도
+   * API에서 받은 round.id를 직접 전달해서 저장할 수 있다.
    */
   async function saveProgress(
     episodeIndex: number,
-    scrollPosition = 0
+    scrollPosition = 0,
+    targetRoundId?: string
   ) {
+    const activeRoundId =
+      targetRoundId ?? roundId;
+
     if (
       !selectedFile ||
       !parsedNovel ||
-      !roundId
+      !activeRoundId
     ) {
       return false;
     }
@@ -1591,8 +1586,10 @@ export default function DriveBrowser() {
                 "application/json",
             },
             body: JSON.stringify({
+              drive_file_id:
+                selectedFile.id,
               round_id:
-                roundId,
+                activeRoundId,
               episode:
                 episode.episode,
               progress,
@@ -1627,9 +1624,6 @@ export default function DriveBrowser() {
           ? "completed"
           : "reading"
       );
-
-      lastSavedEpisodeIndexRef.current =
-        episodeIndex;
 
       return true;
     } catch (error) {
@@ -1680,7 +1674,7 @@ export default function DriveBrowser() {
       );
 
     /*
-     * 이전 회차 위치 저장
+     * 이전 회차 저장
      */
     await saveProgress(
       selectedEpisodeIndex,
@@ -1829,17 +1823,7 @@ export default function DriveBrowser() {
         setParsedNovel(parsed);
 
         /*
-         * ==========================================
-         * 핵심 변경
-         * ==========================================
-         *
-         * 기존:
-         * GET /api/books
-         * → books.last_episode 사용
-         *
-         * 변경:
-         * POST /api/books
-         * → 현재 reading_round + reading_progress
+         * 읽기 상태 가져오기
          */
         const readingState =
           await initializeReadingState(
@@ -1868,8 +1852,7 @@ export default function DriveBrowser() {
         }
 
         /*
-         * URL에 특정 회차가 있으면
-         * 그 회차를 우선한다.
+         * URL에 회차가 있으면 해당 회차 우선
          */
         if (
           targetEpisode !== null &&
@@ -1890,11 +1873,6 @@ export default function DriveBrowser() {
             initialEpisodeIndex =
               targetIndex;
 
-            /*
-             * 현재 저장된 회차와
-             * URL 회차가 같으면
-             * 저장된 스크롤 위치 복원
-             */
             if (
               savedProgress.episode ===
                 targetEpisode &&
@@ -1911,8 +1889,7 @@ export default function DriveBrowser() {
           }
         } else {
           /*
-           * 저장된 reading_progress의
-           * episode를 찾아서 복원
+           * 저장된 episode 복원
            */
           const savedIndex =
             parsed.episodes.findIndex(
@@ -1967,8 +1944,11 @@ export default function DriveBrowser() {
         }
 
         /*
-         * 신규 reading_progress가 0화인 경우
-         * 현재 회차를 기준으로 최초 상태 저장
+         * 중요
+         *
+         * 신규 reading_progress가 0이면
+         * state의 roundId가 갱신되기를 기다리지 않고
+         * API에서 받은 readingState.round.id를 직접 전달한다.
          */
         if (
           savedProgress.episode ===
@@ -1981,7 +1961,8 @@ export default function DriveBrowser() {
 
           await saveProgress(
             initialEpisodeIndex,
-            0
+            0,
+            readingState.round.id
           );
         }
       } catch (error) {
@@ -2289,7 +2270,6 @@ export default function DriveBrowser() {
           </div>
         ) : (
           <>
-            {/* 모바일 회차 선택 */}
             <div className="mb-5 md:hidden">
               <button
                 type="button"
@@ -2510,7 +2490,6 @@ export default function DriveBrowser() {
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
-              {/* 데스크톱 회차 목록 */}
               <aside className="hidden md:block">
                 <div className="sticky top-8">
                   <div
@@ -2658,7 +2637,6 @@ export default function DriveBrowser() {
                 </div>
               </aside>
 
-              {/* 본문 */}
               <article>
                 {selectedEpisode ? (
                   <>
@@ -2729,7 +2707,6 @@ export default function DriveBrowser() {
                           </button>
                         </div>
 
-                        {/* 본문 검색 */}
                         <div className="mt-5">
                           {!bodySearchOpen ? (
                             <button
@@ -3057,7 +3034,6 @@ export default function DriveBrowser() {
                           </div>
                         </div>
 
-                        {/* 데스크톱 이전 / 다음 */}
                         <div className="mx-auto mt-10 hidden max-w-2xl items-center justify-between md:flex">
                           <button
                             onClick={
@@ -3100,7 +3076,6 @@ export default function DriveBrowser() {
                       </div>
                     </div>
 
-                    {/* 모바일 이전 / 다음 */}
                     <div className="mt-4 flex items-center justify-between gap-3 md:hidden">
                       <button
                         onClick={
@@ -3160,7 +3135,6 @@ export default function DriveBrowser() {
         )}
       </section>
 
-      {/* 모바일 하이라이트 버튼 */}
       {showHighlightButton &&
         selectedTextForHighlight && (
           <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 md:hidden">
@@ -3192,7 +3166,6 @@ export default function DriveBrowser() {
           </div>
         )}
 
-      {/* 읽기 설정 */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
         {settingsOpen && (
           <div
