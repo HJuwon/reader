@@ -1827,7 +1827,7 @@ export default function DriveBrowser() {
          */
         const readingState =
           await initializeReadingState(
-            fileId,
+            fileId!,
             infoData.name,
             parsed.episodes.length
           );
