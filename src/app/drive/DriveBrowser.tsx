@@ -13,8 +13,10 @@ import type { ReactNode } from "react";
 import {
   ArrowLeft,
   Bookmark,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Loader2,
   Search,
   Settings,
@@ -187,6 +189,10 @@ export default function DriveBrowser() {
   const [episodeSearch, setEpisodeSearch] =
     useState("");
 
+  // 모바일 회차 목록 열림/닫힘
+  const [episodeListOpen, setEpisodeListOpen] =
+    useState(false);
+
   // 본문 검색
   const [bodySearch, setBodySearch] =
     useState("");
@@ -229,6 +235,10 @@ export default function DriveBrowser() {
     useRef(false);
 
   const contentRef =
+    useRef<HTMLDivElement | null>(null);
+
+  // 모바일 회차 목록 스크롤 영역
+  const mobileEpisodeListRef =
     useRef<HTMLDivElement | null>(null);
 
   const theme = THEMES[themeKey];
@@ -337,6 +347,40 @@ export default function DriveBrowser() {
     setSelectedHighlightRange(null);
   }, [
     selectedEpisodeIndex,
+  ]);
+
+  // 모바일 회차 목록을 열었을 때
+  // 현재 회차가 보이도록 자동 스크롤
+  useEffect(() => {
+    if (
+      !episodeListOpen ||
+      !mobileEpisodeListRef.current ||
+      !parsedNovel
+    ) {
+      return;
+    }
+
+    const selectedButton =
+      mobileEpisodeListRef.current.querySelector(
+        `[data-episode-index="${selectedEpisodeIndex}"]`
+      ) as HTMLElement | null;
+
+    if (!selectedButton) {
+      return;
+    }
+
+    window.setTimeout(() => {
+      selectedButton.scrollIntoView({
+        block: "nearest",
+        behavior: "auto",
+      });
+    }, 0);
+  }, [
+    episodeListOpen,
+    selectedEpisodeIndex,
+    episodeSearch,
+    filteredEpisodes.length,
+    parsedNovel,
   ]);
 
   function extractErrorMessage(
@@ -1343,8 +1387,6 @@ export default function DriveBrowser() {
       const selectionData =
         getSelectionData();
 
-      // 선택이 풀렸거나 선택된 텍스트가 없으면
-      // 모바일 하이라이트 버튼도 제거
       if (!selectionData) {
         if (
           window.innerWidth < 768
@@ -1534,6 +1576,9 @@ export default function DriveBrowser() {
       index ===
       selectedEpisodeIndex
     ) {
+      // 현재 회차를 다시 누른 경우에도
+      // 모바일 목록은 닫는다.
+      setEpisodeListOpen(false);
       return;
     }
 
@@ -1553,6 +1598,9 @@ export default function DriveBrowser() {
     setSelectedEpisodeIndex(
       index
     );
+
+    // 회차를 선택하면 모바일 목록 닫기
+    setEpisodeListOpen(false);
 
     restoreScrollPositionRef.current =
       0;
@@ -2105,147 +2153,226 @@ export default function DriveBrowser() {
           <>
             {/* 모바일 회차 선택 */}
             <div className="mb-5 md:hidden">
-              {/* 회차 검색 */}
-              <div
-                className="flex items-center gap-2 rounded-[4px] px-3 py-2"
-                style={{
-                  boxShadow: `0 0 0 0.5px ${theme.divider}`,
-                }}
-              >
-                <Search
-                  className="h-4 w-4 shrink-0"
-                  style={{
-                    color:
-                      theme.muted,
-                  }}
-                />
-
-                <input
-                  type="text"
-                  value={episodeSearch}
-                  onChange={(e) =>
-                    setEpisodeSearch(
-                      e.target.value
-                    )
-                  }
-                  placeholder="회차 검색"
-                  className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-                  style={{
-                    color:
-                      theme.title,
-                  }}
-                />
-
-                {episodeSearch && (
-                  <button
-                    onClick={() =>
-                      setEpisodeSearch("")
-                    }
-                    className="shrink-0"
-                    style={{
-                      color:
-                        theme.muted,
-                    }}
-                    aria-label="회차 검색어 지우기"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-
-              {/* 모바일 회차 목록 */}
-              <div
-                className="mt-2 max-h-72 overflow-y-auto rounded-[4px]"
-                style={{
-                  boxShadow: `0 0 0 0.5px ${theme.divider}`,
-                }}
-              >
-                {filteredEpisodes.length ===
-                0 ? (
-                  <p
-                    className="px-4 py-5 text-center text-xs"
-                    style={{
-                      color:
-                        theme.muted,
-                    }}
-                  >
-                    검색 결과가 없습니다.
-                  </p>
-                ) : (
-                  filteredEpisodes.map(
-                    (episode) => {
-                      const index =
-                        parsedNovel.episodes.indexOf(
-                          episode
-                        );
-
-                      const isSelected =
-                        index ===
-                        selectedEpisodeIndex;
-
-                      return (
-                        <button
-                          key={`${episode.startLine}-${index}`}
-                          onClick={() =>
-                            changeEpisode(
-                              index
-                            )
-                          }
-                          disabled={
-                            progressSaving
-                          }
-                          className="w-full border-b px-4 py-3 text-left transition last:border-b-0 disabled:opacity-50"
-                          style={{
-                            borderColor:
-                              theme.divider,
-                            backgroundColor:
-                              isSelected
-                                ? `${theme.accent}10`
-                                : "transparent",
-                          }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span
-                              className="shrink-0 text-xs"
-                              style={{
-                                color:
-                                  isSelected
-                                    ? theme.accent
-                                    : theme.muted,
-                              }}
-                            >
-                              {
-                                episode.episode
-                              }
-                              화
-                            </span>
-
-                            <span
-                              className="min-w-0 truncate text-sm"
-                              style={{
-                                fontFamily:
-                                  SERIF,
-                                color:
-                                  isSelected
-                                    ? theme.title
-                                    : theme.text,
-                                fontWeight:
-                                  isSelected
-                                    ? 500
-                                    : 400,
-                              }}
-                            >
-                              {
-                                episode.title
-                              }
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    }
+              {/* 접혀 있을 때: 한 줄만 표시 */}
+              <button
+                type="button"
+                onClick={() =>
+                  setEpisodeListOpen(
+                    (open) => !open
                   )
+                }
+                className="flex w-full items-center justify-between rounded-[4px] px-4 py-3 text-left transition hover:opacity-80"
+                style={{
+                  backgroundColor:
+                    theme.bg,
+                  boxShadow: `0 0 0 0.5px ${theme.divider}`,
+                }}
+                aria-expanded={
+                  episodeListOpen
+                }
+                aria-label="회차 목록 열기"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <span
+                    className="shrink-0 text-xs"
+                    style={{
+                      color:
+                        theme.accent,
+                    }}
+                  >
+                    회차 목록
+                  </span>
+
+                  {selectedEpisode && (
+                    <span
+                      className="min-w-0 truncate text-sm"
+                      style={{
+                        fontFamily:
+                          SERIF,
+                        color:
+                          theme.title,
+                      }}
+                    >
+                      {selectedEpisode.episode}화
+                      {" · "}
+                      {selectedEpisode.title}
+                    </span>
+                  )}
+                </div>
+
+                {episodeListOpen ? (
+                  <ChevronUp
+                    className="ml-3 h-4 w-4 shrink-0"
+                    style={{
+                      color:
+                        theme.muted,
+                    }}
+                  />
+                ) : (
+                  <ChevronDown
+                    className="ml-3 h-4 w-4 shrink-0"
+                    style={{
+                      color:
+                        theme.muted,
+                    }}
+                  />
                 )}
-              </div>
+              </button>
+
+              {/* 펼쳐졌을 때 */}
+              {episodeListOpen && (
+                <div
+                  className="mt-2 overflow-hidden rounded-[4px]"
+                  style={{
+                    boxShadow: `0 0 0 0.5px ${theme.divider}`,
+                  }}
+                >
+                  {/* 회차 검색 */}
+                  <div
+                    className="flex items-center gap-2 px-3 py-2.5"
+                    style={{
+                      borderBottom: `0.5px solid ${theme.divider}`,
+                    }}
+                  >
+                    <Search
+                      className="h-4 w-4 shrink-0"
+                      style={{
+                        color:
+                          theme.muted,
+                      }}
+                    />
+
+                    <input
+                      type="text"
+                      value={episodeSearch}
+                      onChange={(e) =>
+                        setEpisodeSearch(
+                          e.target.value
+                        )
+                      }
+                      placeholder="회차 검색"
+                      className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+                      style={{
+                        color:
+                          theme.title,
+                      }}
+                    />
+
+                    {episodeSearch && (
+                      <button
+                        onClick={() =>
+                          setEpisodeSearch("")
+                        }
+                        className="shrink-0"
+                        style={{
+                          color:
+                            theme.muted,
+                        }}
+                        aria-label="회차 검색어 지우기"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* 스크롤 가능한 회차 목록 */}
+                  <div
+                    ref={
+                      mobileEpisodeListRef
+                    }
+                    className="max-h-72 overflow-y-auto"
+                  >
+                    {filteredEpisodes.length ===
+                    0 ? (
+                      <p
+                        className="px-4 py-5 text-center text-xs"
+                        style={{
+                          color:
+                            theme.muted,
+                        }}
+                      >
+                        검색 결과가 없습니다.
+                      </p>
+                    ) : (
+                      filteredEpisodes.map(
+                        (episode) => {
+                          const index =
+                            parsedNovel.episodes.indexOf(
+                              episode
+                            );
+
+                          const isSelected =
+                            index ===
+                            selectedEpisodeIndex;
+
+                          return (
+                            <button
+                              key={`${episode.startLine}-${index}`}
+                              data-episode-index={
+                                index
+                              }
+                              onClick={() =>
+                                changeEpisode(
+                                  index
+                                )
+                              }
+                              disabled={
+                                progressSaving
+                              }
+                              className="w-full border-b px-4 py-3 text-left transition last:border-b-0 disabled:opacity-50"
+                              style={{
+                                borderColor:
+                                  theme.divider,
+                                backgroundColor:
+                                  isSelected
+                                    ? `${theme.accent}10`
+                                    : "transparent",
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="shrink-0 text-xs"
+                                  style={{
+                                    color:
+                                      isSelected
+                                        ? theme.accent
+                                        : theme.muted,
+                                  }}
+                                >
+                                  {
+                                    episode.episode
+                                  }
+                                  화
+                                </span>
+
+                                <span
+                                  className="min-w-0 truncate text-sm"
+                                  style={{
+                                    fontFamily:
+                                      SERIF,
+                                    color:
+                                      isSelected
+                                        ? theme.title
+                                        : theme.text,
+                                    fontWeight:
+                                      isSelected
+                                        ? 500
+                                        : 400,
+                                  }}
+                                >
+                                  {
+                                    episode.title
+                                  }
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        }
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
@@ -2796,7 +2923,7 @@ export default function DriveBrowser() {
                           </div>
                         </div>
 
-                        {/* 데스크톱 이전 / 다음만 표시 */}
+                        {/* 데스크톱 이전 / 다음 */}
                         <div className="mx-auto mt-10 hidden max-w-2xl items-center justify-between md:flex">
                           <button
                             onClick={
@@ -2839,8 +2966,7 @@ export default function DriveBrowser() {
                       </div>
                     </div>
 
-                    {/* 모바일 이전 / 다음
-                        모바일에서는 이 한 세트만 표시 */}
+                    {/* 모바일 이전 / 다음 */}
                     <div className="mt-4 flex items-center justify-between gap-3 md:hidden">
                       <button
                         onClick={
