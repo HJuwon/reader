@@ -241,11 +241,13 @@ export default function Home() {
                         </div>
 
                         {/* 상태를 아이콘 아래에 배치 */}
+
                         <span
-                          className={`mt-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[book.status]}`}
+                         className={`mt-1.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[book.status]}`}
                         >
-                          {book.status}
-                        </span>
+                         {book.status}
+                       </span>
+                        
                       </div>
 
                       {/* 제목 */}
