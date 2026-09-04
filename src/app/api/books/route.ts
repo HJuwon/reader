@@ -407,6 +407,16 @@ export async function POST(
         );
       }
 
+      if (!newBook) {
+        return Response.json(
+          {
+            error:
+              "책 정보를 생성했지만 책 데이터를 가져오지 못했습니다.",
+          },
+          { status: 500 }
+        );
+      }
+
       book = newBook;
     } else {
       // ------------------------------------------------
@@ -446,12 +456,36 @@ export async function POST(
         );
       }
 
+      if (!updatedBook) {
+        return Response.json(
+          {
+            error:
+              "책 정보를 업데이트했지만 책 데이터를 가져오지 못했습니다.",
+          },
+          { status: 500 }
+        );
+      }
+
       book = updatedBook;
     }
 
     // --------------------------------------------------
-    // 4. 기존 회차 조회
+    // TypeScript null narrowing 보장
     // --------------------------------------------------
+
+    if (!book) {
+      return Response.json(
+        {
+          error:
+            "책 정보를 확인할 수 없습니다.",
+        },
+        { status: 500 }
+      );
+    }
+
+    // ==================================================
+    // 4. 기존 회차 조회
+    // ==================================================
 
     const {
       data: existingRounds,
@@ -522,6 +556,16 @@ export async function POST(
         );
       }
 
+      if (!newRound) {
+        return Response.json(
+          {
+            error:
+              "독서 회차를 생성했지만 회차 데이터를 가져오지 못했습니다.",
+          },
+          { status: 500 }
+        );
+      }
+
       const {
         data: newProgress,
         error:
@@ -547,6 +591,16 @@ export async function POST(
           {
             error:
               progressInsertError.message,
+          },
+          { status: 500 }
+        );
+      }
+
+      if (!newProgress) {
+        return Response.json(
+          {
+            error:
+              "독서 진행상황을 생성했지만 데이터를 가져오지 못했습니다.",
           },
           { status: 500 }
         );
@@ -654,6 +708,16 @@ export async function POST(
           );
         }
 
+        if (!bookResult.data) {
+          return Response.json(
+            {
+              error:
+                "책 상태를 업데이트했지만 데이터를 가져오지 못했습니다.",
+            },
+            { status: 500 }
+          );
+        }
+
         return Response.json({
           success: true,
           data: {
@@ -720,6 +784,16 @@ export async function POST(
         );
       }
 
+      if (!newRound) {
+        return Response.json(
+          {
+            error:
+              "새 독서 회차를 생성했지만 회차 데이터를 가져오지 못했습니다.",
+          },
+          { status: 500 }
+        );
+      }
+
       // ------------------------------------------------
       // 진행상황 + books 업데이트 병렬 처리
       // ------------------------------------------------
@@ -780,6 +854,16 @@ export async function POST(
         );
       }
 
+      if (!progressResult.data) {
+        return Response.json(
+          {
+            error:
+              "진행상황을 생성했지만 데이터를 가져오지 못했습니다.",
+          },
+          { status: 500 }
+        );
+      }
+
       if (bookResult.error) {
         console.error(
           "RESTART BOOK UPDATE ERROR:",
@@ -790,6 +874,16 @@ export async function POST(
           {
             error:
               bookResult.error.message,
+          },
+          { status: 500 }
+        );
+      }
+
+      if (!bookResult.data) {
+        return Response.json(
+          {
+            error:
+              "책 상태를 업데이트했지만 데이터를 가져오지 못했습니다.",
           },
           { status: 500 }
         );
@@ -875,9 +969,6 @@ export async function POST(
 
     // --------------------------------------------------
     // 9. 결과 반환
-    //
-    // 일반적으로 책을 열 때마다 books를 UPDATE하지 않는다.
-    // 회차 상태가 실제 독서 상태를 관리한다.
     // --------------------------------------------------
 
     return Response.json({
@@ -1007,7 +1098,7 @@ export async function PATCH(
     // --------------------------------------------------
 
     const {
-      data: book,
+      data: foundBook,
       error: bookError,
     } = await supabase
       .from("books")
@@ -1033,7 +1124,7 @@ export async function PATCH(
       );
     }
 
-    if (!book) {
+    if (!foundBook) {
       return Response.json(
         {
           error:
@@ -1042,6 +1133,9 @@ export async function PATCH(
         { status: 404 }
       );
     }
+
+    // null이 아님을 TypeScript에 명확하게 전달
+    const book = foundBook;
 
     // --------------------------------------------------
     // 3. 회차 조회
@@ -1199,6 +1293,16 @@ export async function PATCH(
       );
     }
 
+    if (!savedProgress) {
+      return Response.json(
+        {
+          error:
+            "진행상황을 저장했지만 저장된 데이터를 가져오지 못했습니다.",
+        },
+        { status: 500 }
+      );
+    }
+
     // --------------------------------------------------
     // 6. 회차 상태 변경
     // --------------------------------------------------
@@ -1249,6 +1353,16 @@ export async function PATCH(
         );
       }
 
+      if (!completedRound) {
+        return Response.json(
+          {
+            error:
+              "회차를 완독 처리했지만 데이터를 가져오지 못했습니다.",
+          },
+          { status: 500 }
+        );
+      }
+
       updatedRound =
         completedRound;
     }
@@ -1292,6 +1406,16 @@ export async function PATCH(
         {
           error:
             updatedBookError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    if (!updatedBook) {
+      return Response.json(
+        {
+          error:
+            "책 정보를 업데이트했지만 데이터를 가져오지 못했습니다.",
         },
         { status: 500 }
       );
