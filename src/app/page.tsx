@@ -127,7 +127,6 @@ export default function Home() {
   }, [books, filter, search]);
 
   // 최근 읽은 소설
-  // 진행률이 0보다 크고 100보다 작은 소설만 표시
   const recentBooks = useMemo(() => {
     return [...books]
       .filter(
@@ -157,7 +156,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5 sm:px-6">
           <div className="flex items-center gap-2">
             <BookOpen
-              className="h-4.5 w-4.5 text-gray-900"
+              className="h-4 w-4 text-gray-900"
               strokeWidth={1.75}
             />
 
@@ -238,7 +237,7 @@ export default function Home() {
                     className="block rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5"
                   >
                     <div className="flex items-start gap-3">
-                      {/* 작은 아이콘 */}
+                      {/* 아이콘 */}
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100">
                         <BookOpen
                           className="h-4 w-4 text-gray-400"
@@ -251,13 +250,12 @@ export default function Home() {
                           {book.title}
                         </h4>
 
-                        <p className="mt-1.5 text-xs text-gray-400">
+                        <p className="mt-1 text-xs text-gray-400">
                           Google Drive
                         </p>
 
-                        {/* 상태를 제목 아래로 이동 */}
                         <span
-                          className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${statusStyle[book.status]}`}
+                          className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium sm:text-[11px] ${statusStyle[book.status]}`}
                         >
                           {book.status}
                         </span>
@@ -375,7 +373,7 @@ export default function Home() {
             </p>
           )}
 
-          {/* 소설 목록 - 내부 스크롤 */}
+          {/* 소설 목록 */}
           <div className="mt-3 overflow-hidden rounded-2xl border bg-white sm:mt-4">
             {loading ? (
               <div className="px-5 py-10 text-center text-sm text-gray-400 sm:px-6 sm:py-12">
@@ -396,35 +394,37 @@ export default function Home() {
                 {filteredBooks.map((book, index) => (
                   <div
                     key={book.id}
-                    className={`flex items-center gap-3 px-4 py-3.5 transition hover:bg-gray-50 sm:gap-4 sm:px-5 sm:py-4 ${
+                    className={`flex items-start gap-3 px-4 py-3.5 transition hover:bg-gray-50 sm:gap-4 sm:px-5 sm:py-4 ${
                       index !==
                       filteredBooks.length - 1
                         ? "border-b"
                         : ""
                     }`}
                   >
-                    {/* 아이콘 축소 */}
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 sm:h-10 sm:w-10">
-                      <BookOpen
-                        className="h-4 w-4 text-gray-400 sm:h-4.5 sm:w-4.5"
-                        strokeWidth={1.75}
-                      />
+                    {/* 왼쪽 아이콘 영역 */}
+                    <div className="flex w-10 shrink-0 flex-col items-center sm:w-11">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 sm:h-10 sm:w-10">
+                        <BookOpen
+                          className="h-4 w-4 text-gray-400 sm:h-4.5 sm:w-4.5"
+                          strokeWidth={1.75}
+                        />
+                      </div>
+
+                      {/* 상태를 아이콘 아래에 배치 */}
+                      <span
+                        className={`mt-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[book.status]}`}
+                      >
+                        {book.status}
+                      </span>
                     </div>
 
-                    {/* 제목 + 상태 + 회차 */}
+                    {/* 제목 + 회차 + 진행률 */}
                     <div className="min-w-0 flex-1">
                       <h4 className="line-clamp-2 text-sm font-medium leading-5 sm:text-[15px]">
                         {book.title}
                       </h4>
 
-                      {/* 상태를 제목 밑으로 이동 */}
                       <div className="mt-1.5 flex items-center gap-2">
-                        <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium sm:text-[11px] ${statusStyle[book.status]}`}
-                        >
-                          {book.status}
-                        </span>
-
                         <span className="text-xs text-gray-400">
                           {book.last_episode > 0
                             ? `${book.last_episode}화`
@@ -491,7 +491,7 @@ export default function Home() {
           className="fixed bottom-20 right-5 z-20 flex h-10 w-10 items-center justify-center rounded-full border bg-white text-gray-600 shadow-md transition hover:bg-gray-50 hover:text-gray-900 sm:bottom-24 sm:right-8 sm:h-11 sm:w-11"
         >
           <ArrowUp
-            className="h-4.5 w-4.5 sm:h-5 sm:w-5"
+            className="h-4 w-4 sm:h-5 sm:w-5"
             strokeWidth={1.75}
           />
         </button>
@@ -502,7 +502,7 @@ export default function Home() {
         <div className="mx-auto flex max-w-2xl items-center justify-around px-4 py-2.5 sm:py-3">
           <button className="flex flex-col items-center gap-1 text-xs font-medium text-gray-900 sm:text-sm">
             <BookOpen
-              className="h-4.5 w-4.5 sm:h-5 sm:w-5"
+              className="h-4 w-4 sm:h-5 sm:w-5"
               strokeWidth={1.75}
             />
 
@@ -514,7 +514,7 @@ export default function Home() {
             className="flex flex-col items-center gap-1 text-xs text-gray-400 transition hover:text-gray-900 sm:text-sm"
           >
             <Bookmark
-              className="h-4.5 w-4.5 sm:h-5 sm:w-5"
+              className="h-4 w-4 sm:h-5 sm:w-5"
               strokeWidth={1.75}
             />
 
@@ -526,7 +526,7 @@ export default function Home() {
             className="flex flex-col items-center gap-1 text-xs text-gray-400 transition hover:text-gray-900 sm:text-sm"
           >
             <Highlighter
-              className="h-4.5 w-4.5 sm:h-5 sm:w-5"
+              className="h-4 w-4 sm:h-5 sm:w-5"
               strokeWidth={1.75}
             />
 
@@ -538,7 +538,7 @@ export default function Home() {
             className="flex flex-col items-center gap-1 text-xs text-gray-400 transition hover:text-gray-900 sm:text-sm"
           >
             <History
-              className="h-4.5 w-4.5 sm:h-5 sm:w-5"
+              className="h-4 w-4 sm:h-5 sm:w-5"
               strokeWidth={1.75}
             />
 
