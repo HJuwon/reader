@@ -1000,8 +1000,6 @@ export default function DriveBrowser() {
       return;
     }
 
-    const activeRoundId = roundId;
-
     function handleScroll() {
       const position =
         window.scrollY;
@@ -1737,7 +1735,15 @@ export default function DriveBrowser() {
         window.location.search
       );
 
-    const fileId =
+    /*
+     * URLSearchParams.get()은
+     * string | null을 반환한다.
+     *
+     * 먼저 별도의 변수로 받아서
+     * 존재 여부를 확인한 후,
+     * 이후에는 명확한 string 타입으로 사용한다.
+     */
+    const fileIdParam =
       params.get("fileId");
 
     const episodeParam =
@@ -1748,13 +1754,20 @@ export default function DriveBrowser() {
         ? Number(episodeParam)
         : null;
 
-    if (!fileId) {
+    if (!fileIdParam) {
       setLoading(false);
       setError(
         "파일을 찾을 수 없습니다."
       );
       return;
     }
+
+    /*
+     * 위의 if문을 통과했으므로
+     * 여기부터 fileId는 string이다.
+     */
+    const fileId: string =
+      fileIdParam;
 
     let cancelled = false;
 
@@ -1827,7 +1840,8 @@ export default function DriveBrowser() {
             infoData.mimeType,
           modifiedTime:
             infoData.modifiedTime,
-          size: infoData.size,
+          size:
+            infoData.size,
         };
 
         setSelectedFile(item);
