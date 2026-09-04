@@ -33,15 +33,25 @@ const KOREAN_NUMBERS: Record<string, number> = {
 };
 
 function normalizeText(text: string): string {
-  return text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n").replace(/[ \t]+$/gm, "").trim();
+  return text
+    .replace(/^\uFEFF/, "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]+$/gm, "")
+    .trim();
 }
 
 function normalizeLine(line: string): string {
-  return line.replace(/\uFEFF/g, "").replace(/[ \t]+/g, " ").trim();
+  return line
+    .replace(/\uFEFF/g, "")
+    .replace(/[ \t]+/g, " ")
+    .trim();
 }
 
 function parseKoreanNumber(value: string): number | null {
-  const text = value.replace(/\s+/g, "").replace(/[화장편회차]/g, "");
+  const text = value
+    .replace(/\s+/g, "")
+    .replace(/[화장편회차]/g, "");
+
   if (/^\d+$/.test(text)) return Number(text);
 
   const arabic = text.match(/\d+/);
@@ -55,11 +65,14 @@ function parseKoreanNumber(value: string): number | null {
 
   for (const char of text) {
     const number = KOREAN_NUMBERS[char];
+
     if (number === undefined) return null;
+
     found = true;
 
     if (number === 10 || number === 100 || number === 1000) {
       if (current === 0) current = 1;
+
       total += current * number;
       current = 0;
     } else {
@@ -68,15 +81,24 @@ function parseKoreanNumber(value: string): number | null {
   }
 
   if (!found) return null;
+
   return total + current;
 }
 
 function classifyChapterType(line: string): ChapterType {
   const normalized = line.toLowerCase().replace(/\s+/g, "");
 
-  if (/^(프롤로그|prologue|prolog)\b/.test(normalized)) return "prologue";
-  if (/^(에필로그|epilogue|epilog)\b/.test(normalized)) return "epilogue";
-  if (/^(외전|번외|side\s*story|sidestory|special)\b/.test(normalized)) return "side_story";
+  if (/^(프롤로그|prologue|prolog)\b/.test(normalized)) {
+    return "prologue";
+  }
+
+  if (/^(에필로그|epilogue|epilog)\b/.test(normalized)) {
+    return "epilogue";
+  }
+
+  if (/^(외전|번외|side\s*story|sidestory|special)\b/.test(normalized)) {
+    return "side_story";
+  }
 
   return "chapter";
 }
@@ -84,19 +106,50 @@ function classifyChapterType(line: string): ChapterType {
 function extractNumber(line: string): number | null {
   const cleaned = line.replace(/,/g, "").trim();
 
+  /*
+   * ============================================================
+   * === Episode 1 ===
+   * === Episode 2 ===
+   * === Episode 100 ===
+   * ============================================================
+   *
+   * 양쪽에 ===, ==== 등의 구분선이 있는 형식을 우선 처리한다.
+   */
+  const wrappedEpisodePatterns = [
+    /^={2,}\s*(?:episode|ep)\s*[.#:_-]?\s*(\d{1,6})\s*={2,}$/i,
+    /^={2,}\s*(?:chapter|chap|ch)\s*[.#:_-]?\s*(\d{1,6})\s*={2,}$/i,
+  ];
+
+  for (const pattern of wrappedEpisodePatterns) {
+    const match = cleaned.match(pattern);
+
+    if (match) {
+      return Number(match[1]);
+    }
+  }
+
   const patterns = [
     /(?:^|[\s\[\]()【】「」『』])(?:제\s*)?(\d{1,6})\s*(?:화|회|장|편|막|부|권)(?:\s|[.:：\-–—|~()【】「」『』]|$)/i,
+
     /(?:^|[\s\[\]()【】「」『』])(?:chapter|chap|ch)\s*[.#:_-]?\s*(\d{1,6})(?:\s|[.:：\-–—|~()【】「」『』]|$)/i,
+
     /(?:^|[\s\[\]()【】「」『』])(?:episode|ep)\s*[.#:_-]?\s*(\d{1,6})(?:\s|[.:：\-–—|~()【】「」『』]|$)/i,
+
     /(?:^|[\s\[\]()【】「」『』])(?:part|pt|volume|vol|story|no)\s*[.#:_-]?\s*(\d{1,6})(?:\s|[.:：\-–—|~()【】「」『』]|$)/i,
+
     /^#\s*(\d{1,6})(?:\s|[.:：\-–—|~()【】「」『』]|$)/i,
+
     /^(?:제\s*)?(\d{1,6})\s*[.:：\-–—]\s*(?:\S.*)?$/i,
+
     /^(?:제\s*)?(\d{1,6})(?:\s|$)/i,
   ];
 
   for (const pattern of patterns) {
     const match = cleaned.match(pattern);
-    if (match) return Number(match[1]);
+
+    if (match) {
+      return Number(match[1]);
+    }
   }
 
   const koreanPatterns = [
@@ -105,7 +158,10 @@ function extractNumber(line: string): number | null {
 
   for (const pattern of koreanPatterns) {
     const match = cleaned.match(pattern);
-    if (match) return parseKoreanNumber(match[1]);
+
+    if (match) {
+      return parseKoreanNumber(match[1]);
+    }
   }
 
   return null;
@@ -114,71 +170,197 @@ function extractNumber(line: string): number | null {
 function extractTitle(line: string, number: number | null): string {
   let title = line.trim();
 
+  /*
+   * === Episode 1 ===
+   *
+   * 양쪽의 === 같은 구분선을 먼저 제거한다.
+   */
+  title = title
+    .replace(/^={2,}\s*/, "")
+    .replace(/\s*={2,}$/, "")
+    .trim();
+
   title = title
     .replace(/^[#\s]+/, "")
-    .replace(/^(?:제\s*)?\d{1,6}\s*(?:화|회|장|편|막|부|권)\s*/i, "")
-    .replace(/^(?:chapter|chap|ch|episode|ep|part|pt|volume|vol|story|no)\s*[.#:_-]?\s*\d{1,6}\s*/i, "")
+    .replace(
+      /^(?:제\s*)?\d{1,6}\s*(?:화|회|장|편|막|부|권)\s*/i,
+      ""
+    )
+    .replace(
+      /^(?:chapter|chap|ch|episode|ep|part|pt|volume|vol|story|no)\s*[.#:_-]?\s*\d{1,6}\s*/i,
+      ""
+    )
     .replace(/^#\s*\d{1,6}\s*/i, "")
     .replace(/^[.:：\-–—|~]+/, "")
     .trim();
 
-  if (number !== null && title === String(number)) return "";
+  if (number !== null && title === String(number)) {
+    return "";
+  }
+
   return title;
 }
 
 function isSpecialChapter(line: string): boolean {
   const normalized = line.trim().toLowerCase();
 
-  return /^(프롤로그|에필로그|외전|번외|후일담|prologue|epilogue|prolog|epilog|side\s*story|special)\b/i.test(normalized);
+  return /^(프롤로그|에필로그|외전|번외|후일담|prologue|epilogue|prolog|epilog|side\s*story|special)\b/i.test(
+    normalized
+  );
 }
 
 function looksLikeChapterHeading(line: string): boolean {
   const normalized = normalizeLine(line);
 
   if (!normalized) return false;
+
   if (normalized.length > 120) return false;
+
   if (isSpecialChapter(normalized)) return true;
 
+  /*
+   * === Episode 1 ===
+   * === Episode 2 ===
+   *
+   * 구분선으로 감싼 Episode / Chapter 형식을 명시적으로 인정한다.
+   */
+  if (
+    /^={2,}\s*(?:chapter|chap|ch|episode|ep)\s*[.#:_-]?\s*\d{1,6}\s*={2,}$/i.test(
+      normalized
+    )
+  ) {
+    return true;
+  }
+
   const number = extractNumber(normalized);
+
   if (number === null) return false;
 
   if (/^\d{1,6}$/.test(normalized)) return true;
-  if (/^(?:제\s*)?\d{1,6}\s*(?:화|회|장|편|막|부|권)/i.test(normalized)) return true;
-  if (/^(?:chapter|chap|ch|episode|ep|part|pt|volume|vol|story|no)\b/i.test(normalized)) return true;
+
+  if (
+    /^(?:제\s*)?\d{1,6}\s*(?:화|회|장|편|막|부|권)/i.test(
+      normalized
+    )
+  ) {
+    return true;
+  }
+
+  if (
+    /^(?:chapter|chap|ch|episode|ep|part|pt|volume|vol|story|no)\b/i.test(
+      normalized
+    )
+  ) {
+    return true;
+  }
+
   if (/^#\s*\d{1,6}/.test(normalized)) return true;
-  if (/^(?:제\s*)?\d{1,6}\s*[.:：\-–—]/.test(normalized)) return true;
+
+  if (/^(?:제\s*)?\d{1,6}\s*[.:：\-–—]/.test(normalized)) {
+    return true;
+  }
 
   return false;
 }
 
-function scoreCandidate(lines: string[], index: number): ChapterCandidate | null {
+function scoreCandidate(
+  lines: string[],
+  index: number
+): ChapterCandidate | null {
   const line = normalizeLine(lines[index]);
+
   if (!line) return null;
 
   const number = extractNumber(line);
   const special = isSpecialChapter(line);
 
   if (number === null && !special) return null;
+
   if (!looksLikeChapterHeading(line) && !special) return null;
 
   let score = 0;
 
   if (special) score += 8;
+
   if (number !== null) score += 5;
 
-  if (/^(?:제\s*)?\d{1,6}\s*(?:화|회|장|편|막|부|권)/i.test(line)) score += 5;
-  if (/^(?:chapter|chap|ch|episode|ep|part|pt|volume|vol|story|no)\b/i.test(line)) score += 5;
-  if (/^#\s*\d{1,6}/i.test(line)) score += 4;
-  if (/^(?:제\s*)?\d{1,6}\s*[.:：\-–—]/.test(line)) score += 3;
+  /*
+   * === Episode 1 ===
+   * === Episode 2 ===
+   *
+   * 구분선으로 감싼 형식은 매우 강한 회차 제목으로 본다.
+   */
+  if (
+    /^={2,}\s*(?:episode|ep)\s*[.#:_-]?\s*\d{1,6}\s*={2,}$/i.test(
+      line
+    )
+  ) {
+    score += 7;
+  }
 
-  if (line.length <= 60) score += 2;
-  if (line.length <= 30) score += 1;
+  if (
+    /^={2,}\s*(?:chapter|chap|ch)\s*[.#:_-]?\s*\d{1,6}\s*={2,}$/i.test(
+      line
+    )
+  ) {
+    score += 7;
+  }
 
-  const previousLines = lines.slice(Math.max(0, index - 5), index);
-  const nextLines = lines.slice(index + 1, index + 6);
+  if (
+    /^(?:제\s*)?\d{1,6}\s*(?:화|회|장|편|막|부|권)/i.test(line)
+  ) {
+    score += 5;
+  }
 
-  if (previousLines.some((item) => extractNumber(normalizeLine(item)) !== null)) score += 2;
-  if (nextLines.some((item) => extractNumber(normalizeLine(item)) !== null)) score += 2;
+  if (
+    /^(?:chapter|chap|ch|episode|ep|part|pt|volume|vol|story|no)\b/i.test(
+      line
+    )
+  ) {
+    score += 5;
+  }
+
+  if (/^#\s*\d{1,6}/i.test(line)) {
+    score += 4;
+  }
+
+  if (/^(?:제\s*)?\d{1,6}\s*[.:：\-–—]/.test(line)) {
+    score += 3;
+  }
+
+  if (line.length <= 60) {
+    score += 2;
+  }
+
+  if (line.length <= 30) {
+    score += 1;
+  }
+
+  const previousLines = lines.slice(
+    Math.max(0, index - 5),
+    index
+  );
+
+  const nextLines = lines.slice(
+    index + 1,
+    index + 6
+  );
+
+  if (
+    previousLines.some(
+      (item) => extractNumber(normalizeLine(item)) !== null
+    )
+  ) {
+    score += 2;
+  }
+
+  if (
+    nextLines.some(
+      (item) => extractNumber(normalizeLine(item)) !== null
+    )
+  ) {
+    score += 2;
+  }
 
   return {
     lineIndex: index,
@@ -189,7 +371,9 @@ function scoreCandidate(lines: string[], index: number): ChapterCandidate | null
   };
 }
 
-function filterCandidates(candidates: ChapterCandidate[]): ChapterCandidate[] {
+function filterCandidates(
+  candidates: ChapterCandidate[]
+): ChapterCandidate[] {
   if (candidates.length <= 1) return candidates;
 
   const result: ChapterCandidate[] = [];
@@ -201,21 +385,44 @@ function filterCandidates(candidates: ChapterCandidate[]): ChapterCandidate[] {
 
     let score = current.score;
 
-    if (current.number !== null && previous?.number != null) {
-    const difference = current.number - previous.number;
+    if (
+      current.number !== null &&
+      previous?.number != null
+    ) {
+      const difference =
+        current.number - previous.number;
 
-    if (difference === 1) score += 8;
-    else if (difference > 0 && difference <= 3) score += 4;
-    else if (difference <= 0) score -= 4;
+      if (difference === 1) {
+        score += 8;
+      } else if (
+        difference > 0 &&
+        difference <= 3
+      ) {
+        score += 4;
+      } else if (difference <= 0) {
+        score -= 4;
+      }
     }
 
-    if (current.number !== null && next?.number != null) {
-    const difference = next.number - current.number;
+    if (
+      current.number !== null &&
+      next?.number != null
+    ) {
+      const difference =
+        next.number - current.number;
 
-    if (difference === 1) score += 8;
-    else if (difference > 0 && difference <= 3) score += 4;
-    else if (difference <= 0) score -= 4;
+      if (difference === 1) {
+        score += 8;
+      } else if (
+        difference > 0 &&
+        difference <= 3
+      ) {
+        score += 4;
+      } else if (difference <= 0) {
+        score -= 4;
+      }
     }
+
     if (score >= 7) {
       result.push({
         ...current,
@@ -227,17 +434,27 @@ function filterCandidates(candidates: ChapterCandidate[]): ChapterCandidate[] {
   return result;
 }
 
-export function parseNovelText(text: string): ParsedChapter[] {
+export function parseNovelText(
+  text: string
+): ParsedChapter[] {
   const normalizedText = normalizeText(text);
 
   if (!normalizedText) return [];
 
   const lines = normalizedText.split("\n");
+
   const candidates: ChapterCandidate[] = [];
 
-  for (let index = 0; index < lines.length; index += 1) {
+  for (
+    let index = 0;
+    index < lines.length;
+    index += 1
+  ) {
     const candidate = scoreCandidate(lines, index);
-    if (candidate) candidates.push(candidate);
+
+    if (candidate) {
+      candidates.push(candidate);
+    }
   }
 
   const filtered = filterCandidates(candidates);
@@ -256,12 +473,18 @@ export function parseNovelText(text: string): ParsedChapter[] {
 
   const chapters: ParsedChapter[] = [];
 
-  for (let index = 0; index < filtered.length; index += 1) {
+  for (
+    let index = 0;
+    index < filtered.length;
+    index += 1
+  ) {
     const current = filtered[index];
     const next = filtered[index + 1];
 
     const contentStart = current.lineIndex + 1;
-    const contentEnd = next ? next.lineIndex : lines.length;
+    const contentEnd = next
+      ? next.lineIndex
+      : lines.length;
 
     const content = lines
       .slice(contentStart, contentEnd)
