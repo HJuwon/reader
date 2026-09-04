@@ -570,6 +570,8 @@ export default function DriveBrowser() {
       return;
     }
 
+    const currentBookId = bookId;
+
     const episode =
       parsedNovel.episodes[
         selectedEpisodeIndex
@@ -618,7 +620,7 @@ export default function DriveBrowser() {
               },
               body: JSON.stringify({
                 book_id:
-                  bookId,
+                  currentBookId,
                 drive_file_id:
                   selectedFile.id,
                 episode:
@@ -900,6 +902,8 @@ export default function DriveBrowser() {
       return;
     }
 
+    const activeRoundId = roundId;
+
     if (
       roundStatus === "completed"
     ) {
@@ -948,7 +952,7 @@ export default function DriveBrowser() {
               drive_file_id:
                 selectedFile.id,
               round_id:
-                roundId,
+                activeRoundId,
               episode:
                 selectedEpisode.episode,
               progress,
@@ -995,6 +999,8 @@ export default function DriveBrowser() {
     ) {
       return;
     }
+
+    const activeRoundId = roundId;
 
     function handleScroll() {
       const position =
@@ -1387,6 +1393,8 @@ export default function DriveBrowser() {
       return;
     }
 
+    const activeBookId = bookId;
+
     setHighlightLoading(true);
 
     try {
@@ -1401,7 +1409,7 @@ export default function DriveBrowser() {
             },
             body: JSON.stringify({
               book_id:
-                bookId,
+                activeBookId,
               drive_file_id:
                 selectedFile.id,
               episode:
@@ -1506,13 +1514,6 @@ export default function DriveBrowser() {
     );
   }
 
-  /*
-   * 특정 회차의 진행상황 저장
-   *
-   * context를 전달할 수 있게 하여
-   * React state가 아직 갱신되지 않은
-   * 최초 진입 시에도 정확한 데이터를 사용한다.
-   */
   async function saveProgress(
     episodeIndex: number,
     scrollPosition = 0,
@@ -1539,12 +1540,6 @@ export default function DriveBrowser() {
       return false;
     }
 
-    /*
-     * 이미 완독된 현재 회차는 수정 금지.
-     *
-     * targetRoundId가 명시된 최초 저장은
-     * 새로 생성된 reading 회차일 수 있으므로 허용한다.
-     */
     if (
       roundStatus === "completed" &&
       !targetRoundId
@@ -1684,10 +1679,6 @@ export default function DriveBrowser() {
         )
       );
 
-    /*
-     * 완독된 회차에서는 기존 회차를
-     * 다시 reading으로 만들면 안 된다.
-     */
     if (
       roundStatus !== "completed"
     ) {
@@ -1717,9 +1708,6 @@ export default function DriveBrowser() {
       behavior: "auto",
     });
 
-    /*
-     * reading 회차에서만 새 회차 위치 저장.
-     */
     if (
       roundStatus !== "completed"
     ) {
@@ -1736,10 +1724,6 @@ export default function DriveBrowser() {
       episode &&
       selectedFile
     ) {
-      /*
-       * 회차 이동 시에는 북마크가 화면 상태에
-       * 바로 필요하므로 기존처럼 기다린다.
-       */
       await getBookmarkStatus(
         selectedFile.id,
         episode.episode
@@ -1747,11 +1731,6 @@ export default function DriveBrowser() {
     }
   }
 
-  /*
-   * ==================================================
-   * 소설 열기
-   * ==================================================
-   */
   useEffect(() => {
     const params =
       new URLSearchParams(
@@ -1784,11 +1763,6 @@ export default function DriveBrowser() {
       setError("");
 
       try {
-        /*
-         * --------------------------------------------
-         * 1. 파일 정보 + 실제 파일 병렬 요청
-         * --------------------------------------------
-         */
         const [
           infoResponse,
           fileResponse,
@@ -1806,9 +1780,6 @@ export default function DriveBrowser() {
           ),
         ]);
 
-        /*
-         * JSON parsing도 병렬 처리
-         */
         const [
           infoData,
           fileData,
@@ -1839,11 +1810,6 @@ export default function DriveBrowser() {
           return;
         }
 
-        /*
-         * --------------------------------------------
-         * 2. TXT 파싱
-         * --------------------------------------------
-         */
         const parsed =
           parseNovel(
             fileData.content
@@ -1864,11 +1830,6 @@ export default function DriveBrowser() {
           size: infoData.size,
         };
 
-        /*
-         * --------------------------------------------
-         * 3. 화면 데이터 세팅
-         * --------------------------------------------
-         */
         setSelectedFile(item);
 
         setFileContent(
@@ -1877,11 +1838,6 @@ export default function DriveBrowser() {
 
         setParsedNovel(parsed);
 
-        /*
-         * --------------------------------------------
-         * 4. 독서 상태 조회
-         * --------------------------------------------
-         */
         const readingState =
           await initializeReadingState(
             fileId,
@@ -1912,11 +1868,6 @@ export default function DriveBrowser() {
             true;
         }
 
-        /*
-         * --------------------------------------------
-         * 5. 시작 회차 결정
-         * --------------------------------------------
-         */
         if (
           targetEpisode !== null &&
           Number.isFinite(
@@ -1951,9 +1902,6 @@ export default function DriveBrowser() {
             }
           }
         } else {
-          /*
-           * 저장된 회차 복원
-           */
           const savedIndex =
             parsed.episodes.findIndex(
               (episode) =>
@@ -1990,11 +1938,6 @@ export default function DriveBrowser() {
           }
         }
 
-        /*
-         * --------------------------------------------
-         * 6. 선택 회차 즉시 반영
-         * --------------------------------------------
-         */
         setSelectedEpisodeIndex(
           initialEpisodeIndex
         );
@@ -2004,11 +1947,6 @@ export default function DriveBrowser() {
             initialEpisodeIndex
           ];
 
-        /*
-         * --------------------------------------------
-         * 7. 북마크는 기다리지 않고 백그라운드 처리
-         * --------------------------------------------
-         */
         if (initialEpisode) {
           void getBookmarkStatus(
             fileId,
@@ -2016,16 +1954,6 @@ export default function DriveBrowser() {
           );
         }
 
-        /*
-         * --------------------------------------------
-         * 8. 최초 진행상황 저장
-         *
-         * React state 대신 현재 함수의
-         * item / parsed를 직접 전달한다.
-         *
-         * 또한 await하지 않는다.
-         * --------------------------------------------
-         */
         if (
           readingState.round.status ===
             "reading" &&
@@ -2048,14 +1976,6 @@ export default function DriveBrowser() {
           );
         }
 
-        /*
-         * --------------------------------------------
-         * 9. 로딩 종료
-         *
-         * 북마크 / 최초 progress 저장을
-         * 기다리지 않는다.
-         * --------------------------------------------
-         */
         setLoading(false);
       } catch (error) {
         if (cancelled) {
@@ -2085,10 +2005,6 @@ export default function DriveBrowser() {
   }, []);
 
   async function closeFile() {
-    /*
-     * 완독 회차는 종료할 때
-     * 기존 완독 기록을 다시 저장하지 않는다.
-     */
     if (
       selectedFile &&
       parsedNovel &&
