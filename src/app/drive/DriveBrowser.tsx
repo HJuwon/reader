@@ -1518,7 +1518,7 @@ export default function DriveBrowser() {
   /*
    * 특정 회차의 진행상황 저장
    *
-   * targetRoundId를 받을 수 있도록 수정.
+   * targetRoundId는 string 또는 null을 받을 수 있다.
    *
    * 최초 소설 진입 시 React의 roundId state가
    * 아직 갱신되지 않은 상태에서도
@@ -1527,7 +1527,7 @@ export default function DriveBrowser() {
   async function saveProgress(
     episodeIndex: number,
     scrollPosition = 0,
-    targetRoundId?: string
+    targetRoundId?: string | null
   ) {
     const activeRoundId =
       targetRoundId ?? roundId;
@@ -1949,6 +1949,9 @@ export default function DriveBrowser() {
          * 신규 reading_progress가 0이면
          * state의 roundId가 갱신되기를 기다리지 않고
          * API에서 받은 readingState.round.id를 직접 전달한다.
+         *
+         * 이렇게 해야 최초 진입 시에도
+         * 첫 회차 진행상황이 바로 저장된다.
          */
         if (
           savedProgress.episode ===
