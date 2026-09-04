@@ -4,9 +4,6 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import {
   BookOpen,
-  Bookmark,
-  Highlighter,
-  History,
   RotateCcw,
   ArrowUp,
   Search,
@@ -25,6 +22,15 @@ type Book = {
   status: "읽는 중" | "완독" | "안 읽음";
   created_at: string;
   updated_at: string;
+
+  // 회독 정보
+  round_count?: number;
+  completed_round_count?: number;
+  current_round?: number | null;
+  current_round_id?: string | null;
+  current_episode?: number | null;
+  current_progress?: number | null;
+  current_scroll_position?: number | null;
 };
 
 const statusStyle: Record<string, string> = {
@@ -120,13 +126,12 @@ export default function Home() {
   }, [books, filter, search]);
 
   // 최근 읽은 소설
-  // 최근 수정된 순서대로 정렬하고 최대 3개만 표시
   const recentBooks = useMemo(() => {
     return [...books]
       .filter(
         (book) =>
-          book.progress > 0 &&
-          book.progress < 100
+          book.status === "읽는 중" ||
+          (book.progress > 0 && book.progress < 100)
       )
       .sort(
         (a, b) =>
@@ -136,11 +141,140 @@ export default function Home() {
       .slice(0, 3);
   }, [books]);
 
+  // 리더 이동 URL
+  function getReaderUrl(book: Book) {
+    return `/drive?fileId=${encodeURIComponent(
+      book.drive_file_id
+    )}&fileName=${encodeURIComponent(book.title)}`;
+  }
+
+  // 다시 읽기
+  // 완독 상태에서 새로운 회독을 만들고 1화부터 시작
+  async function restartReading(book: Book) {
+    if (book.status !== "완독") {
+      return;
+    }
+
+    try {
+      setError("");
+
+      const response = await fetch("/api/books", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          drive_file_id: book.drive_file_id,
+          title: book.title,
+          total_episodes: book.total_episodes,
+          restart: true,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data?.error === "string"
+            ? data.error
+            : "다시 읽기를 시작하지 못했습니다."
+        );
+      }
+
+      // 새 회독 상태를 먼저 반영
+      await loadBooks();
+
+      // 새 회독은 1화부터 리더 진입
+      window.location.href = getReaderUrl(book);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "다시 읽기를 시작하지 못했습니다."
+      );
+    }
+  }
+
   function scrollToTop() {
     window.scrollTo({
       top: 0,
       behavior: "smooth",
     });
+  }
+
+  // 회독 번호
+  function getRound(book: Book) {
+    return book.current_round ?? book.round_count ?? 1;
+  }
+
+  // 현재 에피소드
+  function getEpisode(book: Book) {
+    if (
+      book.current_episode !== null &&
+      book.current_episode !== undefined &&
+      book.current_episode > 0
+    ) {
+      return book.current_episode;
+    }
+
+    if (book.last_episode > 0) {
+      return book.last_episode;
+    }
+
+    return 1;
+  }
+
+  // 현재 진행률
+  function getProgress(book: Book) {
+    return book.current_progress ?? book.progress ?? 0;
+  }
+
+  // 버튼
+  function renderAction(book: Book, compact = false) {
+    const commonClass = compact
+      ? "shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:px-3 sm:py-2 sm:text-sm"
+      : "rounded-lg px-2.5 py-1.5 text-xs font-medium transition";
+
+    // 완독 → 다시 읽기
+    if (book.status === "완독") {
+      return (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            restartReading(book);
+          }}
+          className={`${commonClass} bg-gray-900 text-white hover:bg-gray-800`}
+        >
+          다시 읽기
+        </button>
+      );
+    }
+
+    // 안 읽음 → 읽기 시작
+    if (book.status === "안 읽음") {
+      return (
+        <Link
+          href={getReaderUrl(book)}
+          onClick={(event) => event.stopPropagation()}
+          className={`${commonClass} bg-gray-900 text-white hover:bg-gray-800`}
+        >
+          읽기 시작
+        </Link>
+      );
+    }
+
+    // 읽는 중 → 이어읽기
+    return (
+      <Link
+        href={getReaderUrl(book)}
+        onClick={(event) => event.stopPropagation()}
+        className={`${commonClass} bg-blue-600 text-white hover:bg-blue-700`}
+      >
+        이어읽기
+      </Link>
+    );
   }
 
   return (
@@ -162,7 +296,6 @@ export default function Home() {
           <LogoutButton />
         </div>
       </header>
-
 
       <section className="mx-auto max-w-6xl px-5 pb-24 pt-8 sm:px-6 sm:pb-28 sm:pt-10">
         {/* 페이지 제목 */}
@@ -222,13 +355,8 @@ export default function Home() {
             ) : (
               <div className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-3">
                 {recentBooks.map((book) => (
-                  <Link
+                  <div
                     key={book.id}
-                    href={`/drive?fileId=${encodeURIComponent(
-                      book.drive_file_id
-                    )}&fileName=${encodeURIComponent(
-                      book.title
-                    )}`}
                     className="block rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5"
                   >
                     {/* 아이콘 + 상태 + 제목 */}
@@ -241,14 +369,11 @@ export default function Home() {
                           />
                         </div>
 
-                        {/* 상태를 아이콘 아래에 배치 */}
-
                         <span
-                         className={`mt-1.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[book.status]}`}
+                          className={`mt-1.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[book.status]}`}
                         >
-                         {book.status}
-                       </span>
-                        
+                          {book.status}
+                        </span>
                       </div>
 
                       {/* 제목 */}
@@ -263,18 +388,26 @@ export default function Home() {
                       </div>
                     </div>
 
-                    {/* 진행률 */}
+                    {/* 회독 + 진행률 */}
                     <div className="mt-5">
                       <div className="flex items-center justify-between text-xs sm:text-sm">
-                        <span className="text-gray-500">
-                          {book.last_episode > 0
-                            ? `${book.last_episode}화`
-                            : "1화"}{" "}
-                          / {book.total_episodes}화
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-700">
+                            {getRound(book)}회독
+                          </span>
+
+                          <span className="text-gray-300">
+                            ·
+                          </span>
+
+                          <span className="text-gray-500">
+                            {getEpisode(book)}화 /{" "}
+                            {book.total_episodes}화
+                          </span>
+                        </div>
 
                         <span className="font-medium">
-                          {book.progress}%
+                          {getProgress(book)}%
                         </span>
                       </div>
 
@@ -282,7 +415,7 @@ export default function Home() {
                         <div
                           className={`h-full rounded-full ${progressBarColor[book.status]}`}
                           style={{
-                            width: `${book.progress}%`,
+                            width: `${getProgress(book)}%`,
                           }}
                         />
                       </div>
@@ -297,11 +430,9 @@ export default function Home() {
                         ).toLocaleDateString("ko-KR")}
                       </span>
 
-                      <span className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-xs font-medium text-white">
-                        이어 읽기
-                      </span>
+                      {renderAction(book)}
                     </div>
-                  </Link>
+                  </div>
                 ))}
               </div>
             )}
@@ -420,18 +551,24 @@ export default function Home() {
                       </span>
                     </div>
 
-                    {/* 제목 + 회차 */}
+                    {/* 제목 + 회독 + 진행률 */}
                     <div className="min-w-0 flex-1">
                       <h4 className="line-clamp-2 text-sm font-medium leading-5 sm:text-[15px]">
                         {book.title}
                       </h4>
 
-                      <div className="mt-1.5">
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <span className="text-xs font-medium text-gray-600">
+                          {getRound(book)}회독
+                        </span>
+
+                        <span className="text-xs text-gray-300">
+                          ·
+                        </span>
+
                         <span className="text-xs text-gray-400">
-                          {book.last_episode > 0
-                            ? `${book.last_episode}화`
-                            : "1화"}{" "}
-                          · {book.progress}%
+                          {getEpisode(book)}화 ·{" "}
+                          {getProgress(book)}%
                         </span>
                       </div>
 
@@ -440,7 +577,7 @@ export default function Home() {
                         <div
                           className={`h-full rounded-full ${progressBarColor[book.status]}`}
                           style={{
-                            width: `${book.progress}%`,
+                            width: `${getProgress(book)}%`,
                           }}
                         />
                       </div>
@@ -452,7 +589,7 @@ export default function Home() {
                         <span>진행률</span>
 
                         <span>
-                          {book.progress}%
+                          {getProgress(book)}%
                         </span>
                       </div>
 
@@ -460,23 +597,14 @@ export default function Home() {
                         <div
                           className={`h-full rounded-full ${progressBarColor[book.status]}`}
                           style={{
-                            width: `${book.progress}%`,
+                            width: `${getProgress(book)}%`,
                           }}
                         />
                       </div>
                     </div>
 
-                    {/* 보기 */}
-                    <Link
-                      href={`/drive?fileId=${encodeURIComponent(
-                        book.drive_file_id
-                      )}&fileName=${encodeURIComponent(
-                        book.title
-                      )}`}
-                      className="shrink-0 rounded-lg px-2.5 py-1.5 text-xs text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 sm:px-3 sm:py-2 sm:text-sm"
-                    >
-                      보기
-                    </Link>
+                    {/* 상태별 버튼 */}
+                    {renderAction(book, true)}
                   </div>
                 ))}
               </div>
@@ -498,9 +626,6 @@ export default function Home() {
           />
         </button>
       )}
-
-
-      
     </main>
   );
 }
