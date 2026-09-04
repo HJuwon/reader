@@ -201,9 +201,6 @@ export default function DriveBrowser() {
   const [roundId, setRoundId] =
     useState<string | null>(null);
 
-  const [currentRound, setCurrentRound] =
-    useState<number>(1);
-
   const [roundStatus, setRoundStatus] =
     useState<"reading" | "completed">(
       "reading"
@@ -510,10 +507,6 @@ export default function DriveBrowser() {
 
       setRoundId(
         state.round.id
-      );
-
-      setCurrentRound(
-        state.round.round
       );
 
       setRoundStatus(
@@ -1660,144 +1653,6 @@ export default function DriveBrowser() {
     }
   }
 
-  /*
-   * 다시 읽기
-   *
-   * 현재 회차가 완독된 상태에서만 호출.
-   *
-   * 1회차 completed
-   * → 2회차 reading
-   *
-   * 2회차 completed
-   * → 3회차 reading
-   *
-   * 기존 회차의 기록은 변경하지 않는다.
-   */
-  async function restartReading() {
-    if (
-      !selectedFile ||
-      !parsedNovel ||
-      roundStatus !== "completed"
-    ) {
-      return;
-    }
-
-    setProgressSaving(true);
-    setError("");
-
-    try {
-      const response =
-        await fetch(
-          "/api/books",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              drive_file_id:
-                selectedFile.id,
-              title:
-                selectedFile.name,
-              total_episodes:
-                parsedNovel.episodes.length,
-              restart: true,
-            }),
-          }
-        );
-
-      const data =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          extractErrorMessage(
-            data,
-            "다시 읽기를 시작하지 못했습니다."
-          )
-        );
-      }
-
-      const stateData =
-        data?.data;
-
-      const newRound =
-        stateData?.current_round ??
-        stateData?.round;
-
-      const newProgress =
-        stateData?.progress;
-
-      if (
-        !newRound ||
-        !newProgress
-      ) {
-        throw new Error(
-          "새 회차 정보를 받지 못했습니다."
-        );
-      }
-
-      // 새 회차 정보 적용
-      setRoundId(
-        newRound.id
-      );
-
-      setCurrentRound(
-        newRound.round
-      );
-
-      setRoundStatus(
-        newRound.status
-      );
-
-      // 새 회차는 처음부터
-      setSelectedEpisodeIndex(0);
-
-      restoreScrollPositionRef.current =
-        0;
-
-      scrollPositionRef.current =
-        0;
-
-      skipScrollRestoreRef.current =
-        false;
-
-      setBodySearch("");
-      setBodySearchIndex(0);
-      setEpisodeSearch("");
-      setEpisodeListOpen(false);
-
-      window.scrollTo({
-        top: 0,
-        behavior: "auto",
-      });
-
-      const firstEpisode =
-        parsedNovel.episodes[0];
-
-      if (firstEpisode) {
-        await getBookmarkStatus(
-          selectedFile.id,
-          firstEpisode.episode
-        );
-      }
-    } catch (error) {
-      console.error(
-        "다시 읽기 실패:",
-        error
-      );
-
-      setError(
-        error instanceof Error
-          ? error.message
-          : "다시 읽기를 시작하지 못했습니다."
-      );
-    } finally {
-      setProgressSaving(false);
-    }
-  }
-
   async function changeEpisode(
     index: number
   ) {
@@ -2346,43 +2201,6 @@ export default function DriveBrowser() {
             >
               {selectedFile.name}
             </h1>
-
-            {roundId && (
-              <div className="mt-1 flex items-center gap-3">
-                <p
-                  className="text-xs"
-                  style={{
-                    color:
-                      theme.muted,
-                  }}
-                >
-                  {currentRound}회차
-                  {roundStatus ===
-                    "completed" &&
-                    " · 완독"}
-                </p>
-
-                {roundStatus ===
-                  "completed" && (
-                  <button
-                    type="button"
-                    onClick={
-                      restartReading
-                    }
-                    disabled={
-                      progressSaving
-                    }
-                    className="text-xs transition hover:opacity-60 disabled:opacity-40"
-                    style={{
-                      color:
-                        theme.accent,
-                    }}
-                  >
-                    다시 읽기
-                  </button>
-                )}
-              </div>
-            )}
           </div>
 
           {parsedNovel && (
