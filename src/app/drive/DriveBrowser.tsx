@@ -45,10 +45,38 @@ type HighlightItem = {
 type BookInfo = {
   id: string;
   drive_file_id: string;
-  last_episode: number;
+  title: string;
+  total_episodes: number;
+  last_episode?: number;
+  progress?: number;
+  status?: string;
+  scroll_position?: number;
+};
+
+type ReadingRound = {
+  id: string;
+  user_id: string;
+  book_id: string;
+  round: number;
+  status: "reading" | "completed";
+  started_at: string;
+  completed_at: string | null;
+  created_at: string;
+};
+
+type ReadingProgress = {
+  id: string;
+  round_id: string;
+  episode: number;
   progress: number;
-  status: "읽는 중" | "완독" | "안 읽음";
   scroll_position: number;
+  updated_at: string;
+};
+
+type ReadingState = {
+  book: BookInfo;
+  round: ReadingRound;
+  progress: ReadingProgress;
 };
 
 const SERIF =
@@ -170,6 +198,23 @@ export default function DriveBrowser() {
   const [bookId, setBookId] =
     useState<string | null>(null);
 
+  /*
+   * 현재 읽기 회차
+   *
+   * 1회차를 읽고 완독하면 round = 1, status = completed
+   * 다시 읽을 때 round = 2가 됨.
+   */
+  const [roundId, setRoundId] =
+    useState<string | null>(null);
+
+  const [currentRound, setCurrentRound] =
+    useState<number>(1);
+
+  const [roundStatus, setRoundStatus] =
+    useState<
+      "reading" | "completed"
+    >("reading");
+
   const [themeKey, setThemeKey] =
     useState<ThemeKey>("ivory");
 
@@ -185,15 +230,12 @@ export default function DriveBrowser() {
   const [highlights, setHighlights] =
     useState<HighlightItem[]>([]);
 
-  // 회차 검색
   const [episodeSearch, setEpisodeSearch] =
     useState("");
 
-  // 모바일 회차 목록 열림/닫힘
   const [episodeListOpen, setEpisodeListOpen] =
     useState(false);
 
-  // 본문 검색
   const [bodySearch, setBodySearch] =
     useState("");
 
@@ -203,7 +245,6 @@ export default function DriveBrowser() {
   const [bodySearchOpen, setBodySearchOpen] =
     useState(false);
 
-  // 모바일 선택 하이라이트
   const [selectedTextForHighlight, setSelectedTextForHighlight] =
     useState("");
 
@@ -216,7 +257,6 @@ export default function DriveBrowser() {
   const [showHighlightButton, setShowHighlightButton] =
     useState(false);
 
-  // 읽기 위치 refs
   const scrollPositionRef =
     useRef(0);
 
@@ -237,7 +277,6 @@ export default function DriveBrowser() {
   const contentRef =
     useRef<HTMLDivElement | null>(null);
 
-  // 모바일 회차 목록 스크롤 영역
   const mobileEpisodeListRef =
     useRef<HTMLDivElement | null>(null);
 
@@ -269,7 +308,6 @@ export default function DriveBrowser() {
       }
     ) || [];
 
-  // 읽기 설정 불러오기
   useEffect(() => {
     try {
       const saved =
@@ -314,7 +352,6 @@ export default function DriveBrowser() {
     }
   }, []);
 
-  // 읽기 설정 저장
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -325,14 +362,13 @@ export default function DriveBrowser() {
         })
       );
     } catch {
-      // 저장 실패해도 앱 동작에는 영향 없음
+      // 무시
     }
   }, [
     themeKey,
     fontSize,
   ]);
 
-  // 본문 검색 결과 초기화
   useEffect(() => {
     setBodySearchIndex(0);
   }, [
@@ -340,7 +376,6 @@ export default function DriveBrowser() {
     selectedEpisodeIndex,
   ]);
 
-  // 회차 변경 시 모바일 선택 하이라이트 초기화
   useEffect(() => {
     setShowHighlightButton(false);
     setSelectedTextForHighlight("");
@@ -349,8 +384,6 @@ export default function DriveBrowser() {
     selectedEpisodeIndex,
   ]);
 
-  // 모바일 회차 목록을 열었을 때
-  // 현재 회차가 보이도록 자동 스크롤
   useEffect(() => {
     if (
       !episodeListOpen ||
@@ -413,13 +446,40 @@ export default function DriveBrowser() {
     return fallback;
   }
 
-  async function getBookProgress(
+  /*
+   * 책을 열 때 현재 읽기 회차를 가져온다.
+   *
+   * POST /api/books
+   *
+   * - books에 책이 없으면 책 생성
+   * - reading_rounds 1회차 생성
+   * - reading_progress 생성
+   * - 이미 존재하면 현재 reading 회차 반환
+   */
+  async function initializeReadingState(
     fileId: string,
-    episodes: ParsedNovel["episodes"]
-  ) {
+    title: string,
+    totalEpisodes: number
+  ): Promise<ReadingState | null> {
     try {
       const response =
-        await fetch("/api/books");
+        await fetch(
+          "/api/books",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              drive_file_id:
+                fileId,
+              title,
+              total_episodes:
+                totalEpisodes,
+            }),
+          }
+        );
 
       const data =
         await response.json();
@@ -428,54 +488,59 @@ export default function DriveBrowser() {
         throw new Error(
           extractErrorMessage(
             data,
-            "책 진행상황을 불러오지 못했습니다."
+            "읽기 정보를 초기화하지 못했습니다."
           )
         );
       }
 
-      const book =
-        (data.data || []).find(
-          (item: any) =>
-            item.drive_file_id ===
-            fileId
-        );
-
-      if (!book) {
-        return 0;
-      }
+      /*
+       * API가 아래 구조로 반환하는 것을 기준으로 한다.
+       *
+       * {
+       *   data: {
+       *     book,
+       *     round,
+       *     progress
+       *   }
+       * }
+       */
+      const state =
+        data.data as ReadingState;
 
       if (
-        typeof book.last_episode !==
-        "number"
+        !state?.book ||
+        !state?.round ||
+        !state?.progress
       ) {
-        return 0;
-      }
-
-      const savedIndex =
-        episodes.findIndex(
-          (episode) =>
-            episode.episode ===
-            book.last_episode
+        throw new Error(
+          "읽기 정보 응답 형식이 올바르지 않습니다."
         );
-
-      if (savedIndex >= 0) {
-        return savedIndex;
       }
 
-      return Math.max(
-        0,
-        Math.min(
-          book.last_episode - 1,
-          episodes.length - 1
-        )
+      setBookId(
+        state.book.id
       );
+
+      setRoundId(
+        state.round.id
+      );
+
+      setCurrentRound(
+        state.round.round
+      );
+
+      setRoundStatus(
+        state.round.status
+      );
+
+      return state;
     } catch (error) {
       console.error(
-        "진행상황 불러오기 실패:",
+        "읽기 정보 초기화 실패:",
         error
       );
 
-      return 0;
+      throw error;
     }
   }
 
@@ -843,13 +908,20 @@ export default function DriveBrowser() {
     selectedEpisodeIndex,
   ]);
 
+  /*
+   * 현재 회차의 진행상황 저장
+   *
+   * 이제 books가 아니라
+   * reading_progress를 업데이트한다.
+   */
   async function saveScrollPosition(
     position?: number
   ) {
     if (
       !selectedFile ||
       !parsedNovel ||
-      !selectedEpisode
+      !selectedEpisode ||
+      !roundId
     ) {
       return;
     }
@@ -882,10 +954,6 @@ export default function DriveBrowser() {
       selectedEpisodeIndex ===
       totalEpisodes - 1;
 
-    const status = isCompleted
-      ? "완독"
-      : "읽는 중";
-
     try {
       const response =
         await fetch(
@@ -897,27 +965,39 @@ export default function DriveBrowser() {
                 "application/json",
             },
             body: JSON.stringify({
-              drive_file_id:
-                selectedFile.id,
-              last_episode:
+              round_id:
+                roundId,
+              episode:
                 selectedEpisode.episode,
               progress,
-              status,
               scroll_position:
                 currentPosition,
+              status: isCompleted
+                ? "completed"
+                : "reading",
             }),
           }
         );
 
-      if (!response.ok) {
-        const data =
-          await response.json();
+      const data =
+        await response.json();
 
+      if (!response.ok) {
         throw new Error(
           extractErrorMessage(
             data,
             "읽기 위치를 저장하지 못했습니다."
           )
+        );
+      }
+
+      if (isCompleted) {
+        setRoundStatus(
+          "completed"
+        );
+      } else {
+        setRoundStatus(
+          "reading"
         );
       }
 
@@ -935,7 +1015,8 @@ export default function DriveBrowser() {
     if (
       !selectedFile ||
       !parsedNovel ||
-      !selectedEpisode
+      !selectedEpisode ||
+      !roundId
     ) {
       return;
     }
@@ -988,14 +1069,25 @@ export default function DriveBrowser() {
     parsedNovel,
     selectedEpisode,
     selectedEpisodeIndex,
+    roundId,
   ]);
 
+  /*
+   * 브라우저 종료 시 마지막 위치 저장
+   *
+   * sendBeacon은 POST이므로
+   * /api/books POST가 progress 저장 payload도
+   * 처리할 수 있어야 한다.
+   *
+   * 안정성을 위해 여기서는 fetch keepalive를 사용한다.
+   */
   useEffect(() => {
     function handleBeforeUnload() {
       if (
         !selectedFile ||
         !parsedNovel ||
-        !selectedEpisode
+        !selectedEpisode ||
+        !roundId
       ) {
         return;
       }
@@ -1025,32 +1117,33 @@ export default function DriveBrowser() {
         selectedEpisodeIndex ===
         totalEpisodes - 1;
 
-      const status = isCompleted
-        ? "완독"
-        : "읽는 중";
-
       const payload = JSON.stringify({
-        drive_file_id:
-          selectedFile.id,
-        last_episode:
+        round_id:
+          roundId,
+        episode:
           selectedEpisode.episode,
         progress,
-        status,
+        status: isCompleted
+          ? "completed"
+          : "reading",
         scroll_position:
           position,
       });
 
-      const blob = new Blob(
-        [payload],
-        {
-          type: "application/json",
-        }
-      );
-
-      navigator.sendBeacon(
+      fetch(
         "/api/books",
-        blob
-      );
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: payload,
+          keepalive: true,
+        }
+      ).catch(() => {
+        // 종료 중 오류는 무시
+      });
     }
 
     window.addEventListener(
@@ -1069,6 +1162,7 @@ export default function DriveBrowser() {
     parsedNovel,
     selectedEpisode,
     selectedEpisodeIndex,
+    roundId,
   ]);
 
   function getBodySearchMatches() {
@@ -1367,11 +1461,6 @@ export default function DriveBrowser() {
       setShowHighlightButton(false);
       setSelectedTextForHighlight("");
       setSelectedHighlightRange(null);
-
-      console.log(
-        "하이라이트 저장 완료:",
-        data
-      );
     } catch (error) {
       console.error(
         "하이라이트 저장 실패:",
@@ -1399,7 +1488,6 @@ export default function DriveBrowser() {
         return;
       }
 
-      // 모바일
       if (
         window.innerWidth < 768
       ) {
@@ -1419,8 +1507,6 @@ export default function DriveBrowser() {
         return;
       }
 
-      // 데스크톱은 기존처럼
-      // 선택 즉시 저장
       saveHighlight(
         selectionData.text,
         selectionData.startOffset,
@@ -1444,13 +1530,17 @@ export default function DriveBrowser() {
     );
   }
 
+  /*
+   * 현재 회차의 특정 회차 진행상황 저장
+   */
   async function saveProgress(
     episodeIndex: number,
     scrollPosition = 0
   ) {
     if (
       !selectedFile ||
-      !parsedNovel
+      !parsedNovel ||
+      !roundId
     ) {
       return false;
     }
@@ -1474,9 +1564,6 @@ export default function DriveBrowser() {
     const totalEpisodes =
       parsedNovel.episodes.length;
 
-    const lastEpisode =
-      episode.episode;
-
     const progress =
       Math.min(
         100,
@@ -1491,10 +1578,6 @@ export default function DriveBrowser() {
       episodeIndex ===
       totalEpisodes - 1;
 
-    const status = isCompleted
-      ? "완독"
-      : "읽는 중";
-
     setProgressSaving(true);
 
     try {
@@ -1508,12 +1591,14 @@ export default function DriveBrowser() {
                 "application/json",
             },
             body: JSON.stringify({
-              drive_file_id:
-                selectedFile.id,
-              last_episode:
-                lastEpisode,
+              round_id:
+                roundId,
+              episode:
+                episode.episode,
               progress,
-              status,
+              status: isCompleted
+                ? "completed"
+                : "reading",
               scroll_position:
                 Math.max(
                   0,
@@ -1536,6 +1621,12 @@ export default function DriveBrowser() {
           )
         );
       }
+
+      setRoundStatus(
+        isCompleted
+          ? "completed"
+          : "reading"
+      );
 
       lastSavedEpisodeIndexRef.current =
         episodeIndex;
@@ -1576,8 +1667,6 @@ export default function DriveBrowser() {
       index ===
       selectedEpisodeIndex
     ) {
-      // 현재 회차를 다시 누른 경우에도
-      // 모바일 목록은 닫는다.
       setEpisodeListOpen(false);
       return;
     }
@@ -1590,6 +1679,9 @@ export default function DriveBrowser() {
         )
       );
 
+    /*
+     * 이전 회차 위치 저장
+     */
     await saveProgress(
       selectedEpisodeIndex,
       currentScrollPosition
@@ -1599,7 +1691,6 @@ export default function DriveBrowser() {
       index
     );
 
-    // 회차를 선택하면 모바일 목록 닫기
     setEpisodeListOpen(false);
 
     restoreScrollPositionRef.current =
@@ -1616,6 +1707,9 @@ export default function DriveBrowser() {
       behavior: "auto",
     });
 
+    /*
+     * 새 회차 저장
+     */
     await saveProgress(
       index,
       0
@@ -1635,6 +1729,9 @@ export default function DriveBrowser() {
     }
   }
 
+  /*
+   * 소설 열기
+   */
   useEffect(() => {
     const params =
       new URLSearchParams(
@@ -1731,32 +1828,34 @@ export default function DriveBrowser() {
 
         setParsedNovel(parsed);
 
-        const booksResponse =
-          await fetch(
-            "/api/books"
+        /*
+         * ==========================================
+         * 핵심 변경
+         * ==========================================
+         *
+         * 기존:
+         * GET /api/books
+         * → books.last_episode 사용
+         *
+         * 변경:
+         * POST /api/books
+         * → 현재 reading_round + reading_progress
+         */
+        const readingState =
+          await initializeReadingState(
+            fileId,
+            infoData.name,
+            parsed.episodes.length
           );
 
-        const booksData =
-          await booksResponse.json();
-
-        let currentBook:
-          | BookInfo
-          | null = null;
-
-        if (booksResponse.ok) {
-          currentBook =
-            (booksData.data || []).find(
-              (item: any) =>
-                item.drive_file_id ===
-                fileId
-            );
-
-          if (currentBook) {
-            setBookId(
-              currentBook.id
-            );
-          }
+        if (!readingState) {
+          throw new Error(
+            "읽기 정보를 불러오지 못했습니다."
+          );
         }
+
+        const savedProgress =
+          readingState.progress;
 
         let initialEpisodeIndex = 0;
 
@@ -1768,6 +1867,10 @@ export default function DriveBrowser() {
             true;
         }
 
+        /*
+         * URL에 특정 회차가 있으면
+         * 그 회차를 우선한다.
+         */
         if (
           targetEpisode !== null &&
           Number.isFinite(
@@ -1787,47 +1890,62 @@ export default function DriveBrowser() {
             initialEpisodeIndex =
               targetIndex;
 
+            /*
+             * 현재 저장된 회차와
+             * URL 회차가 같으면
+             * 저장된 스크롤 위치 복원
+             */
             if (
-              currentBook &&
-              currentBook.last_episode ===
+              savedProgress.episode ===
                 targetEpisode &&
               !highlightId &&
-              typeof currentBook.scroll_position ===
+              typeof savedProgress.scroll_position ===
                 "number"
             ) {
               restoreScrollPositionRef.current =
                 Math.max(
                   0,
-                  currentBook.scroll_position
+                  savedProgress.scroll_position
                 );
             }
           }
         } else {
-          const savedEpisodeIndex =
-            await getBookProgress(
-              fileId!,
-              parsed.episodes
+          /*
+           * 저장된 reading_progress의
+           * episode를 찾아서 복원
+           */
+          const savedIndex =
+            parsed.episodes.findIndex(
+              (episode) =>
+                episode.episode ===
+                savedProgress.episode
             );
 
-          initialEpisodeIndex =
-            parsed.episodes.length >
-            0
-              ? Math.min(
-                  savedEpisodeIndex,
+          if (savedIndex >= 0) {
+            initialEpisodeIndex =
+              savedIndex;
+          } else if (
+            savedProgress.episode > 0
+          ) {
+            initialEpisodeIndex =
+              Math.max(
+                0,
+                Math.min(
+                  savedProgress.episode - 1,
                   parsed.episodes.length - 1
                 )
-              : 0;
+              );
+          }
 
           if (
-            currentBook &&
-            typeof currentBook.scroll_position ===
-              "number" &&
-            !highlightId
+            !highlightId &&
+            typeof savedProgress.scroll_position ===
+              "number"
           ) {
             restoreScrollPositionRef.current =
               Math.max(
                 0,
-                currentBook.scroll_position
+                savedProgress.scroll_position
               );
           }
         }
@@ -1848,9 +1966,13 @@ export default function DriveBrowser() {
           );
         }
 
+        /*
+         * 신규 reading_progress가 0화인 경우
+         * 현재 회차를 기준으로 최초 상태 저장
+         */
         if (
-          currentBook &&
-          currentBook.progress === 0 &&
+          savedProgress.episode ===
+            0 &&
           parsed.episodes.length > 0 &&
           targetEpisode === null
         ) {
@@ -1885,7 +2007,8 @@ export default function DriveBrowser() {
     if (
       selectedFile &&
       parsedNovel &&
-      selectedEpisode
+      selectedEpisode &&
+      roundId
     ) {
       await saveScrollPosition(
         window.scrollY
@@ -2053,6 +2176,21 @@ export default function DriveBrowser() {
             >
               {selectedFile.name}
             </h1>
+
+            {roundId && (
+              <p
+                className="mt-1 text-xs"
+                style={{
+                  color:
+                    theme.muted,
+                }}
+              >
+                {currentRound}회차
+                {roundStatus ===
+                  "completed" &&
+                  " · 완독"}
+              </p>
+            )}
           </div>
 
           {parsedNovel && (
@@ -2153,7 +2291,6 @@ export default function DriveBrowser() {
           <>
             {/* 모바일 회차 선택 */}
             <div className="mb-5 md:hidden">
-              {/* 접혀 있을 때: 한 줄만 표시 */}
               <button
                 type="button"
                 onClick={() =>
@@ -2219,7 +2356,6 @@ export default function DriveBrowser() {
                 )}
               </button>
 
-              {/* 펼쳐졌을 때 */}
               {episodeListOpen && (
                 <div
                   className="mt-2 overflow-hidden rounded-[4px]"
@@ -2227,7 +2363,6 @@ export default function DriveBrowser() {
                     boxShadow: `0 0 0 0.5px ${theme.divider}`,
                   }}
                 >
-                  {/* 회차 검색 */}
                   <div
                     className="flex items-center gap-2 px-3 py-2.5"
                     style={{
@@ -2275,7 +2410,6 @@ export default function DriveBrowser() {
                     )}
                   </div>
 
-                  {/* 스크롤 가능한 회차 목록 */}
                   <div
                     ref={
                       mobileEpisodeListRef
