@@ -1,4 +1,9 @@
-export type ChapterType = "prologue" | "chapter" | "epilogue" | "side_story" | "unknown";
+export type ChapterType =
+  | "prologue"
+  | "chapter"
+  | "epilogue"
+  | "side_story"
+  | "unknown";
 
 export interface ParsedChapter {
   id: string;
@@ -96,7 +101,11 @@ function classifyChapterType(line: string): ChapterType {
     return "epilogue";
   }
 
-  if (/^(외전|번외|side\s*story|sidestory|special)\b/.test(normalized)) {
+  if (
+    /^(외전|번외|side\s*story|sidestory|special)\b/.test(
+      normalized
+    )
+  ) {
     return "side_story";
   }
 
@@ -108,19 +117,24 @@ function extractNumber(line: string): number | null {
 
   /*
    * ============================================================
-   * === Episode 1 ===
-   * === Episode 2 ===
-   * === Episode 100 ===
-   * ============================================================
+   * 구분선으로 감싼 Episode / Chapter
    *
-   * 양쪽에 ===, ==== 등의 구분선이 있는 형식을 우선 처리한다.
+   * === Episode 1 ===
+   * === Episode1 ===
+   * === EP 1 ===
+   * === EP1 ===
+   * === Chapter 1 ===
+   * === Chapter1 ===
+   * === CH1 ===
+   * ============================================================
    */
-  const wrappedEpisodePatterns = [
+  const wrappedChapterPatterns = [
     /^={2,}\s*(?:episode|ep)\s*[.#:_-]?\s*(\d{1,6})\s*={2,}$/i,
+
     /^={2,}\s*(?:chapter|chap|ch)\s*[.#:_-]?\s*(\d{1,6})\s*={2,}$/i,
   ];
 
-  for (const pattern of wrappedEpisodePatterns) {
+  for (const pattern of wrappedChapterPatterns) {
     const match = cleaned.match(pattern);
 
     if (match) {
@@ -128,6 +142,9 @@ function extractNumber(line: string): number | null {
     }
   }
 
+  /*
+   * 일반적인 회차 표기
+   */
   const patterns = [
     /(?:^|[\s\[\]()【】「」『』])(?:제\s*)?(\d{1,6})\s*(?:화|회|장|편|막|부|권)(?:\s|[.:：\-–—|~()【】「」『』]|$)/i,
 
@@ -152,6 +169,13 @@ function extractNumber(line: string): number | null {
     }
   }
 
+  /*
+   * 한글 숫자 회차
+   *
+   * 제일화
+   * 일화
+   * 이십화
+   */
   const koreanPatterns = [
     /^(?:제\s*)?([일이삼사오육칠팔구십백천영\s]+)\s*(?:화|회|장|편)(?:\s|[.:：\-–—|~]|$)/,
   ];
@@ -167,13 +191,17 @@ function extractNumber(line: string): number | null {
   return null;
 }
 
-function extractTitle(line: string, number: number | null): string {
+function extractTitle(
+  line: string,
+  number: number | null
+): string {
   let title = line.trim();
 
   /*
    * === Episode 1 ===
+   * === Episode1 ===
    *
-   * 양쪽의 === 같은 구분선을 먼저 제거한다.
+   * 양쪽 구분선을 먼저 제거한다.
    */
   title = title
     .replace(/^={2,}\s*/, "")
@@ -219,10 +247,18 @@ function looksLikeChapterHeading(line: string): boolean {
   if (isSpecialChapter(normalized)) return true;
 
   /*
-   * === Episode 1 ===
-   * === Episode 2 ===
+   * ============================================================
+   * 구분선으로 감싼 회차
    *
-   * 구분선으로 감싼 Episode / Chapter 형식을 명시적으로 인정한다.
+   * === Episode 1 ===
+   * === Episode1 ===
+   * === EP 1 ===
+   * === EP1 ===
+   * === Chapter 1 ===
+   * === Chapter1 ===
+   * === CH 1 ===
+   * === CH1 ===
+   * ============================================================
    */
   if (
     /^={2,}\s*(?:chapter|chap|ch|episode|ep)\s*[.#:_-]?\s*\d{1,6}\s*={2,}$/i.test(
@@ -236,7 +272,9 @@ function looksLikeChapterHeading(line: string): boolean {
 
   if (number === null) return false;
 
-  if (/^\d{1,6}$/.test(normalized)) return true;
+  if (/^\d{1,6}$/.test(normalized)) {
+    return true;
+  }
 
   if (
     /^(?:제\s*)?\d{1,6}\s*(?:화|회|장|편|막|부|권)/i.test(
@@ -254,9 +292,15 @@ function looksLikeChapterHeading(line: string): boolean {
     return true;
   }
 
-  if (/^#\s*\d{1,6}/.test(normalized)) return true;
+  if (/^#\s*\d{1,6}/.test(normalized)) {
+    return true;
+  }
 
-  if (/^(?:제\s*)?\d{1,6}\s*[.:：\-–—]/.test(normalized)) {
+  if (
+    /^(?:제\s*)?\d{1,6}\s*[.:：\-–—]/.test(
+      normalized
+    )
+  ) {
     return true;
   }
 
@@ -274,21 +318,27 @@ function scoreCandidate(
   const number = extractNumber(line);
   const special = isSpecialChapter(line);
 
-  if (number === null && !special) return null;
+  if (number === null && !special) {
+    return null;
+  }
 
-  if (!looksLikeChapterHeading(line) && !special) return null;
+  if (!looksLikeChapterHeading(line) && !special) {
+    return null;
+  }
 
   let score = 0;
 
-  if (special) score += 8;
+  if (special) {
+    score += 8;
+  }
 
-  if (number !== null) score += 5;
+  if (number !== null) {
+    score += 5;
+  }
 
   /*
-   * === Episode 1 ===
-   * === Episode 2 ===
-   *
-   * 구분선으로 감싼 형식은 매우 강한 회차 제목으로 본다.
+   * 구분선으로 감싼 Episode 형식은
+   * 매우 명확한 회차 제목이므로 높은 점수를 준다.
    */
   if (
     /^={2,}\s*(?:episode|ep)\s*[.#:_-]?\s*\d{1,6}\s*={2,}$/i.test(
@@ -307,7 +357,9 @@ function scoreCandidate(
   }
 
   if (
-    /^(?:제\s*)?\d{1,6}\s*(?:화|회|장|편|막|부|권)/i.test(line)
+    /^(?:제\s*)?\d{1,6}\s*(?:화|회|장|편|막|부|권)/i.test(
+      line
+    )
   ) {
     score += 5;
   }
@@ -324,7 +376,11 @@ function scoreCandidate(
     score += 4;
   }
 
-  if (/^(?:제\s*)?\d{1,6}\s*[.:：\-–—]/.test(line)) {
+  if (
+    /^(?:제\s*)?\d{1,6}\s*[.:：\-–—]/.test(
+      line
+    )
+  ) {
     score += 3;
   }
 
@@ -348,7 +404,8 @@ function scoreCandidate(
 
   if (
     previousLines.some(
-      (item) => extractNumber(normalizeLine(item)) !== null
+      (item) =>
+        extractNumber(normalizeLine(item)) !== null
     )
   ) {
     score += 2;
@@ -356,7 +413,8 @@ function scoreCandidate(
 
   if (
     nextLines.some(
-      (item) => extractNumber(normalizeLine(item)) !== null
+      (item) =>
+        extractNumber(normalizeLine(item)) !== null
     )
   ) {
     score += 2;
@@ -374,7 +432,9 @@ function scoreCandidate(
 function filterCandidates(
   candidates: ChapterCandidate[]
 ): ChapterCandidate[] {
-  if (candidates.length <= 1) return candidates;
+  if (candidates.length <= 1) {
+    return candidates;
+  }
 
   const result: ChapterCandidate[] = [];
 
@@ -439,7 +499,9 @@ export function parseNovelText(
 ): ParsedChapter[] {
   const normalizedText = normalizeText(text);
 
-  if (!normalizedText) return [];
+  if (!normalizedText) {
+    return [];
+  }
 
   const lines = normalizedText.split("\n");
 
@@ -450,7 +512,10 @@ export function parseNovelText(
     index < lines.length;
     index += 1
   ) {
-    const candidate = scoreCandidate(lines, index);
+    const candidate = scoreCandidate(
+      lines,
+      index
+    );
 
     if (candidate) {
       candidates.push(candidate);
@@ -481,7 +546,9 @@ export function parseNovelText(
     const current = filtered[index];
     const next = filtered[index + 1];
 
-    const contentStart = current.lineIndex + 1;
+    const contentStart =
+      current.lineIndex + 1;
+
     const contentEnd = next
       ? next.lineIndex
       : lines.length;
