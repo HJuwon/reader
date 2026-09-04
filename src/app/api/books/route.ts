@@ -22,7 +22,10 @@ export async function GET() {
   const userId = session.user.email;
 
   try {
+    // --------------------------------------------------
     // 1. 책 목록
+    // --------------------------------------------------
+
     const { data: books, error: booksError } = await supabase
       .from("books")
       .select("*")
@@ -46,7 +49,10 @@ export async function GET() {
 
     const bookIds = books.map((book) => book.id);
 
-    // 2. 해당 책들의 독서 회차
+    // --------------------------------------------------
+    // 2. 독서 회차
+    // --------------------------------------------------
+
     const { data: rounds, error: roundsError } = await supabase
       .from("reading_rounds")
       .select("*")
@@ -65,7 +71,10 @@ export async function GET() {
 
     const roundIds = (rounds ?? []).map((round) => round.id);
 
+    // --------------------------------------------------
     // 3. 독서 진행 상황
+    // --------------------------------------------------
+
     let progresses: any[] = [];
 
     if (roundIds.length > 0) {
@@ -89,7 +98,10 @@ export async function GET() {
       progresses = data ?? [];
     }
 
-    // 4. 책마다 회차/진행상황을 묶어서 반환
+    // --------------------------------------------------
+    // 4. 책마다 회차/진행상황 묶기
+    // --------------------------------------------------
+
     const result = books.map((book) => {
       const bookRounds =
         rounds?.filter(
@@ -116,6 +128,7 @@ export async function GET() {
         // 회차 정보
         rounds: bookRounds,
         round_count: bookRounds.length,
+
         completed_round_count: bookRounds.filter(
           (round) => round.status === "completed"
         ).length,
@@ -127,8 +140,10 @@ export async function GET() {
         // 현재 회차 진행상황
         current_episode:
           activeProgress?.episode ?? 0,
+
         current_progress:
           activeProgress?.progress ?? 0,
+
         current_scroll_position:
           activeProgress?.scroll_position ?? 0,
       };
@@ -162,8 +177,15 @@ export async function GET() {
  * 2. 없으면 books 생성
  * 3. reading_rounds에 1회차 생성
  * 4. reading_progress에 1회차 진행상황 생성
+ * 5. 책 상태를 "읽는 중"으로 변경
  *
- * 이미 존재하면 기존 책/현재 회차를 반환.
+ * 이미 존재하는 책이면:
+ * - 기존 회차를 찾음
+ * - 현재 reading 회차를 반환
+ * - 책 상태를 "읽는 중"으로 변경
+ *
+ * 단, 이미 완독한 책을 단순히 다시 여는 경우
+ * 새로운 회차를 자동 생성하지 않음.
  */
 export async function POST(request: Request) {
   const session: any = await getServerSession(authOptions);
@@ -185,6 +207,10 @@ export async function POST(request: Request) {
       title,
       total_episodes,
     } = body;
+
+    // --------------------------------------------------
+    // 기본값 검증
+    // --------------------------------------------------
 
     if (!drive_file_id) {
       return Response.json(
@@ -214,13 +240,15 @@ export async function POST(request: Request) {
     // 1. 기존 책 확인
     // --------------------------------------------------
 
-    const { data: existingBook, error: findBookError } =
-      await supabase
-        .from("books")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("drive_file_id", drive_file_id)
-        .maybeSingle();
+    const {
+      data: existingBook,
+      error: findBookError,
+    } = await supabase
+      .from("books")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("drive_file_id", drive_file_id)
+      .maybeSingle();
 
     if (findBookError) {
       console.error(
@@ -241,21 +269,23 @@ export async function POST(request: Request) {
     // --------------------------------------------------
 
     if (!book) {
-      const { data: newBook, error: bookInsertError } =
-        await supabase
-          .from("books")
-          .insert({
-            user_id: userId,
-            drive_file_id,
-            title,
-            total_episodes,
-            last_episode: 0,
-            progress: 0,
-            status: "안읽음",
-            scroll_position: 0,
-          })
-          .select()
-          .single();
+      const {
+        data: newBook,
+        error: bookInsertError,
+      } = await supabase
+        .from("books")
+        .insert({
+          user_id: userId,
+          drive_file_id,
+          title,
+          total_episodes,
+          last_episode: 0,
+          progress: 0,
+          status: "읽는 중",
+          scroll_position: 0,
+        })
+        .select()
+        .single();
 
       if (bookInsertError) {
         console.error(
@@ -270,19 +300,59 @@ export async function POST(request: Request) {
       }
 
       book = newBook;
+    } else {
+      // --------------------------------------------------
+      // 2-1. 기존 책이면 최신 책 정보 반영
+      //
+      // 처음 책을 열었을 때
+      // "안읽음" → "읽는 중"
+      // --------------------------------------------------
+
+      const {
+        data: updatedExistingBook,
+        error: existingBookUpdateError,
+      } = await supabase
+        .from("books")
+        .update({
+          title,
+          total_episodes,
+          status: "읽는 중",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", book.id)
+        .eq("user_id", userId)
+        .eq("drive_file_id", drive_file_id)
+        .select()
+        .single();
+
+      if (existingBookUpdateError) {
+        console.error(
+          "EXISTING BOOK UPDATE ERROR:",
+          existingBookUpdateError
+        );
+
+        return Response.json(
+          { error: existingBookUpdateError.message },
+          { status: 500 }
+        );
+      }
+
+      book = updatedExistingBook;
     }
 
     // --------------------------------------------------
     // 3. 기존 회차 확인
     // --------------------------------------------------
 
-    const { data: existingRounds, error: roundsError } =
-      await supabase
-        .from("reading_rounds")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("book_id", book.id)
-        .order("round", { ascending: true });
+    const {
+      data: existingRounds,
+      error: roundsError,
+    } = await supabase
+      .from("reading_rounds")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("book_id", book.id)
+      .order("round", { ascending: true });
 
     if (roundsError) {
       console.error(
@@ -303,17 +373,19 @@ export async function POST(request: Request) {
     // --------------------------------------------------
 
     if (rounds.length === 0) {
-      const { data: newRound, error: roundInsertError } =
-        await supabase
-          .from("reading_rounds")
-          .insert({
-            user_id: userId,
-            book_id: book.id,
-            round: 1,
-            status: "reading",
-          })
-          .select()
-          .single();
+      const {
+        data: newRound,
+        error: roundInsertError,
+      } = await supabase
+        .from("reading_rounds")
+        .insert({
+          user_id: userId,
+          book_id: book.id,
+          round: 1,
+          status: "reading",
+        })
+        .select()
+        .single();
 
       if (roundInsertError) {
         console.error(
@@ -333,15 +405,16 @@ export async function POST(request: Request) {
       // 5. 1회차 진행상황 생성
       // --------------------------------------------------
 
-      const { error: progressInsertError } =
-        await supabase
-          .from("reading_progress")
-          .insert({
-            round_id: newRound.id,
-            episode: 0,
-            progress: 0,
-            scroll_position: 0,
-          });
+      const {
+        error: progressInsertError,
+      } = await supabase
+        .from("reading_progress")
+        .insert({
+          round_id: newRound.id,
+          episode: 0,
+          progress: 0,
+          scroll_position: 0,
+        });
 
       if (progressInsertError) {
         console.error(
@@ -363,19 +436,23 @@ export async function POST(request: Request) {
     const currentRound =
       [...rounds]
         .reverse()
-        .find((round) => round.status === "reading") ??
+        .find(
+          (round) => round.status === "reading"
+        ) ??
       rounds[rounds.length - 1];
 
     // --------------------------------------------------
     // 7. 현재 회차 진행상황 조회
     // --------------------------------------------------
 
-    const { data: progress, error: progressError } =
-      await supabase
-        .from("reading_progress")
-        .select("*")
-        .eq("round_id", currentRound.id)
-        .maybeSingle();
+    const {
+      data: progress,
+      error: progressError,
+    } = await supabase
+      .from("reading_progress")
+      .select("*")
+      .eq("round_id", currentRound.id)
+      .maybeSingle();
 
     if (progressError) {
       console.error(
@@ -388,6 +465,51 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
+
+    // --------------------------------------------------
+    // 8. 책 상태 최종 확인
+    //
+    // 혹시 기존 책이 "안읽음"이었더라도
+    // 실제로 읽기 화면을 열었으므로 "읽는 중".
+    //
+    // 단, 현재 회차가 이미 completed라면
+    // 완독 상태를 유지.
+    // --------------------------------------------------
+
+    if (currentRound.status === "reading") {
+      const {
+        data: finalBook,
+        error: finalBookUpdateError,
+      } = await supabase
+        .from("books")
+        .update({
+          status: "읽는 중",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", book.id)
+        .eq("user_id", userId)
+        .eq("drive_file_id", drive_file_id)
+        .select()
+        .single();
+
+      if (finalBookUpdateError) {
+        console.error(
+          "BOOK READING STATUS UPDATE ERROR:",
+          finalBookUpdateError
+        );
+
+        return Response.json(
+          { error: finalBookUpdateError.message },
+          { status: 500 }
+        );
+      }
+
+      book = finalBook;
+    }
+
+    // --------------------------------------------------
+    // 9. 결과 반환
+    // --------------------------------------------------
 
     return Response.json({
       success: true,
@@ -403,7 +525,10 @@ export async function POST(request: Request) {
       },
     });
   } catch (error) {
-    console.error("BOOKS POST UNEXPECTED ERROR:", error);
+    console.error(
+      "BOOKS POST UNEXPECTED ERROR:",
+      error
+    );
 
     return Response.json(
       {
@@ -420,18 +545,9 @@ export async function POST(request: Request) {
 /**
  * 현재 독서 진행상황 저장
  *
- * 기존:
- *   books.last_episode
- *   books.progress
- *   books.scroll_position
- *
- * 앞으로:
- *   reading_progress.episode
- *   reading_progress.progress
- *   reading_progress.scroll_position
- *
- * 완료 여부:
- *   reading_rounds.status
+ * reading_progress = 실제 회차별 진행상황
+ * reading_rounds = 회차의 읽기 상태
+ * books = 기존 화면과의 호환을 위해 동기화
  */
 export async function PATCH(request: Request) {
   const session: any = await getServerSession(authOptions);
@@ -456,6 +572,10 @@ export async function PATCH(request: Request) {
       scroll_position,
       status,
     } = body;
+
+    // --------------------------------------------------
+    // 기본값 검증
+    // --------------------------------------------------
 
     if (!drive_file_id) {
       return Response.json(
@@ -489,13 +609,15 @@ export async function PATCH(request: Request) {
     // 1. 책 확인
     // --------------------------------------------------
 
-    const { data: book, error: bookError } =
-      await supabase
-        .from("books")
-        .select("*")
-        .eq("user_id", userId)
-        .eq("drive_file_id", drive_file_id)
-        .maybeSingle();
+    const {
+      data: book,
+      error: bookError,
+    } = await supabase
+      .from("books")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("drive_file_id", drive_file_id)
+      .maybeSingle();
 
     if (bookError) {
       console.error(
@@ -526,16 +648,18 @@ export async function PATCH(request: Request) {
     let currentRoundId = round_id;
 
     if (!currentRoundId) {
-      const { data: currentRound, error: roundError } =
-        await supabase
-          .from("reading_rounds")
-          .select("*")
-          .eq("user_id", userId)
-          .eq("book_id", book.id)
-          .eq("status", "reading")
-          .order("round", { ascending: false })
-          .limit(1)
-          .maybeSingle();
+      const {
+        data: currentRound,
+        error: roundError,
+      } = await supabase
+        .from("reading_rounds")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("book_id", book.id)
+        .eq("status", "reading")
+        .order("round", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (roundError) {
         console.error(
@@ -563,17 +687,19 @@ export async function PATCH(request: Request) {
     }
 
     // --------------------------------------------------
-    // 3. round_id가 이 사용자의 이 책에 속하는지 확인
+    // 3. round_id 검증
     // --------------------------------------------------
 
-    const { data: round, error: verifyRoundError } =
-      await supabase
-        .from("reading_rounds")
-        .select("*")
-        .eq("id", currentRoundId)
-        .eq("user_id", userId)
-        .eq("book_id", book.id)
-        .maybeSingle();
+    const {
+      data: round,
+      error: verifyRoundError,
+    } = await supabase
+      .from("reading_rounds")
+      .select("*")
+      .eq("id", currentRoundId)
+      .eq("user_id", userId)
+      .eq("book_id", book.id)
+      .maybeSingle();
 
     if (verifyRoundError) {
       console.error(
@@ -589,7 +715,10 @@ export async function PATCH(request: Request) {
 
     if (!round) {
       return Response.json(
-        { error: "올바르지 않은 reading round입니다." },
+        {
+          error:
+            "올바르지 않은 reading round입니다.",
+        },
         { status: 403 }
       );
     }
@@ -598,23 +727,25 @@ export async function PATCH(request: Request) {
     // 4. reading_progress 저장
     // --------------------------------------------------
 
-    const { data: savedProgress, error: progressError } =
-      await supabase
-        .from("reading_progress")
-        .upsert(
-          {
-            round_id: currentRoundId,
-            episode,
-            progress,
-            scroll_position,
-            updated_at: new Date().toISOString(),
-          },
-          {
-            onConflict: "round_id",
-          }
-        )
-        .select()
-        .single();
+    const {
+      data: savedProgress,
+      error: progressError,
+    } = await supabase
+      .from("reading_progress")
+      .upsert(
+        {
+          round_id: currentRoundId,
+          episode,
+          progress,
+          scroll_position,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: "round_id",
+        }
+      )
+      .select()
+      .single();
 
     if (progressError) {
       console.error(
@@ -629,24 +760,26 @@ export async function PATCH(request: Request) {
     }
 
     // --------------------------------------------------
-    // 5. 완독이면 reading_rounds 상태 변경
+    // 5. 완독 처리
     // --------------------------------------------------
 
     let savedRound = round;
 
     if (status === "completed") {
-      const { data: completedRound, error: completeError } =
-        await supabase
-          .from("reading_rounds")
-          .update({
-            status: "completed",
-            completed_at: new Date().toISOString(),
-          })
-          .eq("id", currentRoundId)
-          .eq("user_id", userId)
-          .eq("book_id", book.id)
-          .select()
-          .single();
+      const {
+        data: completedRound,
+        error: completeError,
+      } = await supabase
+        .from("reading_rounds")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", currentRoundId)
+        .eq("user_id", userId)
+        .eq("book_id", book.id)
+        .select()
+        .single();
 
       if (completeError) {
         console.error(
@@ -664,30 +797,29 @@ export async function PATCH(request: Request) {
     }
 
     // --------------------------------------------------
-    // 6. books의 기존 진행상황도 일단 동기화
-    //
-    // 기존 화면 코드가 아직 books의 값을 사용하므로
-    // 완전히 제거하기 전까지는 같이 저장.
+    // 6. books 기존 진행상황 동기화
     // --------------------------------------------------
 
-    const { data: updatedBook, error: bookUpdateError } =
-      await supabase
-        .from("books")
-        .update({
-          last_episode: episode,
-          progress,
-          status:
-            status === "completed"
-              ? "완독"
-              : "읽는 중",
-          scroll_position,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", book.id)
-        .eq("user_id", userId)
-        .eq("drive_file_id", drive_file_id)
-        .select()
-        .single();
+    const {
+      data: updatedBook,
+      error: bookUpdateError,
+    } = await supabase
+      .from("books")
+      .update({
+        last_episode: episode,
+        progress,
+        status:
+          status === "completed"
+            ? "완독"
+            : "읽는 중",
+        scroll_position,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", book.id)
+      .eq("user_id", userId)
+      .eq("drive_file_id", drive_file_id)
+      .select()
+      .single();
 
     if (bookUpdateError) {
       console.error(
@@ -701,6 +833,10 @@ export async function PATCH(request: Request) {
       );
     }
 
+    // --------------------------------------------------
+    // 7. 결과 반환
+    // --------------------------------------------------
+
     return Response.json({
       success: true,
       data: {
@@ -710,7 +846,10 @@ export async function PATCH(request: Request) {
       },
     });
   } catch (error) {
-    console.error("BOOKS PATCH UNEXPECTED ERROR:", error);
+    console.error(
+      "BOOKS PATCH UNEXPECTED ERROR:",
+      error
+    );
 
     return Response.json(
       {
