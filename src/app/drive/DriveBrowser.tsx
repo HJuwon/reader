@@ -205,9 +205,9 @@ export default function DriveBrowser() {
     useState<number>(1);
 
   const [roundStatus, setRoundStatus] =
-    useState<
-      "reading" | "completed"
-    >("reading");
+    useState<"reading" | "completed">(
+      "reading"
+    );
 
   const [themeKey, setThemeKey] =
     useState<ThemeKey>("ivory");
@@ -437,9 +437,6 @@ export default function DriveBrowser() {
     return fallback;
   }
 
-  /*
-   * 책을 열 때 읽기 상태 초기화/조회
-   */
   async function initializeReadingState(
     fileId: string,
     title: string,
@@ -480,10 +477,6 @@ export default function DriveBrowser() {
       const stateData =
         data?.data;
 
-      /*
-       * API에서 round 또는 current_round
-       * 어느 이름으로 반환하더라도 처리
-       */
       const round =
         stateData?.round ??
         stateData?.current_round;
@@ -902,9 +895,6 @@ export default function DriveBrowser() {
     selectedEpisodeIndex,
   ]);
 
-  /*
-   * 현재 위치 저장
-   */
   async function saveScrollPosition(
     position?: number
   ) {
@@ -997,9 +987,6 @@ export default function DriveBrowser() {
     }
   }
 
-  /*
-   * 스크롤 감지 → 1초 후 저장
-   */
   useEffect(() => {
     if (
       !selectedFile ||
@@ -1061,9 +1048,6 @@ export default function DriveBrowser() {
     roundId,
   ]);
 
-  /*
-   * 브라우저 종료 시 마지막 위치 저장
-   */
   useEffect(() => {
     function handleBeforeUnload() {
       if (
@@ -1518,11 +1502,9 @@ export default function DriveBrowser() {
   /*
    * 특정 회차의 진행상황 저장
    *
-   * targetRoundId는 string 또는 null을 받을 수 있다.
-   *
    * 최초 소설 진입 시 React의 roundId state가
    * 아직 갱신되지 않은 상태에서도
-   * API에서 받은 round.id를 직접 전달해서 저장할 수 있다.
+   * API에서 받은 round.id를 직접 전달해서 저장한다.
    */
   async function saveProgress(
     episodeIndex: number,
@@ -1673,9 +1655,6 @@ export default function DriveBrowser() {
         )
       );
 
-    /*
-     * 이전 회차 저장
-     */
     await saveProgress(
       selectedEpisodeIndex,
       currentScrollPosition
@@ -1701,9 +1680,6 @@ export default function DriveBrowser() {
       behavior: "auto",
     });
 
-    /*
-     * 새 회차 저장
-     */
     await saveProgress(
       index,
       0
@@ -1752,6 +1728,22 @@ export default function DriveBrowser() {
     }
 
     async function openFile() {
+      /*
+       * 중요:
+       * 중첩 async 함수에서는 바깥의
+       * if (!fileId) return만으로
+       * TypeScript가 string으로 좁히지 못할 수 있다.
+       *
+       * 따라서 openFile 내부에서 다시 검사한다.
+       */
+      if (!fileId) {
+        setLoading(false);
+        setError(
+          "파일을 찾을 수 없습니다."
+        );
+        return;
+      }
+
       setLoading(true);
       setError("");
 
@@ -1759,7 +1751,7 @@ export default function DriveBrowser() {
         const infoResponse =
           await fetch(
             `/api/drive/file-info?fileId=${encodeURIComponent(
-              fileId!
+              fileId
             )}`
           );
 
@@ -1778,7 +1770,7 @@ export default function DriveBrowser() {
         const fileResponse =
           await fetch(
             `/api/drive/file?fileId=${encodeURIComponent(
-              fileId!
+              fileId
             )}`
           );
 
@@ -1822,12 +1814,9 @@ export default function DriveBrowser() {
 
         setParsedNovel(parsed);
 
-        /*
-         * 읽기 상태 가져오기
-         */
         const readingState =
           await initializeReadingState(
-            fileId!,
+            fileId,
             infoData.name,
             parsed.episodes.length
           );
@@ -1938,20 +1927,16 @@ export default function DriveBrowser() {
 
         if (initialEpisode) {
           await getBookmarkStatus(
-            fileId!,
+            fileId,
             initialEpisode.episode
           );
         }
 
         /*
-         * 중요
-         *
          * 신규 reading_progress가 0이면
-         * state의 roundId가 갱신되기를 기다리지 않고
-         * API에서 받은 readingState.round.id를 직접 전달한다.
-         *
-         * 이렇게 해야 최초 진입 시에도
-         * 첫 회차 진행상황이 바로 저장된다.
+         * state의 roundId state가 갱신되기를
+         * 기다리지 않고 API에서 받은
+         * readingState.round.id를 직접 전달한다.
          */
         if (
           savedProgress.episode ===
