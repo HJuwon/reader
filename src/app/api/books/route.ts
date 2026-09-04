@@ -2,8 +2,222 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { supabase } from "@/lib/supabase";
 
-export async function POST(request: Request) {
+// ======================================================
+// GET
+// 소설 목록 조회
+// ======================================================
+
+export async function GET() {
   const session: any = await getServerSession(authOptions);
+
+  if (!session?.user?.email) {
+    return Response.json(
+      { error: "로그인이 필요합니다." },
+      { status: 401 }
+    );
+  }
+
+  const userId = session.user.email;
+
+  try {
+    // --------------------------------------------------
+    // 1. 책 목록
+    // --------------------------------------------------
+
+    const {
+      data: books,
+      error: booksError,
+    } = await supabase
+      .from("books")
+      .select("*")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false });
+
+    if (booksError) {
+      console.error("BOOKS GET ERROR:", booksError);
+
+      return Response.json(
+        { error: booksError.message },
+        { status: 500 }
+      );
+    }
+
+    const bookList = books ?? [];
+
+    if (bookList.length === 0) {
+      return Response.json({
+        success: true,
+        data: [],
+      });
+    }
+
+    // --------------------------------------------------
+    // 2. 독서 회차 조회
+    // --------------------------------------------------
+
+    const bookIds = bookList.map(
+      (book) => book.id
+    );
+
+    const {
+      data: rounds,
+      error: roundsError,
+    } = await supabase
+      .from("reading_rounds")
+      .select("*")
+      .eq("user_id", userId)
+      .in("book_id", bookIds)
+      .order("round", { ascending: true });
+
+    if (roundsError) {
+      console.error(
+        "READING ROUNDS GET ERROR:",
+        roundsError
+      );
+
+      return Response.json(
+        { error: roundsError.message },
+        { status: 500 }
+      );
+    }
+
+    const roundList = rounds ?? [];
+
+    // --------------------------------------------------
+    // 3. 진행상황 조회
+    // --------------------------------------------------
+
+    const roundIds = roundList.map(
+      (round) => round.id
+    );
+
+    let progressList: any[] = [];
+
+    if (roundIds.length > 0) {
+      const {
+        data: progress,
+        error: progressError,
+      } = await supabase
+        .from("reading_progress")
+        .select("*")
+        .in("round_id", roundIds);
+
+      if (progressError) {
+        console.error(
+          "READING PROGRESS GET ERROR:",
+          progressError
+        );
+
+        return Response.json(
+          { error: progressError.message },
+          { status: 500 }
+        );
+      }
+
+      progressList = progress ?? [];
+    }
+
+    // --------------------------------------------------
+    // 4. 책별 데이터 조합
+    // --------------------------------------------------
+
+    const result = bookList.map((book) => {
+      const bookRounds = roundList.filter(
+        (round) =>
+          round.book_id === book.id
+      );
+
+      const currentRound =
+        [...bookRounds]
+          .reverse()
+          .find(
+            (round) =>
+              round.status === "reading"
+          ) ??
+        bookRounds[
+          bookRounds.length - 1
+        ] ??
+        null;
+
+      const currentProgress =
+        currentRound
+          ? progressList.find(
+              (progress) =>
+                progress.round_id ===
+                currentRound.id
+            ) ?? null
+          : null;
+
+      return {
+        ...book,
+
+        rounds: bookRounds,
+
+        round_count:
+          bookRounds.length,
+
+        completed_round_count:
+          bookRounds.filter(
+            (round) =>
+              round.status ===
+              "completed"
+          ).length,
+
+        current_round:
+          currentRound?.round ?? null,
+
+        current_round_id:
+          currentRound?.id ?? null,
+
+        current_episode:
+          currentProgress?.episode ??
+          0,
+
+        current_progress:
+          currentProgress?.progress ??
+          0,
+
+        current_scroll_position:
+          currentProgress?.scroll_position ??
+          0,
+      };
+    });
+
+    return Response.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error(
+      "BOOKS GET UNEXPECTED ERROR:",
+      error
+    );
+
+    return Response.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "책 목록을 불러오는 중 오류가 발생했습니다.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// ======================================================
+// POST
+//
+// 1. 최초 책 등록
+// 2. 일반 책 열기
+// 3. 다시 읽기(restart)
+// ======================================================
+
+export async function POST(
+  request: Request
+) {
+  const session: any =
+    await getServerSession(authOptions);
 
   if (!session?.user?.email) {
     return Response.json(
@@ -30,24 +244,33 @@ export async function POST(request: Request) {
 
     if (!drive_file_id) {
       return Response.json(
-        { error: "drive_file_id가 필요합니다." },
+        {
+          error:
+            "drive_file_id가 필요합니다.",
+        },
         { status: 400 }
       );
     }
 
     if (!title) {
       return Response.json(
-        { error: "title이 필요합니다." },
+        {
+          error: "title이 필요합니다.",
+        },
         { status: 400 }
       );
     }
 
     if (
-      typeof total_episodes !== "number" ||
+      typeof total_episodes !==
+        "number" ||
       total_episodes < 0
     ) {
       return Response.json(
-        { error: "total_episodes가 올바르지 않습니다." },
+        {
+          error:
+            "total_episodes가 올바르지 않습니다.",
+        },
         { status: 400 }
       );
     }
@@ -63,11 +286,17 @@ export async function POST(request: Request) {
       .from("books")
       .select("*")
       .eq("user_id", userId)
-      .eq("drive_file_id", drive_file_id)
+      .eq(
+        "drive_file_id",
+        drive_file_id
+      )
       .maybeSingle();
 
     if (findBookError) {
-      console.error("BOOK FIND ERROR:", findBookError);
+      console.error(
+        "BOOK FIND ERROR:",
+        findBookError
+      );
 
       return Response.json(
         { error: findBookError.message },
@@ -78,12 +307,12 @@ export async function POST(request: Request) {
     let book = existingBook;
 
     // --------------------------------------------------
-    // 3. 책이 없으면 생성
+    // 3. 책이 없는 경우
     // --------------------------------------------------
 
     if (!book) {
-      // restart=true인데 책 자체가 없다면
-      // 정상적인 상황이 아니므로 오류 처리
+      // restart로 존재하지 않는 책을
+      // 새 회차로 시작하려는 경우
       if (restart) {
         return Response.json(
           {
@@ -119,26 +348,25 @@ export async function POST(request: Request) {
         );
 
         return Response.json(
-          { error: bookInsertError.message },
+          {
+            error:
+              bookInsertError.message,
+          },
           { status: 500 }
         );
       }
 
       book = newBook;
     } else {
-      // --------------------------------------------------
-      // 3-1. 기존 책 정보만 최신화
+      // ------------------------------------------------
+      // 기존 책 정보만 갱신
       //
-      // 중요:
-      // 여기서는 status를 변경하지 않는다.
-      //
-      // 완독 책을 단순히 다시 열었을 때
-      // "완독" 상태를 유지해야 하기 때문.
-      // --------------------------------------------------
+      // status는 변경하지 않는다.
+      // ------------------------------------------------
 
       const {
-        data: updatedExistingBook,
-        error: existingBookUpdateError,
+        data: updatedBook,
+        error: updateBookError,
       } = await supabase
         .from("books")
         .update({
@@ -147,27 +375,33 @@ export async function POST(request: Request) {
         })
         .eq("id", book.id)
         .eq("user_id", userId)
-        .eq("drive_file_id", drive_file_id)
+        .eq(
+          "drive_file_id",
+          drive_file_id
+        )
         .select()
         .single();
 
-      if (existingBookUpdateError) {
+      if (updateBookError) {
         console.error(
           "EXISTING BOOK UPDATE ERROR:",
-          existingBookUpdateError
+          updateBookError
         );
 
         return Response.json(
-          { error: existingBookUpdateError.message },
+          {
+            error:
+              updateBookError.message,
+          },
           { status: 500 }
         );
       }
 
-      book = updatedExistingBook;
+      book = updatedBook;
     }
 
     // --------------------------------------------------
-    // 4. 기존 독서 회차 조회
+    // 4. 기존 회차 조회
     // --------------------------------------------------
 
     const {
@@ -178,7 +412,9 @@ export async function POST(request: Request) {
       .select("*")
       .eq("user_id", userId)
       .eq("book_id", book.id)
-      .order("round", { ascending: true });
+      .order("round", {
+        ascending: true,
+      });
 
     if (roundsError) {
       console.error(
@@ -192,26 +428,19 @@ export async function POST(request: Request) {
       );
     }
 
-    let rounds = existingRounds ?? [];
+    let rounds =
+      existingRounds ?? [];
 
     // --------------------------------------------------
     // 5. 최초 독서
     //
-    // 중요:
-    // restart=true일 때는 여기서 1회차를 만들지 않는다.
-    //
-    // 정상적인 최초 진입:
-    // rounds = []
-    // restart = false
-    // → 1회차 생성
-    //
-    // 다시 읽기:
-    // rounds가 이미 존재
-    // restart = true
-    // → 아래 6번에서 다음 회차 생성
+    // restart=false일 때만 1회차 생성
     // --------------------------------------------------
 
-    if (rounds.length === 0 && !restart) {
+    if (
+      rounds.length === 0 &&
+      !restart
+    ) {
       const {
         data: newRound,
         error: roundInsertError,
@@ -233,14 +462,18 @@ export async function POST(request: Request) {
         );
 
         return Response.json(
-          { error: roundInsertError.message },
+          {
+            error:
+              roundInsertError.message,
+          },
           { status: 500 }
         );
       }
 
       const {
         data: newProgress,
-        error: progressInsertError,
+        error:
+          progressInsertError,
       } = await supabase
         .from("reading_progress")
         .insert({
@@ -259,138 +492,103 @@ export async function POST(request: Request) {
         );
 
         return Response.json(
-          { error: progressInsertError.message },
+          {
+            error:
+              progressInsertError.message,
+          },
           { status: 500 }
         );
       }
 
       rounds = [newRound];
 
-      // 최초 독서이므로 books 상태도 읽는 중으로 설정
-      const {
-        data: initialBook,
-        error: initialBookError,
-      } = await supabase
-        .from("books")
-        .update({
-          status: "읽는 중",
-          last_episode: 0,
-          progress: 0,
-          scroll_position: 0,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", book.id)
-        .eq("user_id", userId)
-        .eq("drive_file_id", drive_file_id)
-        .select()
-        .single();
-
-      if (initialBookError) {
-        console.error(
-          "INITIAL BOOK UPDATE ERROR:",
-          initialBookError
-        );
-
-        return Response.json(
-          { error: initialBookError.message },
-          { status: 500 }
-        );
-      }
-
-      book = initialBook;
-
       return Response.json({
         success: true,
         data: {
           book,
           rounds,
-          current_round: newRound,
-          progress: newProgress,
+          current_round:
+            newRound,
+          progress:
+            newProgress,
         },
       });
     }
 
-    // --------------------------------------------------
+    // ==================================================
     // 6. 다시 읽기
-    //
-    // restart=true일 때만 실행된다.
-    //
-    // 예:
-    //
-    // 1회차 completed
-    //       ↓
-    // 다시 읽기
-    //       ↓
-    // 2회차 reading
-    //
-    // 다시 완독
-    //       ↓
-    // 다시 읽기
-    //       ↓
-    // 3회차 reading
-    //
-    // 기존 completed 회차는 절대 수정하지 않는다.
-    // --------------------------------------------------
+    // ==================================================
 
     if (restart) {
-      // ------------------------------------------------
-      // 혹시 마지막 회차가 이미 reading이면
-      // 새로운 회차를 중복 생성하지 않는다.
-      // ------------------------------------------------
-
       const latestRound =
         rounds.length > 0
-          ? rounds[rounds.length - 1]
+          ? rounds[
+              rounds.length - 1
+            ]
           : null;
+
+      // ------------------------------------------------
+      // 이미 읽는 중인 회차가 있으면
+      // 새 회차를 만들지 않는다.
+      // ------------------------------------------------
 
       if (
         latestRound &&
-        latestRound.status === "reading"
+        latestRound.status ===
+          "reading"
       ) {
         const {
           data: existingProgress,
-          error: existingProgressError,
+          error:
+            existingProgressError,
         } = await supabase
           .from("reading_progress")
           .select("*")
-          .eq("round_id", latestRound.id)
+          .eq(
+            "round_id",
+            latestRound.id
+          )
           .maybeSingle();
 
         if (existingProgressError) {
-          console.error(
-            "EXISTING PROGRESS FIND ERROR:",
-            existingProgressError
-          );
-
           return Response.json(
-            { error: existingProgressError.message },
+            {
+              error:
+                existingProgressError.message,
+            },
             { status: 500 }
           );
         }
 
         const {
           data: readingBook,
-          error: readingBookError,
+          error:
+            readingBookError,
         } = await supabase
           .from("books")
           .update({
             status: "읽는 중",
-            updated_at: new Date().toISOString(),
+            updated_at:
+              new Date().toISOString(),
           })
           .eq("id", book.id)
-          .eq("user_id", userId)
-          .eq("drive_file_id", drive_file_id)
+          .eq(
+            "user_id",
+            userId
+          )
+          .eq(
+            "drive_file_id",
+            drive_file_id
+          )
           .select()
           .single();
 
         if (readingBookError) {
-          console.error(
-            "READING BOOK UPDATE ERROR:",
-            readingBookError
-          );
-
           return Response.json(
-            { error: readingBookError.message },
+            {
+              error:
+                readingBookError.message,
+            },
             { status: 500 }
           );
         }
@@ -400,10 +598,13 @@ export async function POST(request: Request) {
           data: {
             book: readingBook,
             rounds,
-            current_round: latestRound,
+            current_round:
+              latestRound,
             progress:
-              existingProgress ?? {
-                round_id: latestRound.id,
+              existingProgress ??
+              {
+                round_id:
+                  latestRound.id,
                 episode: 0,
                 progress: 0,
                 scroll_position: 0,
@@ -413,15 +614,15 @@ export async function POST(request: Request) {
       }
 
       // ------------------------------------------------
-      // 마지막 회차가 completed라면
-      // 다음 회차 번호 생성
+      // 다음 회차 번호
       // ------------------------------------------------
 
       const nextRoundNumber =
         rounds.length > 0
           ? Math.max(
               ...rounds.map(
-                (round) => round.round
+                (round) =>
+                  round.round
               )
             ) + 1
           : 1;
@@ -438,7 +639,8 @@ export async function POST(request: Request) {
         .insert({
           user_id: userId,
           book_id: book.id,
-          round: nextRoundNumber,
+          round:
+            nextRoundNumber,
           status: "reading",
         })
         .select()
@@ -451,13 +653,16 @@ export async function POST(request: Request) {
         );
 
         return Response.json(
-          { error: newRoundError.message },
+          {
+            error:
+              newRoundError.message,
+          },
           { status: 500 }
         );
       }
 
       // ------------------------------------------------
-      // 새 회차 진행상황 생성
+      // 새 회차 진행상황
       // ------------------------------------------------
 
       const {
@@ -481,7 +686,10 @@ export async function POST(request: Request) {
         );
 
         return Response.json(
-          { error: newProgressError.message },
+          {
+            error:
+              newProgressError.message,
+          },
           { status: 500 }
         );
       }
@@ -492,14 +700,15 @@ export async function POST(request: Request) {
       ];
 
       // ------------------------------------------------
-      // books는 현재 읽고 있는 회차 기준으로 변경
+      // books의 현재 상태만 변경
       //
-      // 기존 reading_rounds 데이터는 건드리지 않는다.
+      // 과거 completed 회차는 건드리지 않는다.
       // ------------------------------------------------
 
       const {
         data: restartedBook,
-        error: restartedBookError,
+        error:
+          restartedBookError,
       } = await supabase
         .from("books")
         .update({
@@ -507,11 +716,18 @@ export async function POST(request: Request) {
           last_episode: 0,
           progress: 0,
           scroll_position: 0,
-          updated_at: new Date().toISOString(),
+          updated_at:
+            new Date().toISOString(),
         })
         .eq("id", book.id)
-        .eq("user_id", userId)
-        .eq("drive_file_id", drive_file_id)
+        .eq(
+          "user_id",
+          userId
+        )
+        .eq(
+          "drive_file_id",
+          drive_file_id
+        )
         .select()
         .single();
 
@@ -522,7 +738,10 @@ export async function POST(request: Request) {
         );
 
         return Response.json(
-          { error: restartedBookError.message },
+          {
+            error:
+              restartedBookError.message,
+          },
           { status: 500 }
         );
       }
@@ -532,39 +751,29 @@ export async function POST(request: Request) {
         data: {
           book: restartedBook,
           rounds,
-          current_round: newRound,
-          progress: newProgress,
+          current_round:
+            newRound,
+          progress:
+            newProgress,
         },
       });
     }
 
-    // --------------------------------------------------
+    // ==================================================
     // 7. 일반적으로 책 열기
-    //
-    // reading 회차가 있으면 그 회차를 계속 읽는다.
-    //
-    // 예:
-    //
-    // 1회차 completed
-    // 2회차 reading
-    // → 2회차 사용
-    //
-    // 1회차 completed
-    // 2회차 completed
-    // → 2회차 사용
-    //
-    // 즉, 완독 책을 단순히 열었다고
-    // 새로운 회차가 자동 생성되지 않는다.
-    // --------------------------------------------------
+    // ==================================================
 
     const currentRound =
       [...rounds]
         .reverse()
         .find(
           (round) =>
-            round.status === "reading"
+            round.status ===
+            "reading"
         ) ??
-      rounds[rounds.length - 1];
+      rounds[
+        rounds.length - 1
+      ];
 
     if (!currentRound) {
       return Response.json(
@@ -577,7 +786,7 @@ export async function POST(request: Request) {
     }
 
     // --------------------------------------------------
-    // 8. 현재 회차 진행상황 조회
+    // 8. 진행상황 조회
     // --------------------------------------------------
 
     const {
@@ -586,7 +795,10 @@ export async function POST(request: Request) {
     } = await supabase
       .from("reading_progress")
       .select("*")
-      .eq("round_id", currentRound.id)
+      .eq(
+        "round_id",
+        currentRound.id
+      )
       .maybeSingle();
 
     if (progressError) {
@@ -596,24 +808,21 @@ export async function POST(request: Request) {
       );
 
       return Response.json(
-        { error: progressError.message },
+        {
+          error:
+            progressError.message,
+        },
         { status: 500 }
       );
     }
 
     // --------------------------------------------------
     // 9. books 상태 동기화
-    //
-    // reading   → 읽는 중
-    // completed → 완독
-    //
-    // 중요:
-    // 여기서는 현재 회차의 상태만 반영한다.
-    // 과거 회차의 상태는 변경하지 않는다.
     // --------------------------------------------------
 
     const bookStatus =
-      currentRound.status === "completed"
+      currentRound.status ===
+      "completed"
         ? "완독"
         : "읽는 중";
 
@@ -624,11 +833,18 @@ export async function POST(request: Request) {
       .from("books")
       .update({
         status: bookStatus,
-        updated_at: new Date().toISOString(),
+        updated_at:
+          new Date().toISOString(),
       })
       .eq("id", book.id)
-      .eq("user_id", userId)
-      .eq("drive_file_id", drive_file_id)
+      .eq(
+        "user_id",
+        userId
+      )
+      .eq(
+        "drive_file_id",
+        drive_file_id
+      )
       .select()
       .single();
 
@@ -639,7 +855,10 @@ export async function POST(request: Request) {
       );
 
       return Response.json(
-        { error: finalBookError.message },
+        {
+          error:
+            finalBookError.message,
+        },
         { status: 500 }
       );
     }
@@ -655,10 +874,12 @@ export async function POST(request: Request) {
       data: {
         book,
         rounds,
-        current_round: currentRound,
+        current_round:
+          currentRound,
         progress:
           progress ?? {
-            round_id: currentRound.id,
+            round_id:
+              currentRound.id,
             episode: 0,
             progress: 0,
             scroll_position: 0,
@@ -677,6 +898,421 @@ export async function POST(request: Request) {
           error instanceof Error
             ? error.message
             : "책 생성 중 오류가 발생했습니다.",
+      },
+      { status: 500 }
+    );
+  }
+}
+
+// ======================================================
+// PATCH
+// 읽기 진행상황 저장
+// ======================================================
+
+export async function PATCH(
+  request: Request
+) {
+  const session: any =
+    await getServerSession(authOptions);
+
+  if (!session?.user?.email) {
+    return Response.json(
+      { error: "로그인이 필요합니다." },
+      { status: 401 }
+    );
+  }
+
+  const userId = session.user.email;
+
+  try {
+    const body = await request.json();
+
+    const {
+      drive_file_id,
+      episode,
+      progress,
+      scroll_position,
+      round_id,
+      status,
+    } = body;
+
+    // --------------------------------------------------
+    // 1. 기본값 검증
+    // --------------------------------------------------
+
+    if (!drive_file_id) {
+      return Response.json(
+        {
+          error:
+            "drive_file_id가 필요합니다.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      typeof episode !==
+        "number" ||
+      episode < 0
+    ) {
+      return Response.json(
+        {
+          error:
+            "episode가 올바르지 않습니다.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      typeof progress !==
+        "number" ||
+      progress < 0 ||
+      progress > 100
+    ) {
+      return Response.json(
+        {
+          error:
+            "progress가 올바르지 않습니다.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (
+      typeof scroll_position !==
+        "number" ||
+      scroll_position < 0
+    ) {
+      return Response.json(
+        {
+          error:
+            "scroll_position이 올바르지 않습니다.",
+        },
+        { status: 400 }
+      );
+    }
+
+    // --------------------------------------------------
+    // 2. 책 조회
+    // --------------------------------------------------
+
+    const {
+      data: book,
+      error: bookError,
+    } = await supabase
+      .from("books")
+      .select("*")
+      .eq("user_id", userId)
+      .eq(
+        "drive_file_id",
+        drive_file_id
+      )
+      .maybeSingle();
+
+    if (bookError) {
+      console.error(
+        "PATCH BOOK FIND ERROR:",
+        bookError
+      );
+
+      return Response.json(
+        { error: bookError.message },
+        { status: 500 }
+      );
+    }
+
+    if (!book) {
+      return Response.json(
+        {
+          error:
+            "책 정보를 찾을 수 없습니다.",
+        },
+        { status: 404 }
+      );
+    }
+
+    // --------------------------------------------------
+    // 3. 현재 회차 조회
+    // --------------------------------------------------
+
+    let currentRound: any =
+      null;
+
+    if (round_id) {
+      const {
+        data: requestedRound,
+        error: requestedRoundError,
+      } = await supabase
+        .from("reading_rounds")
+        .select("*")
+        .eq("id", round_id)
+        .eq("user_id", userId)
+        .eq("book_id", book.id)
+        .maybeSingle();
+
+      if (requestedRoundError) {
+        console.error(
+          "REQUESTED ROUND FIND ERROR:",
+          requestedRoundError
+        );
+
+        return Response.json(
+          {
+            error:
+              requestedRoundError.message,
+          },
+          { status: 500 }
+        );
+      }
+
+      currentRound =
+        requestedRound;
+    } else {
+      const {
+        data: rounds,
+        error: roundsError,
+      } = await supabase
+        .from("reading_rounds")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("book_id", book.id)
+        .order("round", {
+          ascending: false,
+        });
+
+      if (roundsError) {
+        console.error(
+          "PATCH ROUNDS FIND ERROR:",
+          roundsError
+        );
+
+        return Response.json(
+          {
+            error:
+              roundsError.message,
+          },
+          { status: 500 }
+        );
+      }
+
+      currentRound =
+        rounds?.find(
+          (round) =>
+            round.status ===
+            "reading"
+        ) ??
+        rounds?.[0] ??
+        null;
+    }
+
+    if (!currentRound) {
+      return Response.json(
+        {
+          error:
+            "독서 회차를 찾을 수 없습니다.",
+        },
+        { status: 404 }
+      );
+    }
+
+    // --------------------------------------------------
+    // 4. 이미 완독한 회차 보호
+    //
+    // completed → reading으로 되돌아가지 않게 한다.
+    // --------------------------------------------------
+
+    if (
+      currentRound.status ===
+        "completed" &&
+      status !== "completed"
+    ) {
+      return Response.json({
+        success: true,
+        data: {
+          book,
+          round: currentRound,
+          progress: null,
+        },
+      });
+    }
+
+    // --------------------------------------------------
+    // 5. 진행상황 저장
+    // --------------------------------------------------
+
+    const nextStatus =
+      status === "completed"
+        ? "completed"
+        : "reading";
+
+    const {
+      data: savedProgress,
+      error: progressError,
+    } = await supabase
+      .from("reading_progress")
+      .upsert(
+        {
+          round_id:
+            currentRound.id,
+          episode,
+          progress,
+          scroll_position,
+          updated_at:
+            new Date().toISOString(),
+        },
+        {
+          onConflict:
+            "round_id",
+        }
+      )
+      .select()
+      .single();
+
+    if (progressError) {
+      console.error(
+        "PATCH PROGRESS ERROR:",
+        progressError
+      );
+
+      return Response.json(
+        {
+          error:
+            progressError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    // --------------------------------------------------
+    // 6. 회차 상태 변경
+    // --------------------------------------------------
+
+    let updatedRound =
+      currentRound;
+
+    if (
+      nextStatus ===
+      "completed"
+    ) {
+      const {
+        data: completedRound,
+        error:
+          completedRoundError,
+      } = await supabase
+        .from("reading_rounds")
+        .update({
+          status: "completed",
+          completed_at:
+            new Date().toISOString(),
+        })
+        .eq(
+          "id",
+          currentRound.id
+        )
+        .eq(
+          "user_id",
+          userId
+        )
+        .eq(
+          "book_id",
+          book.id
+        )
+        .select()
+        .single();
+
+      if (completedRoundError) {
+        console.error(
+          "ROUND COMPLETE ERROR:",
+          completedRoundError
+        );
+
+        return Response.json(
+          {
+            error:
+              completedRoundError.message,
+          },
+          { status: 500 }
+        );
+      }
+
+      updatedRound =
+        completedRound;
+    }
+
+    // --------------------------------------------------
+    // 7. books 테이블 동기화
+    // --------------------------------------------------
+
+    const {
+      data: updatedBook,
+      error: updatedBookError,
+    } = await supabase
+      .from("books")
+      .update({
+        last_episode: episode,
+        progress,
+        status:
+          nextStatus ===
+          "completed"
+            ? "완독"
+            : "읽는 중",
+        scroll_position,
+        updated_at:
+          new Date().toISOString(),
+      })
+      .eq("id", book.id)
+      .eq(
+        "user_id",
+        userId
+      )
+      .eq(
+        "drive_file_id",
+        drive_file_id
+      )
+      .select()
+      .single();
+
+    if (updatedBookError) {
+      console.error(
+        "PATCH BOOK UPDATE ERROR:",
+        updatedBookError
+      );
+
+      return Response.json(
+        {
+          error:
+            updatedBookError.message,
+        },
+        { status: 500 }
+      );
+    }
+
+    // --------------------------------------------------
+    // 8. 결과 반환
+    // --------------------------------------------------
+
+    return Response.json({
+      success: true,
+      data: {
+        book: updatedBook,
+        round: updatedRound,
+        progress:
+          savedProgress,
+      },
+    });
+  } catch (error) {
+    console.error(
+      "BOOKS PATCH UNEXPECTED ERROR:",
+      error
+    );
+
+    return Response.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "읽기 진행상황 저장 중 오류가 발생했습니다.",
       },
       { status: 500 }
     );
