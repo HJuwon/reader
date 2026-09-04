@@ -895,6 +895,14 @@ export default function DriveBrowser() {
     selectedEpisodeIndex,
   ]);
 
+  /*
+   * 현재 회차의 스크롤 위치 저장
+   *
+   * 중요:
+   * 이미 완독된 회차는 수정하지 않는다.
+   * 완독 회차를 다시 읽으면 새 회차가 만들어지고,
+   * 그때부터 새 회차를 저장한다.
+   */
   async function saveScrollPosition(
     position?: number
   ) {
@@ -903,6 +911,13 @@ export default function DriveBrowser() {
       !parsedNovel ||
       !selectedEpisode ||
       !roundId
+    ) {
+      return;
+    }
+
+    // 완독된 회차는 읽기 기록을 변경하지 않음
+    if (
+      roundStatus === "completed"
     ) {
       return;
     }
@@ -1046,6 +1061,7 @@ export default function DriveBrowser() {
     selectedEpisode,
     selectedEpisodeIndex,
     roundId,
+    roundStatus,
   ]);
 
   useEffect(() => {
@@ -1055,6 +1071,13 @@ export default function DriveBrowser() {
         !parsedNovel ||
         !selectedEpisode ||
         !roundId
+      ) {
+        return;
+      }
+
+      // 완독 회차는 종료 시에도 다시 저장하지 않음
+      if (
+        roundStatus === "completed"
       ) {
         return;
       }
@@ -1132,6 +1155,7 @@ export default function DriveBrowser() {
     selectedEpisode,
     selectedEpisodeIndex,
     roundId,
+    roundStatus,
   ]);
 
   function getBodySearchMatches() {
@@ -1505,6 +1529,9 @@ export default function DriveBrowser() {
    * 최초 소설 진입 시 React의 roundId state가
    * 아직 갱신되지 않은 상태에서도
    * API에서 받은 round.id를 직접 전달해서 저장한다.
+   *
+   * 단, 이미 완독된 회차는 절대
+   * reading으로 되돌리지 않는다.
    */
   async function saveProgress(
     episodeIndex: number,
@@ -1518,6 +1545,19 @@ export default function DriveBrowser() {
       !selectedFile ||
       !parsedNovel ||
       !activeRoundId
+    ) {
+      return false;
+    }
+
+    /*
+     * 이미 완독된 현재 회차는 수정 금지.
+     *
+     * targetRoundId가 명시된 최초 저장의 경우에는
+     * 새로 생성된 reading 회차일 수 있으므로 허용한다.
+     */
+    if (
+      roundStatus === "completed" &&
+      !targetRoundId
     ) {
       return false;
     }
@@ -1620,6 +1660,144 @@ export default function DriveBrowser() {
     }
   }
 
+  /*
+   * 다시 읽기
+   *
+   * 현재 회차가 완독된 상태에서만 호출.
+   *
+   * 1회차 completed
+   * → 2회차 reading
+   *
+   * 2회차 completed
+   * → 3회차 reading
+   *
+   * 기존 회차의 기록은 변경하지 않는다.
+   */
+  async function restartReading() {
+    if (
+      !selectedFile ||
+      !parsedNovel ||
+      roundStatus !== "completed"
+    ) {
+      return;
+    }
+
+    setProgressSaving(true);
+    setError("");
+
+    try {
+      const response =
+        await fetch(
+          "/api/books",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              drive_file_id:
+                selectedFile.id,
+              title:
+                selectedFile.name,
+              total_episodes:
+                parsedNovel.episodes.length,
+              restart: true,
+            }),
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          extractErrorMessage(
+            data,
+            "다시 읽기를 시작하지 못했습니다."
+          )
+        );
+      }
+
+      const stateData =
+        data?.data;
+
+      const newRound =
+        stateData?.current_round ??
+        stateData?.round;
+
+      const newProgress =
+        stateData?.progress;
+
+      if (
+        !newRound ||
+        !newProgress
+      ) {
+        throw new Error(
+          "새 회차 정보를 받지 못했습니다."
+        );
+      }
+
+      // 새 회차 정보 적용
+      setRoundId(
+        newRound.id
+      );
+
+      setCurrentRound(
+        newRound.round
+      );
+
+      setRoundStatus(
+        newRound.status
+      );
+
+      // 새 회차는 처음부터
+      setSelectedEpisodeIndex(0);
+
+      restoreScrollPositionRef.current =
+        0;
+
+      scrollPositionRef.current =
+        0;
+
+      skipScrollRestoreRef.current =
+        false;
+
+      setBodySearch("");
+      setBodySearchIndex(0);
+      setEpisodeSearch("");
+      setEpisodeListOpen(false);
+
+      window.scrollTo({
+        top: 0,
+        behavior: "auto",
+      });
+
+      const firstEpisode =
+        parsedNovel.episodes[0];
+
+      if (firstEpisode) {
+        await getBookmarkStatus(
+          selectedFile.id,
+          firstEpisode.episode
+        );
+      }
+    } catch (error) {
+      console.error(
+        "다시 읽기 실패:",
+        error
+      );
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : "다시 읽기를 시작하지 못했습니다."
+      );
+    } finally {
+      setProgressSaving(false);
+    }
+  }
+
   async function changeEpisode(
     index: number
   ) {
@@ -1655,10 +1833,22 @@ export default function DriveBrowser() {
         )
       );
 
-    await saveProgress(
-      selectedEpisodeIndex,
-      currentScrollPosition
-    );
+    /*
+     * 완독된 회차에서는 기존 회차를
+     * 다시 reading으로 만들면 안 된다.
+     *
+     * 따라서 completed 상태에서는
+     * 진행상황 저장을 하지 않고
+     * 화면만 이동한다.
+     */
+    if (
+      roundStatus !== "completed"
+    ) {
+      await saveProgress(
+        selectedEpisodeIndex,
+        currentScrollPosition
+      );
+    }
 
     setSelectedEpisodeIndex(
       index
@@ -1680,10 +1870,20 @@ export default function DriveBrowser() {
       behavior: "auto",
     });
 
-    await saveProgress(
-      index,
-      0
-    );
+    /*
+     * completed 회차에서는 새 위치를
+     * DB에 저장하지 않는다.
+     *
+     * reading 회차에서만 새 회차 위치 저장.
+     */
+    if (
+      roundStatus !== "completed"
+    ) {
+      await saveProgress(
+        index,
+        0
+      );
+    }
 
     const episode =
       parsedNovel.episodes[index];
@@ -1728,14 +1928,6 @@ export default function DriveBrowser() {
     }
 
     async function openFile() {
-      /*
-       * 중요:
-       * 중첩 async 함수에서는 바깥의
-       * if (!fileId) return만으로
-       * TypeScript가 string으로 좁히지 못할 수 있다.
-       *
-       * 따라서 openFile 내부에서 다시 검사한다.
-       */
       if (!fileId) {
         setLoading(false);
         setError(
@@ -1933,12 +2125,16 @@ export default function DriveBrowser() {
         }
 
         /*
-         * 신규 reading_progress가 0이면
-         * state의 roundId state가 갱신되기를
-         * 기다리지 않고 API에서 받은
-         * readingState.round.id를 직접 전달한다.
+         * 중요:
+         *
+         * reading 회차일 때만 최초 진행상황을 저장한다.
+         *
+         * completed 회차의 progress.episode가 0이어도
+         * completed → reading으로 되돌리면 안 된다.
          */
         if (
+          readingState.round.status ===
+            "reading" &&
           savedProgress.episode ===
             0 &&
           parsed.episodes.length > 0 &&
@@ -1973,11 +2169,16 @@ export default function DriveBrowser() {
   }, []);
 
   async function closeFile() {
+    /*
+     * 완독 회차는 종료할 때
+     * 기존 완독 기록을 다시 저장하지 않는다.
+     */
     if (
       selectedFile &&
       parsedNovel &&
       selectedEpisode &&
-      roundId
+      roundId &&
+      roundStatus !== "completed"
     ) {
       await saveScrollPosition(
         window.scrollY
@@ -2147,18 +2348,40 @@ export default function DriveBrowser() {
             </h1>
 
             {roundId && (
-              <p
-                className="mt-1 text-xs"
-                style={{
-                  color:
-                    theme.muted,
-                }}
-              >
-                {currentRound}회차
+              <div className="mt-1 flex items-center gap-3">
+                <p
+                  className="text-xs"
+                  style={{
+                    color:
+                      theme.muted,
+                  }}
+                >
+                  {currentRound}회차
+                  {roundStatus ===
+                    "completed" &&
+                    " · 완독"}
+                </p>
+
                 {roundStatus ===
-                  "completed" &&
-                  " · 완독"}
-              </p>
+                  "completed" && (
+                  <button
+                    type="button"
+                    onClick={
+                      restartReading
+                    }
+                    disabled={
+                      progressSaving
+                    }
+                    className="text-xs transition hover:opacity-60 disabled:opacity-40"
+                    style={{
+                      color:
+                        theme.accent,
+                    }}
+                  >
+                    다시 읽기
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
