@@ -183,28 +183,11 @@ export default function DriveBrowser() {
   const [highlights, setHighlights] =
     useState<HighlightItem[]>([]);
 
-  // =========================================================
-  // 모바일 하이라이트 대기 상태
-  // =========================================================
-
-  const [pendingHighlight, setPendingHighlight] =
-    useState<{
-      text: string;
-      startOffset: number;
-      endOffset: number;
-    } | null>(null);
-
-  // =========================================================
   // 회차 검색
-  // =========================================================
-
   const [episodeSearch, setEpisodeSearch] =
     useState("");
 
-  // =========================================================
   // 본문 검색
-  // =========================================================
-
   const [bodySearch, setBodySearch] =
     useState("");
 
@@ -214,10 +197,20 @@ export default function DriveBrowser() {
   const [bodySearchOpen, setBodySearchOpen] =
     useState(false);
 
-  // =========================================================
-  // 읽기 위치 관련 ref
-  // =========================================================
+  // 모바일 선택 하이라이트
+  const [selectedTextForHighlight, setSelectedTextForHighlight] =
+    useState("");
 
+  const [selectedHighlightRange, setSelectedHighlightRange] =
+    useState<{
+      startOffset: number;
+      endOffset: number;
+    } | null>(null);
+
+  const [showHighlightButton, setShowHighlightButton] =
+    useState(false);
+
+  // 읽기 위치 refs
   const scrollPositionRef =
     useRef(0);
 
@@ -245,10 +238,6 @@ export default function DriveBrowser() {
       selectedEpisodeIndex
     ];
 
-  // =========================================================
-  // 검색된 회차 목록
-  // =========================================================
-
   const filteredEpisodes =
     parsedNovel?.episodes.filter(
       (episode) => {
@@ -270,10 +259,7 @@ export default function DriveBrowser() {
       }
     ) || [];
 
-  // =========================================================
   // 읽기 설정 불러오기
-  // =========================================================
-
   useEffect(() => {
     try {
       const saved =
@@ -318,10 +304,7 @@ export default function DriveBrowser() {
     }
   }, []);
 
-  // =========================================================
   // 읽기 설정 저장
-  // =========================================================
-
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -339,10 +322,7 @@ export default function DriveBrowser() {
     fontSize,
   ]);
 
-  // =========================================================
   // 본문 검색 결과 초기화
-  // =========================================================
-
   useEffect(() => {
     setBodySearchIndex(0);
   }, [
@@ -350,9 +330,14 @@ export default function DriveBrowser() {
     selectedEpisodeIndex,
   ]);
 
-  // =========================================================
-  // 에러 메시지 처리
-  // =========================================================
+  // 회차 변경 시 모바일 선택 상태 초기화
+  useEffect(() => {
+    setShowHighlightButton(false);
+    setSelectedTextForHighlight("");
+    setSelectedHighlightRange(null);
+  }, [
+    selectedEpisodeIndex,
+  ]);
 
   function extractErrorMessage(
     data: any,
@@ -383,10 +368,6 @@ export default function DriveBrowser() {
 
     return fallback;
   }
-
-  // =========================================================
-  // DB에서 해당 책의 진행상황 가져오기
-  // =========================================================
 
   async function getBookProgress(
     fileId: string,
@@ -454,10 +435,6 @@ export default function DriveBrowser() {
     }
   }
 
-  // =========================================================
-  // 북마크 상태 가져오기
-  // =========================================================
-
   async function getBookmarkStatus(
     fileId: string,
     episode: number
@@ -494,10 +471,6 @@ export default function DriveBrowser() {
       setBookmarked(false);
     }
   }
-
-  // =========================================================
-  // 북마크 추가 / 삭제
-  // =========================================================
 
   async function toggleBookmark() {
     if (
@@ -589,10 +562,6 @@ export default function DriveBrowser() {
     }
   }
 
-  // =========================================================
-  // 하이라이트 불러오기
-  // =========================================================
-
   async function loadHighlights(
     fileId: string,
     episode: number
@@ -630,10 +599,6 @@ export default function DriveBrowser() {
     }
   }
 
-  // =========================================================
-  // 현재 회차 변경 시 하이라이트 불러오기
-  // =========================================================
-
   useEffect(() => {
     if (
       !selectedFile ||
@@ -651,26 +616,6 @@ export default function DriveBrowser() {
     selectedFile,
     selectedEpisodeIndex,
   ]);
-
-  // =========================================================
-  // 회차 변경 시 모바일 하이라이트 선택 초기화
-  // =========================================================
-
-  useEffect(() => {
-    setPendingHighlight(null);
-
-    const selection =
-      window.getSelection();
-
-    if (selection) {
-      selection.removeAllRanges();
-    }
-  }, [selectedEpisodeIndex]);
-
-  // =========================================================
-  // 하이라이트 목록에서 들어온 경우
-  // 해당 하이라이트 위치로 자동 스크롤
-  // =========================================================
 
   useEffect(() => {
     if (!highlightId) {
@@ -756,10 +701,6 @@ export default function DriveBrowser() {
     selectedEpisodeIndex,
     highlights,
   ]);
-
-  // =========================================================
-  // 저장된 스크롤 위치 복원
-  // =========================================================
 
   useEffect(() => {
     if (
@@ -858,10 +799,6 @@ export default function DriveBrowser() {
     selectedEpisodeIndex,
   ]);
 
-  // =========================================================
-  // 현재 스크롤 위치 저장
-  // =========================================================
-
   async function saveScrollPosition(
     position?: number
   ) {
@@ -950,10 +887,6 @@ export default function DriveBrowser() {
     }
   }
 
-  // =========================================================
-  // 스크롤 이벤트
-  // =========================================================
-
   useEffect(() => {
     if (
       !selectedFile ||
@@ -1012,10 +945,6 @@ export default function DriveBrowser() {
     selectedEpisode,
     selectedEpisodeIndex,
   ]);
-
-  // =========================================================
-  // 페이지를 떠날 때 마지막 위치 저장
-  // =========================================================
 
   useEffect(() => {
     function handleBeforeUnload() {
@@ -1097,10 +1026,6 @@ export default function DriveBrowser() {
     selectedEpisode,
     selectedEpisodeIndex,
   ]);
-
-  // =========================================================
-  // 본문 검색
-  // =========================================================
 
   function getBodySearchMatches() {
     if (
@@ -1253,14 +1178,8 @@ export default function DriveBrowser() {
     }
   }
 
-  // =========================================================
-  // 선택된 텍스트의 offset 계산
-  // =========================================================
-
-  function getSelectionOffsets() {
-    if (
-      !contentRef.current
-    ) {
+  function getSelectionData() {
+    if (!contentRef.current) {
       return null;
     }
 
@@ -1269,8 +1188,8 @@ export default function DriveBrowser() {
 
     if (
       !selection ||
-      selection.isCollapsed ||
-      selection.rangeCount === 0
+      selection.rangeCount === 0 ||
+      selection.isCollapsed
     ) {
       return null;
     }
@@ -1306,7 +1225,9 @@ export default function DriveBrowser() {
     );
 
     const startOffset =
-      startRange.toString().length;
+      startRange
+        .toString()
+        .length;
 
     const endRange =
       document.createRange();
@@ -1321,7 +1242,9 @@ export default function DriveBrowser() {
     );
 
     const endOffset =
-      endRange.toString().length;
+      endRange
+        .toString()
+        .length;
 
     if (
       endOffset <= startOffset
@@ -1336,95 +1259,17 @@ export default function DriveBrowser() {
     };
   }
 
-  // =========================================================
-  // 모바일 텍스트 선택 감지
-  // =========================================================
-
-  function handleContentSelection() {
-    const result =
-      getSelectionOffsets();
-
-    if (!result) {
-      return;
-    }
-
-    // 모바일에서만 버튼을 표시한다.
-    if (
-      window.matchMedia(
-        "(max-width: 767px)"
-      ).matches
-    ) {
-      setPendingHighlight({
-        text: result.text,
-        startOffset:
-          result.startOffset,
-        endOffset:
-          result.endOffset,
-      });
-
-      return;
-    }
-
-    // PC는 기존처럼 선택 즉시 저장
-    saveHighlightFromSelection();
-  }
-
-  // =========================================================
-  // 하이라이트 저장
-  // =========================================================
-
-  async function saveHighlightFromSelection(
-    pending?: {
-      text: string;
-      startOffset: number;
-      endOffset: number;
-    }
+  async function saveHighlight(
+    text: string,
+    startOffset: number,
+    endOffset: number
   ) {
     if (
       !selectedFile ||
       !parsedNovel ||
-      !bookId
+      !bookId ||
+      !selectedEpisode
     ) {
-      return;
-    }
-
-    let selectedText = "";
-    let startOffset = 0;
-    let endOffset = 0;
-
-    if (pending) {
-      selectedText =
-        pending.text;
-      startOffset =
-        pending.startOffset;
-      endOffset =
-        pending.endOffset;
-    } else {
-      const result =
-        getSelectionOffsets();
-
-      if (!result) {
-        return;
-      }
-
-      selectedText =
-        result.text;
-      startOffset =
-        result.startOffset;
-      endOffset =
-        result.endOffset;
-    }
-
-    if (!selectedText) {
-      return;
-    }
-
-    const episode =
-      parsedNovel.episodes[
-        selectedEpisodeIndex
-      ];
-
-    if (!episode) {
       return;
     }
 
@@ -1446,8 +1291,8 @@ export default function DriveBrowser() {
               drive_file_id:
                 selectedFile.id,
               episode:
-                episode.episode,
-              text: selectedText,
+                selectedEpisode.episode,
+              text,
               start_offset:
                 startOffset,
               end_offset:
@@ -1470,17 +1315,14 @@ export default function DriveBrowser() {
 
       await loadHighlights(
         selectedFile.id,
-        episode.episode
+        selectedEpisode.episode
       );
 
-      setPendingHighlight(null);
+      window.getSelection()?.removeAllRanges();
 
-      const selection =
-        window.getSelection();
-
-      if (selection) {
-        selection.removeAllRanges();
-      }
+      setShowHighlightButton(false);
+      setSelectedTextForHighlight("");
+      setSelectedHighlightRange(null);
 
       console.log(
         "하이라이트 저장 완료:",
@@ -1496,9 +1338,64 @@ export default function DriveBrowser() {
     }
   }
 
-  // =========================================================
-  // DB에 읽기 진행상황 저장
-  // =========================================================
+  async function saveHighlightFromSelection() {
+    const selectionData =
+      getSelectionData();
+
+    if (!selectionData) {
+      return;
+    }
+
+    // 모바일에서는 바로 저장하지 않고
+    // 하이라이트 버튼을 보여준다.
+    if (
+      window.innerWidth < 768
+    ) {
+      setSelectedTextForHighlight(
+        selectionData.text
+      );
+
+      setSelectedHighlightRange({
+        startOffset:
+          selectionData.startOffset,
+        endOffset:
+          selectionData.endOffset,
+      });
+
+      setShowHighlightButton(true);
+
+      return;
+    }
+
+    // 데스크톱에서는 기존처럼
+    // 텍스트 선택 즉시 저장
+    await saveHighlight(
+      selectionData.text,
+      selectionData.startOffset,
+      selectionData.endOffset
+    );
+  }
+
+  function handleTextSelection() {
+    window.setTimeout(() => {
+      saveHighlightFromSelection();
+    }, 0);
+  }
+
+  async function savePendingHighlight() {
+    if (
+      !selectedTextForHighlight ||
+      !selectedHighlightRange
+    ) {
+      return;
+    }
+
+    await saveHighlight(
+      selectedTextForHighlight,
+      selectedHighlightRange.startOffset,
+      selectedHighlightRange.endOffset
+    );
+  }
 
   async function saveProgress(
     episodeIndex: number,
@@ -1609,10 +1506,6 @@ export default function DriveBrowser() {
     }
   }
 
-  // =========================================================
-  // 회차 변경
-  // =========================================================
-
   async function changeEpisode(
     index: number
   ) {
@@ -1656,8 +1549,6 @@ export default function DriveBrowser() {
       index
     );
 
-    setPendingHighlight(null);
-
     restoreScrollPositionRef.current =
       0;
 
@@ -1691,9 +1582,13 @@ export default function DriveBrowser() {
     }
   }
 
-  // =========================================================
-  // URL의 fileId로 바로 소설 열기
-  // =========================================================
+  async function selectEpisodeFromSearch(
+    index: number
+  ) {
+    await changeEpisode(index);
+
+    setEpisodeSearch("");
+  }
 
   useEffect(() => {
     const params =
@@ -1725,10 +1620,6 @@ export default function DriveBrowser() {
       setError("");
 
       try {
-        // -----------------------------------------------------
-        // 1. Drive 파일 정보
-        // -----------------------------------------------------
-
         const infoResponse =
           await fetch(
             `/api/drive/file-info?fileId=${encodeURIComponent(
@@ -1748,10 +1639,6 @@ export default function DriveBrowser() {
           );
         }
 
-        // -----------------------------------------------------
-        // 2. TXT 가져오기
-        // -----------------------------------------------------
-
         const fileResponse =
           await fetch(
             `/api/drive/file?fileId=${encodeURIComponent(
@@ -1770,10 +1657,6 @@ export default function DriveBrowser() {
             )
           );
         }
-
-        // -----------------------------------------------------
-        // 3. TXT 파싱
-        // -----------------------------------------------------
 
         const parsed =
           parseNovel(
@@ -1803,10 +1686,6 @@ export default function DriveBrowser() {
 
         setParsedNovel(parsed);
 
-        // -----------------------------------------------------
-        // 4. DB 책 정보 가져오기
-        // -----------------------------------------------------
-
         const booksResponse =
           await fetch(
             "/api/books"
@@ -1833,10 +1712,6 @@ export default function DriveBrowser() {
             );
           }
         }
-
-        // -----------------------------------------------------
-        // 5. 처음 열 회차 결정
-        // -----------------------------------------------------
 
         let initialEpisodeIndex = 0;
 
@@ -1928,11 +1803,6 @@ export default function DriveBrowser() {
           );
         }
 
-        // -----------------------------------------------------
-        // 6. 아직 읽기 이력이 없는 책이라면
-        // 첫 회차를 읽기 시작한 것으로 기록
-        // -----------------------------------------------------
-
         if (
           currentBook &&
           currentBook.progress === 0 &&
@@ -1966,10 +1836,6 @@ export default function DriveBrowser() {
     openFile();
   }, []);
 
-  // =========================================================
-  // 파일 닫기
-  // =========================================================
-
   async function closeFile() {
     if (
       selectedFile &&
@@ -1983,10 +1849,6 @@ export default function DriveBrowser() {
 
     window.history.back();
   }
-
-  // =========================================================
-  // 이전 화
-  // =========================================================
 
   async function goToPrevEpisode() {
     if (
@@ -2013,10 +1875,6 @@ export default function DriveBrowser() {
       nextIndex
     );
   }
-
-  // =========================================================
-  // 다음 화
-  // =========================================================
 
   async function goToNextEpisode() {
     if (
@@ -2045,10 +1903,6 @@ export default function DriveBrowser() {
     );
   }
 
-  // =========================================================
-  // 로딩 화면
-  // =========================================================
-
   if (loading) {
     return (
       <main
@@ -2067,10 +1921,6 @@ export default function DriveBrowser() {
       </main>
     );
   }
-
-  // =========================================================
-  // 에러 화면
-  // =========================================================
 
   if (
     error ||
@@ -2113,10 +1963,6 @@ export default function DriveBrowser() {
     );
   }
 
-  // =========================================================
-  // Reader 화면
-  // =========================================================
-
   const isFirstEpisode =
     selectedEpisodeIndex === 0;
 
@@ -2139,10 +1985,6 @@ export default function DriveBrowser() {
           theme.title,
       }}
     >
-      {/* =====================================================
-          상단
-      ====================================================== */}
-
       <header>
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6 md:px-8 md:py-8">
           <div className="min-w-0">
@@ -2264,15 +2106,10 @@ export default function DriveBrowser() {
           </div>
         ) : (
           <>
-            {/* =================================================
-                모바일 회차 검색
-            ================================================== */}
-
+            {/* 모바일 회차 선택 */}
             <div className="mb-5 md:hidden">
-              {/* 모바일 회차 검색 */}
-
               <div
-                className="mb-2 flex items-center gap-2 rounded-[4px] px-3 py-2"
+                className="flex items-center gap-2 rounded-[4px] px-3 py-2"
                 style={{
                   boxShadow: `0 0 0 0.5px ${theme.divider}`,
                 }}
@@ -2304,9 +2141,7 @@ export default function DriveBrowser() {
                 {episodeSearch && (
                   <button
                     onClick={() =>
-                      setEpisodeSearch(
-                        ""
-                      )
+                      setEpisodeSearch("")
                     }
                     className="shrink-0"
                     style={{
@@ -2320,13 +2155,9 @@ export default function DriveBrowser() {
                 )}
               </div>
 
-              {/* =================================================
-                  검색어가 있으면 결과를 직접 선택
-              ================================================== */}
-
-              {episodeSearch.trim() ? (
+              {episodeSearch.trim() && (
                 <div
-                  className="max-h-56 overflow-y-auto rounded-[4px]"
+                  className="mt-2 max-h-64 overflow-y-auto rounded-[4px]"
                   style={{
                     boxShadow: `0 0 0 0.5px ${theme.divider}`,
                   }}
@@ -2334,7 +2165,7 @@ export default function DriveBrowser() {
                   {filteredEpisodes.length ===
                   0 ? (
                     <p
-                      className="px-4 py-5 text-center text-sm"
+                      className="px-4 py-5 text-center text-xs"
                       style={{
                         color:
                           theme.muted,
@@ -2346,10 +2177,8 @@ export default function DriveBrowser() {
                     filteredEpisodes.map(
                       (episode) => {
                         const index =
-                          parsedNovel.episodes.findIndex(
-                            (item) =>
-                              item.startLine ===
-                              episode.startLine
+                          parsedNovel.episodes.indexOf(
+                            episode
                           );
 
                         const isSelected =
@@ -2359,9 +2188,8 @@ export default function DriveBrowser() {
                         return (
                           <button
                             key={`${episode.startLine}-${index}`}
-                            type="button"
                             onClick={() =>
-                              changeEpisode(
+                              selectEpisodeFromSearch(
                                 index
                               )
                             }
@@ -2370,97 +2198,63 @@ export default function DriveBrowser() {
                             }
                             className="w-full border-b px-4 py-3 text-left last:border-b-0 disabled:opacity-50"
                             style={{
-                              backgroundColor:
-                                isSelected
-                                  ? `${theme.accent}12`
-                                  : "transparent",
                               borderColor:
                                 theme.divider,
-                              color:
-                                theme.title,
+                              backgroundColor:
+                                isSelected
+                                  ? `${theme.accent}10`
+                                  : "transparent",
                             }}
                           >
-                            <p
-                              className="text-sm font-medium"
-                              style={{
-                                fontFamily:
-                                  SERIF,
-                              }}
-                            >
-                              {
-                                episode.episode
-                              }
-                              화
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <span
+                                className="shrink-0 text-xs"
+                                style={{
+                                  color:
+                                    isSelected
+                                      ? theme.accent
+                                      : theme.muted,
+                                }}
+                              >
+                                {
+                                  episode.episode
+                                }
+                                화
+                              </span>
 
-                            <p
-                              className="mt-0.5 truncate text-xs"
-                              style={{
-                                color:
-                                  theme.muted,
-                              }}
-                            >
-                              {
-                                episode.title
-                              }
-                            </p>
+                              <span
+                                className="min-w-0 truncate text-sm"
+                                style={{
+                                  fontFamily:
+                                    SERIF,
+                                  color:
+                                    isSelected
+                                      ? theme.title
+                                      : theme.text,
+                                  fontWeight:
+                                    isSelected
+                                      ? 500
+                                      : 400,
+                                }}
+                              >
+                                {
+                                  episode.title
+                                }
+                              </span>
+                            </div>
                           </button>
                         );
                       }
                     )
                   )}
                 </div>
-              ) : (
-                /* =================================================
-                    검색하지 않을 때 현재 회차만 표시
-                ================================================== */
-
-                <div
-                  className="rounded-[4px] px-4 py-3"
-                  style={{
-                    boxShadow: `0 0 0 0.5px ${theme.divider}`,
-                  }}
-                >
-                  <p
-                    className="text-[11px]"
-                    style={{
-                      color:
-                        theme.muted,
-                    }}
-                  >
-                    현재 회차
-                  </p>
-
-                  <p
-                    className="mt-1 truncate text-sm font-medium"
-                    style={{
-                      color:
-                        theme.title,
-                      fontFamily:
-                        SERIF,
-                    }}
-                  >
-                    {
-                      selectedEpisode?.episode
-                    }
-                    화 ·{" "}
-                    {
-                      selectedEpisode?.title
-                    }
-                  </p>
-                </div>
               )}
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
-              {/* =================================================
-                  데스크톱 회차 목록
-              ================================================== */}
-
+              {/* 데스크톱 회차 목록 */}
               <aside className="hidden md:block">
                 <div className="sticky top-8">
-                  {/* 회차 검색 */}
-
                   <div
                     className="mb-4 flex items-center gap-2 rounded-[4px] px-3 py-2"
                     style={{
@@ -2540,10 +2334,8 @@ export default function DriveBrowser() {
                       filteredEpisodes.map(
                         (episode) => {
                           const index =
-                            parsedNovel.episodes.findIndex(
-                              (item) =>
-                                item.startLine ===
-                                episode.startLine
+                            parsedNovel.episodes.indexOf(
+                              episode
                             );
 
                           const isSelected =
@@ -2608,10 +2400,7 @@ export default function DriveBrowser() {
                 </div>
               </aside>
 
-              {/* =================================================
-                  본문
-              ================================================== */}
-
+              {/* 본문 */}
               <article>
                 {selectedEpisode ? (
                   <>
@@ -2682,10 +2471,7 @@ export default function DriveBrowser() {
                           </button>
                         </div>
 
-                        {/* =================================================
-                            본문 검색
-                        ================================================== */}
-
+                        {/* 본문 검색 */}
                         <div className="mt-5">
                           {!bodySearchOpen ? (
                             <button
@@ -2843,17 +2629,16 @@ export default function DriveBrowser() {
                           )}
                         </div>
 
-                        {/* =================================================
-                            본문
-                        ================================================== */}
-
                         <div className="mx-auto mt-8 max-w-2xl">
                           <div
                             ref={
                               contentRef
                             }
                             onMouseUp={
-                              handleContentSelection
+                              handleTextSelection
+                            }
+                            onTouchEnd={
+                              handleTextSelection
                             }
                             className="whitespace-pre-wrap break-words"
                             style={{
@@ -2863,6 +2648,8 @@ export default function DriveBrowser() {
                               lineHeight: 2,
                               color:
                                 theme.text,
+                              userSelect:
+                                "text",
                             }}
                           >
                             {(() => {
@@ -3012,10 +2799,7 @@ export default function DriveBrowser() {
                           </div>
                         </div>
 
-                        {/* =================================================
-                            이전 / 다음
-                        ================================================== */}
-
+                        {/* 본문 하단 이전 / 다음 */}
                         <div className="mx-auto mt-10 flex max-w-2xl items-center justify-between">
                           <button
                             onClick={
@@ -3028,7 +2812,7 @@ export default function DriveBrowser() {
                             className="text-sm font-medium hover:opacity-70 disabled:opacity-30"
                             style={{
                               color:
-                                theme.title,
+                                theme.muted,
                             }}
                           >
                             ← 이전화
@@ -3045,7 +2829,7 @@ export default function DriveBrowser() {
                             className="text-sm font-medium hover:opacity-70 disabled:opacity-30"
                             style={{
                               color:
-                                theme.title,
+                                theme.muted,
                             }}
                           >
                             다음화 →
@@ -3054,10 +2838,7 @@ export default function DriveBrowser() {
                       </div>
                     </div>
 
-                    {/* =================================================
-                        모바일 이전 / 다음
-                    ================================================== */}
-
+                    {/* 모바일 이전 / 다음 */}
                     <div className="mt-4 flex items-center justify-between gap-3 md:hidden">
                       <button
                         onClick={
@@ -3070,7 +2851,7 @@ export default function DriveBrowser() {
                         className="flex flex-1 items-center justify-center gap-1 rounded-[4px] px-3 py-3 text-sm font-medium disabled:opacity-30"
                         style={{
                           color:
-                            theme.title,
+                            theme.muted,
                           boxShadow: `0 0 0 0.5px ${theme.divider}`,
                         }}
                       >
@@ -3089,7 +2870,7 @@ export default function DriveBrowser() {
                         className="flex flex-1 items-center justify-center gap-1 rounded-[4px] px-3 py-3 text-sm font-medium disabled:opacity-30"
                         style={{
                           color:
-                            theme.title,
+                            theme.muted,
                           boxShadow: `0 0 0 0.5px ${theme.divider}`,
                         }}
                       >
@@ -3115,46 +2896,39 @@ export default function DriveBrowser() {
         )}
       </section>
 
-      {/* =====================================================
-          모바일 하이라이트 버튼
-      ====================================================== */}
+      {/* 모바일 하이라이트 버튼 */}
+      {showHighlightButton &&
+        selectedTextForHighlight && (
+          <div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 md:hidden">
+            <button
+              onMouseDown={(e) =>
+                e.preventDefault()
+              }
+              onTouchStart={(e) =>
+                e.preventDefault()
+              }
+              onClick={
+                savePendingHighlight
+              }
+              disabled={
+                highlightLoading
+              }
+              className="rounded-full px-5 py-3 text-sm font-medium shadow-lg transition disabled:opacity-60"
+              style={{
+                backgroundColor:
+                  theme.title,
+                color:
+                  theme.bg,
+              }}
+            >
+              {highlightLoading
+                ? "저장 중..."
+                : "하이라이트"}
+            </button>
+          </div>
+        )}
 
-      {pendingHighlight && (
-        <div className="fixed bottom-6 left-0 right-0 z-50 flex justify-center px-5 md:hidden">
-          <button
-            type="button"
-            onClick={() =>
-              saveHighlightFromSelection(
-                pendingHighlight
-              )
-            }
-            disabled={
-              highlightLoading
-            }
-            className="flex items-center gap-2 rounded-full px-5 py-3 text-sm font-medium shadow-lg disabled:opacity-60"
-            style={{
-              backgroundColor:
-                theme.title,
-              color:
-                theme.bg,
-            }}
-          >
-            {highlightLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                저장 중...
-              </>
-            ) : (
-              "하이라이트"
-            )}
-          </button>
-        </div>
-      )}
-
-      {/* =====================================================
-          읽기 설정
-      ====================================================== */}
-
+      {/* 읽기 설정 */}
       <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
         {settingsOpen && (
           <div
