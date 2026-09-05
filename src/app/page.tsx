@@ -115,7 +115,8 @@ export default function Home() {
 
     return books.filter((book) => {
       const matchesStatus =
-        filter === "전체" || book.status === filter;
+        filter === "전체" ||
+        getDisplayStatus(book) === filter;
 
       const matchesSearch =
         keyword === "" ||
@@ -227,6 +228,17 @@ export default function Home() {
   // 현재 진행률
   function getProgress(book: Book) {
     return book.current_progress ?? book.progress ?? 0;
+  }
+
+  // 화면에 보여줄 상태 배지
+  // 한 번이라도 완독한 적이 있으면, 다시 읽는 중이어도
+  // 배지는 계속 "완독"으로 유지한다. (회독수만 올라감)
+  function getDisplayStatus(book: Book) {
+    if ((book.completed_round_count ?? 0) > 0) {
+      return "완독";
+    }
+
+    return book.status;
   }
 
   // 버튼
@@ -370,9 +382,9 @@ export default function Home() {
                         </div>
 
                         <span
-                          className={`mt-1.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[book.status]}`}
+                          className={`mt-1.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[getDisplayStatus(book)]}`}
                         >
-                          {book.status}
+                          {getDisplayStatus(book)}
                         </span>
                       </div>
 
@@ -545,9 +557,9 @@ export default function Home() {
                       </div>
 
                       <span
-                        className={`mt-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[book.status]}`}
+                        className={`mt-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[getDisplayStatus(book)]}`}
                       >
-                        {book.status}
+                        {getDisplayStatus(book)}
                       </span>
                     </div>
 
@@ -629,3 +641,4 @@ export default function Home() {
     </main>
   );
 }
+
