@@ -171,8 +171,25 @@ export async function GET() {
     // --------------------------------------------------
 
     const result = bookList.map((book) => {
-      const bookRounds =
+      const rawBookRounds =
         roundsByBook.get(book.id) ?? [];
+
+      // 각 회독(round)에 해당 회독의 진행상황(episode/progress)을 붙여준다.
+      const bookRounds = rawBookRounds.map(
+        (round) => {
+          const roundProgress =
+            progressByRound.get(round.id) ??
+            null;
+
+          return {
+            ...round,
+            episode:
+              roundProgress?.episode ?? 0,
+            progress:
+              roundProgress?.progress ?? 0,
+          };
+        }
+      );
 
       const currentRound =
         [...bookRounds]
@@ -1451,3 +1468,4 @@ export async function PATCH(
     );
   }
 }
+
