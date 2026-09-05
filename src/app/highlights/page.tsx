@@ -194,6 +194,7 @@ export default function HighlightsPage() {
           </div>
         ) : (
           <div className="mt-8 overflow-hidden rounded-2xl border bg-white">
+            <div className="max-h-[60vh] overflow-y-auto">
             {highlights.map((highlight, index) => {
               const isDeleting =
                 deletingId === highlight.id;
@@ -258,10 +259,10 @@ export default function HighlightsPage() {
                 </div>
               );
             })}
+            </div>
           </div>
         )}
       </section>
     </main>
   );
 }
-
