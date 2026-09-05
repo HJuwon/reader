@@ -277,6 +277,7 @@ export default function BookmarksPage() {
           </div>
         ) : (
           <div className="mt-8 overflow-hidden rounded-2xl border bg-white">
+            <div className="max-h-[60vh] overflow-y-auto">
             {bookmarks.map(
               (bookmark, index) => {
                 const selected =
@@ -352,6 +353,7 @@ export default function BookmarksPage() {
                 );
               }
             )}
+            </div>
           </div>
         )}
       </section>
