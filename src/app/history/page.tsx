@@ -192,6 +192,7 @@ export default function HistoryPage() {
           </div>
         ) : (
           <div className="mt-8 overflow-hidden rounded-2xl border bg-white">
+            <div className="max-h-[60vh] overflow-y-auto">
             {historyEntries.map((entry, index) => (
               <Link
                 key={entry.round.id}
@@ -257,10 +258,10 @@ export default function HistoryPage() {
                 </div>
               </Link>
             ))}
+            </div>
           </div>
         )}
       </section>
     </main>
   );
 }
-
