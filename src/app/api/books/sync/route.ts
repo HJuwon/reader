@@ -3,6 +3,31 @@ import { authOptions } from "@/auth";
 import { supabase } from "@/lib/supabase";
 import { parseNovel } from "@/lib/parser";
 
+// 파일명에서 연재 상태 추출
+// "미완"이 "완"을 포함하므로 반드시 미완부터 검사
+function extractSeriesStatus(
+  fileName: string
+): "ongoing" | "completed" {
+  if (/\(미완\)/.test(fileName)) {
+    return "ongoing";
+  }
+
+  if (/\(완\)/.test(fileName)) {
+    return "completed";
+  }
+
+  return "ongoing"; // 태그가 없으면 기본값
+}
+
+// 제목에서 "(완)" / "(미완)" 태그 제거
+function cleanTitle(fileName: string): string {
+  return fileName
+    .replace(/\.txt$/i, "")
+    .replace(/\s*\(미완\)\s*/g, "")
+    .replace(/\s*\(완\)\s*/g, "")
+    .trim();
+}
+
 export async function GET() {
   const session: any = await getServerSession(authOptions);
 
@@ -139,14 +164,14 @@ export async function GET() {
         // =====================================================
         // 5. DB에 새 책 등록
         // =====================================================
-
         const { data, error } = await supabase
           .from("books")
           .upsert(
-            {
+            {      
               user_id: session.user.email,
               drive_file_id: file.id,
-              title: file.name.replace(/\.txt$/i, ""),
+              title: cleanTitle(file.name),
+              series_status: extractSeriesStatus(file.name),
               total_episodes: parsed.totalEpisodes,
               last_episode: 0,
               progress: 0,
@@ -159,6 +184,7 @@ export async function GET() {
           )
           .select()
           .maybeSingle();
+        
 
         if (error) {
           console.error(
