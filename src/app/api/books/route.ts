@@ -30,7 +30,7 @@ export async function GET() {
         supabase
           .from("books")
           .select(
-            "id,user_id,drive_file_id,title,total_episodes,last_episode,progress,status,created_at,updated_at,scroll_position"
+            "id,user_id,drive_file_id,title,total_episodes,last_episode,progress,status,series_status,created_at,updated_at,scroll_position"
           )
           .eq("user_id", userId)
           .order("updated_at", {
@@ -40,7 +40,7 @@ export async function GET() {
         supabase
           .from("reading_rounds")
           .select(
-            "id,user_id,book_id,round,status,started_at,completed_at,created_at"
+            "id,user_id,drive_file_id,title,total_episodes,last_episode,progress,status,series_status,created_at,updated_at,scroll_position"
           )
           .eq("user_id", userId)
           .order("round", {
@@ -350,7 +350,7 @@ export async function POST(
     } = await supabase
       .from("books")
       .select(
-        "id,user_id,drive_file_id,title,total_episodes,last_episode,progress,status,created_at,updated_at,scroll_position"
+        "id,user_id,drive_file_id,title,total_episodes,last_episode,progress,status,series_status,created_at,updated_at,scroll_position"
       )
       .eq("user_id", userId)
       .eq(
