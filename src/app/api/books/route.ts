@@ -38,14 +38,16 @@ export async function GET() {
           }),
 
         supabase
+
           .from("reading_rounds")
           .select(
-            "id,user_id,drive_file_id,title,total_episodes,last_episode,progress,status,series_status,created_at,updated_at,scroll_position"
+            "id,user_id,book_id,round,status,started_at,completed_at,created_at"
           )
           .eq("user_id", userId)
           .order("round", {
             ascending: true,
           }),
+        
       ]);
 
     const {
