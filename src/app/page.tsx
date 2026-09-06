@@ -22,6 +22,7 @@ type Book = {
   status: "읽는 중" | "완독" | "안 읽음";
   created_at: string;
   updated_at: string;
+  series_status: "ongoing" | "completed";
 
   // 회독 정보
   round_count?: number;
@@ -394,9 +395,21 @@ export default function Home() {
                           {book.title}
                         </h4>
 
-                        <p className="mt-1.5 text-xs text-gray-400">
-                          Google Drive
-                        </p>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <span
+                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                              book.series_status === "completed"
+                                ? "bg-purple-50 text-purple-700"
+                                : "bg-orange-50 text-orange-700"
+                            }`}
+                          >
+                            {book.series_status === "completed" ? "완결" : "연재중"}
+                          </span>
+
+                          <p className="text-xs text-gray-400">
+                            Google Drive
+                          </p>
+                        </div>
                       </div>
                     </div>
 
@@ -565,9 +578,21 @@ export default function Home() {
 
                     {/* 제목 + 회독 + 진행률 */}
                     <div className="min-w-0 flex-1">
-                      <h4 className="line-clamp-2 text-sm font-medium leading-5 sm:text-[15px]">
-                        {book.title}
-                      </h4>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="line-clamp-2 text-sm font-medium leading-5 sm:text-[15px]">
+                          {book.title}
+                        </h4>
+
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            book.series_status === "completed"
+                              ? "bg-purple-50 text-purple-700"
+                              : "bg-orange-50 text-orange-700"
+                          }`}
+                        >
+                          {book.series_status === "completed" ? "완결" : "연재중"}
+                        </span>
+                      </div>
 
                       <div className="mt-1.5 flex items-center gap-2">
                         <span className="text-xs font-medium text-gray-600">
@@ -641,4 +666,3 @@ export default function Home() {
     </main>
   );
 }
-
