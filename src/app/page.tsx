@@ -53,6 +53,7 @@ export default function Home() {
   const [filter, setFilter] = useState("전체");
   const [search, setSearch] = useState("");
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [syncing, setSyncing] = useState(false);
 
   async function loadBooks() {
     setLoading(true);
@@ -478,20 +479,46 @@ export default function Home() {
               내 소설
             </h3>
 
+
             <button
+              disabled={syncing}
               onClick={async () => {
-                await fetch("/api/books/sync");
-                await loadBooks();
+                setSyncing(true);
+                setError("");
+
+                try {
+                  const response = await fetch("/api/books/sync");
+                  const data = await response.json();
+
+                  if (!response.ok) {
+                    throw new Error(
+                      typeof data?.error === "string"
+                        ? data.error
+                        : "동기화에 실패했습니다."
+                    );
+                  }
+
+                  await loadBooks();
+                } catch (error) {
+                  setError(
+                    error instanceof Error
+                      ? error.message
+                      : "동기화 중 오류가 발생했습니다."
+                  );
+                } finally {
+                  setSyncing(false);
+                }
               }}
-              className="flex items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1.5 text-xs text-gray-600 transition hover:bg-gray-50 sm:px-3 sm:py-2 sm:text-sm"
+              className="flex items-center gap-1.5 rounded-lg border bg-white px-2.5 py-1.5 text-xs text-gray-600 transition hover:bg-gray-50 disabled:opacity-50 sm:px-3 sm:py-2 sm:text-sm"
             >
               <RotateCcw
-                className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${syncing ? "animate-spin" : ""}`}
                 strokeWidth={1.75}
               />
 
-              새로고침
+              {syncing ? "동기화 중..." : "새로고침"}
             </button>
+            
           </div>
 
           {/* 검색창 */}
