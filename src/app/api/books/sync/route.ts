@@ -32,7 +32,7 @@ function cleanTitle(fileName: string): string {
     .trim();
 }
 
-// newFiles를 chunkSize개씩 묶어서 병렬 처리하기 위한 헬퍼
+// 배열을 chunkSize개씩 묶어서 병렬 처리하기 위한 헬퍼
 function chunk<T>(arr: T[], size: number): T[][] {
   const result: T[][] = [];
 
@@ -147,26 +147,29 @@ export async function GET() {
     );
 
     // =========================================================
-    // 3. Drive에는 있지만 DB에는 없는 파일만 찾기
+    // 3. Drive 파일을 "새 파일" / "이미 등록된 파일"로 분리
     // =========================================================
 
     const newFiles = files.filter(
       (file: any) => !existingIds.has(file.id)
     );
 
+    const existingFiles = files.filter((file: any) =>
+      existingIds.has(file.id)
+    );
+
     // =========================================================
-    // 4. 새 파일만 Drive에서 TXT를 가져와 파싱 후 DB 등록
-    //    (10개씩 묶어서 병렬 처리 → 순차 처리보다 훨씬 빠름)
+    // 4. 새 파일: Drive에서 TXT를 가져와 파싱 후 DB 등록
+    //    (10개씩 묶어서 병렬 처리)
     // =========================================================
 
     const insertedBooks: any[] = [];
-    const batches = chunk(newFiles, 10);
+    const insertBatches = chunk(newFiles, 10);
 
-    for (const batch of batches) {
+    for (const batch of insertBatches) {
       const results = await Promise.all(
         batch.map(async (file: any) => {
           try {
-            // 새 파일의 실제 TXT 내용 가져오기
             const fileResponse = await fetch(
               `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(
                 file.id
@@ -188,13 +191,8 @@ export async function GET() {
             }
 
             const content = await fileResponse.text();
-
-            // TXT 파싱
             const parsed = parseNovel(content);
 
-            // ===============================================
-            // 5. DB에 새 책 등록
-            // ===============================================
             const { data, error } = await supabase
               .from("books")
               .upsert(
@@ -247,6 +245,42 @@ export async function GET() {
     }
 
     // =========================================================
+    // 5. 기존 파일: title / series_status만 파일명 기준으로 갱신
+    //    (진행상황 컬럼은 절대 건드리지 않음)
+    // =========================================================
+
+    let updatedCount = 0;
+    const updateBatches = chunk(existingFiles, 20);
+
+    for (const batch of updateBatches) {
+      const results = await Promise.all(
+        batch.map(async (file: any) => {
+          const { error } = await supabase
+            .from("books")
+            .update({
+              title: cleanTitle(file.name),
+              series_status: extractSeriesStatus(file.name),
+            })
+            .eq("user_id", session.user.email)
+            .eq("drive_file_id", file.id);
+
+          if (error) {
+            console.error(
+              `기존 책 갱신 실패: ${file.name}`,
+              error
+            );
+
+            return false;
+          }
+
+          return true;
+        })
+      );
+
+      updatedCount += results.filter(Boolean).length;
+    }
+
+    // =========================================================
     // 6. 결과 반환
     // =========================================================
 
@@ -261,6 +295,9 @@ export async function GET() {
 
       // 실제 DB에 새로 등록된 파일 수
       inserted: insertedBooks.length,
+
+      // 기존 파일 중 title/series_status가 갱신된 수
+      updated: updatedCount,
 
       // 이번에 새로 등록된 책
       books: insertedBooks,
