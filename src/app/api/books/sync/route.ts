@@ -1,26 +1,17 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { supabase } from "@/lib/supabase";
-import { parseNovel } from "@/lib/parser";
 
-// Vercel 함수 최대 실행시간 (초). 요금제에 따라 상한이 다르니
-// 배포 후 안 먹으면 60으로 낮춰보세요.
-export const maxDuration = 300;
+export const maxDuration = 60;
 
 // 파일명에서 연재 상태 추출
 // "미완"이 "완"을 포함하므로 반드시 미완부터 검사
 function extractSeriesStatus(
   fileName: string
 ): "ongoing" | "completed" {
-  if (/\(미완\)/.test(fileName)) {
-    return "ongoing";
-  }
-
-  if (/\(완\)/.test(fileName)) {
-    return "completed";
-  }
-
-  return "ongoing"; // 태그가 없으면 기본값
+  if (/\(미완\)/.test(fileName)) return "ongoing";
+  if (/\(완\)/.test(fileName)) return "completed";
+  return "ongoing";
 }
 
 // 제목에서 "(완)" / "(미완)" 태그 제거
@@ -32,14 +23,12 @@ function cleanTitle(fileName: string): string {
     .trim();
 }
 
-// 배열을 chunkSize개씩 묶어서 병렬 처리하기 위한 헬퍼
+// 배열을 chunkSize개씩 묶기 위한 헬퍼
 function chunk<T>(arr: T[], size: number): T[][] {
   const result: T[][] = [];
-
   for (let i = 0; i < arr.length; i += size) {
     result.push(arr.slice(i, i + size));
   }
-
   return result;
 }
 
@@ -67,11 +56,10 @@ export async function GET() {
   try {
     // =========================================================
     // 1. Google Drive에서 현재 소설 폴더의 TXT 파일 목록 조회
-    //    (페이지네이션: nextPageToken이 없을 때까지 반복 조회)
+    //    (메타데이터만, 파일 내용은 안 받아옴)
     // =========================================================
 
     const q = `'${folderId}' in parents and trashed = false`;
-
     let allFiles: any[] = [];
     let pageToken: string | undefined = undefined;
 
@@ -139,7 +127,6 @@ export async function GET() {
       );
     }
 
-    // DB에 이미 등록된 Drive 파일 ID를 Set으로 관리
     const existingIds = new Set(
       (existingBooks || []).map(
         (book: any) => book.drive_file_id
@@ -147,7 +134,7 @@ export async function GET() {
     );
 
     // =========================================================
-    // 3. Drive 파일을 "새 파일" / "이미 등록된 파일"로 분리
+    // 3. 새 파일 / 기존 파일 분리
     // =========================================================
 
     const newFiles = files.filter(
@@ -159,88 +146,41 @@ export async function GET() {
     );
 
     // =========================================================
-    // 4. 새 파일: Drive에서 TXT를 가져와 파싱 후 DB 등록
-    //    (10개씩 묶어서 병렬 처리)
+    // 4. 새 파일 등록 — 내용 다운로드/파싱 없이 메타데이터만
+    //    (total_episodes는 0으로 두고, 책을 처음 열 때
+    //     리더 화면에서 실제 내용을 읽고 채워넣음)
     // =========================================================
 
     const insertedBooks: any[] = [];
-    const insertBatches = chunk(newFiles, 10);
+    const insertBatches = chunk(newFiles, 50);
 
     for (const batch of insertBatches) {
-      const results = await Promise.all(
-        batch.map(async (file: any) => {
-          try {
-            const fileResponse = await fetch(
-              `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(
-                file.id
-              )}?alt=media`,
-              {
-                headers: {
-                  Authorization: `Bearer ${session.accessToken}`,
-                },
-              }
-            );
+      const rows = batch.map((file: any) => ({
+        user_id: session.user.email,
+        drive_file_id: file.id,
+        title: cleanTitle(file.name),
+        series_status: extractSeriesStatus(file.name),
+        total_episodes: 0,
+        last_episode: 0,
+        progress: 0,
+        status: "안 읽음",
+      }));
 
-            if (!fileResponse.ok) {
-              console.error(
-                `파일 읽기 실패: ${file.name}`,
-                await fileResponse.text()
-              );
-
-              return null;
-            }
-
-            const content = await fileResponse.text();
-            const parsed = parseNovel(content);
-
-            const { data, error } = await supabase
-              .from("books")
-              .upsert(
-                {
-                  user_id: session.user.email,
-                  drive_file_id: file.id,
-                  title: cleanTitle(file.name),
-                  series_status: extractSeriesStatus(
-                    file.name
-                  ),
-                  total_episodes: parsed.totalEpisodes,
-                  last_episode: 0,
-                  progress: 0,
-                  status: "안 읽음",
-                },
-                {
-                  onConflict: "user_id,drive_file_id",
-                  ignoreDuplicates: true,
-                }
-              )
-              .select()
-              .maybeSingle();
-
-            if (error) {
-              console.error(
-                `DB 등록 실패: ${file.name}`,
-                error
-              );
-
-              return null;
-            }
-
-            return data;
-          } catch (error) {
-            console.error(
-              `파일 처리 실패: ${file.name}`,
-              error
-            );
-
-            return null;
-          }
+      const { data, error } = await supabase
+        .from("books")
+        .upsert(rows, {
+          onConflict: "user_id,drive_file_id",
+          ignoreDuplicates: true,
         })
-      );
+        .select();
 
-      for (const data of results) {
-        if (data) {
-          insertedBooks.push(data);
-        }
+      if (error) {
+        console.error("배치 등록 실패:", error);
+        continue;
+      }
+
+      if (data) {
+        insertedBooks.push(...data);
       }
     }
 
@@ -250,7 +190,7 @@ export async function GET() {
     // =========================================================
 
     let updatedCount = 0;
-    const updateBatches = chunk(existingFiles, 20);
+    const updateBatches = chunk(existingFiles, 50);
 
     for (const batch of updateBatches) {
       const results = await Promise.all(
@@ -269,7 +209,6 @@ export async function GET() {
               `기존 책 갱신 실패: ${file.name}`,
               error
             );
-
             return false;
           }
 
@@ -286,20 +225,10 @@ export async function GET() {
 
     return Response.json({
       success: true,
-
-      // 현재 Drive에 있는 TXT 파일 수
       totalDriveFiles: files.length,
-
-      // Drive에는 있지만 DB에는 없었던 파일 수
       newFiles: newFiles.length,
-
-      // 실제 DB에 새로 등록된 파일 수
       inserted: insertedBooks.length,
-
-      // 기존 파일 중 title/series_status가 갱신된 수
       updated: updatedCount,
-
-      // 이번에 새로 등록된 책
       books: insertedBooks,
     });
   } catch (error) {
