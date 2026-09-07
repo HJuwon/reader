@@ -967,7 +967,7 @@ export default function Home() {
         )}
 
         {/* 상태 필터 */}
-        <div className="mt-5 flex gap-1 sm:mt-6 sm:gap-2">
+        <div className="mt-5 flex gap-1.5 sm:mt-6 sm:gap-2">
           {["전체", "읽는 중", "완독", "안 읽음"].map((item) => (
             <button
               key={item}
@@ -977,7 +977,7 @@ export default function Home() {
                 setFilter(item);
                 setManagementMenuOpen(false);
               }}
-              className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:px-4 sm:py-2 sm:text-sm ${
+              className={`shrink-0 rounded-lg px-3 py-2 text-sm font-medium transition ${
                 managementFilter === "none" && filter === item
                   ? "bg-gray-900 text-white"
                   : "text-gray-600 hover:bg-gray-100"
@@ -993,7 +993,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setManagementMenuOpen((prev) => !prev)}
-              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:px-4 sm:py-2 sm:text-sm ${
+              className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
                 managementFilter !== "none"
                   ? "bg-gray-900 text-white"
                   : "text-gray-600 hover:bg-gray-100"
@@ -1255,37 +1255,33 @@ export default function Home() {
           </div>
 
           {/* 정렬 + 태그 필터 열기 */}
-          <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4 sm:flex-nowrap sm:justify-between">
-            <div className="flex flex-wrap items-center gap-1.5 text-xs sm:gap-2 sm:text-sm">
-              <span className="shrink-0 text-gray-400">정렬</span>
-
-              {(
-                [
-                  { key: "default", label: "기본순" },
-                  { key: "episodes", label: "화수 많은순" },
-                  { key: "title", label: "가나다순" },
-                ] as const
-              ).map((opt) => (
-                <button
-                  key={opt.key}
-                  type="button"
-                  onClick={() => changeSortOption(opt.key)}
-                  className={`shrink-0 rounded-full border px-2.5 py-1 font-medium transition sm:px-3 ${
-                    sortOption === opt.key
-                      ? "border-gray-900 bg-gray-900 text-white"
-                      : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
+          <div className="mt-3 flex items-center gap-1.5 sm:mt-4 sm:gap-2">
+            {(
+              [
+                { key: "default", label: "기본순" },
+                { key: "episodes", label: "화수 많은순" },
+                { key: "title", label: "가나다순" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => changeSortOption(opt.key)}
+                className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-medium transition sm:px-3 sm:text-sm ${
+                  sortOption === opt.key
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
 
             {managementFilter === "none" && (
               <button
                 type="button"
                 onClick={() => setTagFilterOpen((prev) => !prev)}
-                className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition sm:px-3.5 sm:py-1.5 sm:text-sm ${
+                className={`flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-medium transition sm:px-3.5 sm:py-1.5 sm:text-sm ${
                   activeTags.size > 0
                     ? "border-blue-600 bg-blue-50 text-blue-700"
                     : tagFilterOpen
@@ -1303,6 +1299,7 @@ export default function Home() {
               </button>
             )}
           </div>
+
 
           {/* 완결 / 미완 / 단편 / 중편 / 장편 / 초기화 - 필터 버튼을 눌러야 열림 */}
           {managementFilter === "none" && tagFilterOpen && (
