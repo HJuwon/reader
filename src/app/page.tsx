@@ -85,17 +85,9 @@ export default function Home() {
   }
 
   useEffect(() => {
-    async function initializeBooks() {
-      try {
-        await fetch("/api/books/sync");
-        await loadBooks();
-      } catch (error) {
-        console.error("책 동기화 실패:", error);
-        await loadBooks();
-      }
-    }
-
-    initializeBooks();
+    // 페이지 로드(새로고침) 시에는 DB만 조회한다.
+    // 구글 드라이브 동기화는 "새로고침" 버튼을 눌렀을 때만 실행된다.
+    loadBooks();
   }, []);
 
   // 스크롤 위치에 따라 맨 위로 버튼 표시

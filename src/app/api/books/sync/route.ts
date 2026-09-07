@@ -117,7 +117,7 @@ export async function GET() {
     const { data: existingBooks, error: existingError } =
       await supabase
         .from("books")
-        .select("drive_file_id")
+        .select("drive_file_id, title, series_status")
         .eq("user_id", session.user.email);
 
     if (existingError) {
@@ -127,11 +127,16 @@ export async function GET() {
       );
     }
 
-    const existingIds = new Set(
-      (existingBooks || []).map(
-        (book: any) => book.drive_file_id
-      )
+    // drive_file_id -> { title, series_status } 매핑
+    // (기존 값과 비교해서 실제로 바뀐 파일만 UPDATE 하기 위함)
+    const existingMap = new Map(
+      (existingBooks || []).map((book: any) => [
+        book.drive_file_id,
+        book,
+      ])
     );
+
+    const existingIds = new Set(existingMap.keys());
 
     // =========================================================
     // 3. 새 파일 / 기존 파일 분리
@@ -144,6 +149,18 @@ export async function GET() {
     const existingFiles = files.filter((file: any) =>
       existingIds.has(file.id)
     );
+
+    // 기존 파일 중 title / series_status가 실제로 달라진 것만 추려낸다.
+    // Drive 파일명이 그대로면 DB에 UPDATE를 아예 날리지 않는다.
+    const changedFiles = existingFiles.filter((file: any) => {
+      const current: any = existingMap.get(file.id);
+
+      return (
+        current.title !== cleanTitle(file.name) ||
+        current.series_status !==
+          extractSeriesStatus(file.name)
+      );
+    });
 
     // =========================================================
     // 4. 새 파일 등록 — 내용 다운로드/파싱 없이 메타데이터만
@@ -187,10 +204,12 @@ export async function GET() {
     // =========================================================
     // 5. 기존 파일: title / series_status만 파일명 기준으로 갱신
     //    (진행상황 컬럼은 절대 건드리지 않음)
+    //    ★ 실제로 값이 바뀐 파일만 UPDATE → 대부분의 재동기화에서
+    //      changedFiles가 비어있어 DB 왕복이 거의 발생하지 않는다.
     // =========================================================
 
     let updatedCount = 0;
-    const updateBatches = chunk(existingFiles, 50);
+    const updateBatches = chunk(changedFiles, 50);
 
     for (const batch of updateBatches) {
       const results = await Promise.all(

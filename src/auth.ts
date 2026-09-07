@@ -9,8 +9,10 @@ export const authOptions = {
 
       authorization: {
         params: {
+          // 본문 수정 후 구글 드라이브에 다시 저장하려면
+          // 읽기 전용(drive.readonly)이 아닌 쓰기 가능한 권한이 필요하다.
           scope:
-            "openid email profile https://www.googleapis.com/auth/drive.readonly",
+            "openid email profile https://www.googleapis.com/auth/drive",
 
           // Google refresh_token을 받기 위해 사용
           access_type: "offline",

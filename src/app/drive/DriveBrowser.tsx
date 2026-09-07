@@ -1,6 +1,7 @@
 "use client";
 
 import { parseNovel, type ParsedNovel } from "@/lib/parser";
+import { getLines } from "@/lib/parser/normalize";
 import {
   useEffect,
   useRef,
@@ -13,11 +14,13 @@ import type { ReactNode } from "react";
 import {
   ArrowLeft,
   Bookmark,
+  Check,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   ChevronUp,
   Loader2,
+  Pencil,
   Search,
   Settings,
   X,
@@ -247,6 +250,19 @@ export default function DriveBrowser() {
 
   const [showHighlightButton, setShowHighlightButton] =
     useState(false);
+
+  // 본문 수정 관련 상태
+  const [editingContent, setEditingContent] =
+    useState(false);
+
+  const [editedText, setEditedText] =
+    useState("");
+
+  const [savingEdit, setSavingEdit] =
+    useState(false);
+
+  const [editError, setEditError] =
+    useState("");
 
   const scrollPositionRef =
     useRef(0);
@@ -650,6 +666,96 @@ export default function DriveBrowser() {
       );
     } finally {
       setBookmarkLoading(false);
+    }
+  }
+
+  // 본문 수정 시작
+  function startEditingContent() {
+    if (!selectedEpisode) {
+      return;
+    }
+
+    setEditedText(selectedEpisode.content);
+    setEditError("");
+    setEditingContent(true);
+  }
+
+  // 본문 수정 취소
+  function cancelEditingContent() {
+    setEditingContent(false);
+    setEditedText("");
+    setEditError("");
+  }
+
+  // 수정한 본문을 구글 드라이브 파일에 반영
+  async function saveEditedContent() {
+    if (!selectedFile || !selectedEpisode) {
+      return;
+    }
+
+    setSavingEdit(true);
+    setEditError("");
+
+    try {
+      // 파서와 동일한 방식으로 정규화한 줄 단위 배열을 얻는다.
+      // (parseNovel 내부에서 쓰는 startLine/endLine과 인덱스를
+      //  맞추기 위해 반드시 같은 정규화 함수를 써야 한다.)
+      const lines = getLines(fileContent);
+
+      // 회차 제목(헤딩) 줄은 그대로 두고,
+      // 본문에 해당하는 줄들만 수정한 내용으로 교체한다.
+      const newLines = [
+        ...lines.slice(
+          0,
+          selectedEpisode.startLine + 1
+        ),
+        ...editedText.split("\n"),
+        ...lines.slice(
+          selectedEpisode.endLine + 1
+        ),
+      ];
+
+      const newFullText = newLines.join("\n");
+
+      const response = await fetch(
+        `/api/drive/file?fileId=${encodeURIComponent(
+          selectedFile.id
+        )}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            content: newFullText,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          extractErrorMessage(
+            data,
+            "구글 드라이브에 저장하지 못했습니다."
+          )
+        );
+      }
+
+      // 로컬 상태도 새 본문 기준으로 다시 계산한다.
+      setFileContent(newFullText);
+      setParsedNovel(parseNovel(newFullText));
+      setEditingContent(false);
+      setEditedText("");
+    } catch (error) {
+      setEditError(
+        error instanceof Error
+          ? error.message
+          : "저장 중 오류가 발생했습니다."
+      );
+    } finally {
+      setSavingEdit(false);
     }
   }
 
@@ -2725,7 +2831,29 @@ export default function DriveBrowser() {
                               ? "북마크됨"
                               : "북마크"}
                           </button>
+
+                          {!editingContent && (
+                            <button
+                              onClick={
+                                startEditingContent
+                              }
+                              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm transition"
+                              style={{
+                                color:
+                                  theme.muted,
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                              본문 수정
+                            </button>
+                          )}
                         </div>
+
+                        {editError && (
+                          <p className="mt-2 text-xs text-red-500">
+                            {editError}
+                          </p>
+                        )}
 
                         <div className="mt-5">
                           {!bodySearchOpen ? (
@@ -2884,6 +3012,81 @@ export default function DriveBrowser() {
                           )}
                         </div>
 
+                        {editingContent ? (
+                          <div className="mx-auto mt-8 max-w-2xl">
+                            <textarea
+                              value={
+                                editedText
+                              }
+                              onChange={(
+                                event
+                              ) =>
+                                setEditedText(
+                                  event
+                                    .target
+                                    .value
+                                )
+                              }
+                              disabled={
+                                savingEdit
+                              }
+                              className="w-full resize-y whitespace-pre-wrap break-words rounded-lg border p-4 outline-none focus:ring-2"
+                              style={{
+                                fontFamily:
+                                  SERIF,
+                                fontSize: `${fontSize}px`,
+                                lineHeight: 2,
+                                color:
+                                  theme.text,
+                                minHeight:
+                                  "50vh",
+                                borderColor:
+                                  theme.divider,
+                              }}
+                            />
+
+                            <div className="mt-4 flex items-center justify-end gap-2">
+                              <button
+                                onClick={
+                                  cancelEditingContent
+                                }
+                                disabled={
+                                  savingEdit
+                                }
+                                className="rounded-lg px-4 py-2 text-sm transition disabled:opacity-50"
+                                style={{
+                                  color:
+                                    theme.muted,
+                                }}
+                              >
+                                취소
+                              </button>
+
+                              <button
+                                onClick={
+                                  saveEditedContent
+                                }
+                                disabled={
+                                  savingEdit
+                                }
+                                className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-medium text-white transition disabled:opacity-50"
+                                style={{
+                                  backgroundColor:
+                                    theme.accent,
+                                }}
+                              >
+                                {savingEdit ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Check className="h-4 w-4" />
+                                )}
+                                {savingEdit
+                                  ? "저장 중..."
+                                  : "확인"}
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
                         <div className="mx-auto mt-8 max-w-2xl">
                           <div
                             ref={
@@ -3053,6 +3256,7 @@ export default function DriveBrowser() {
                             })()}
                           </div>
                         </div>
+                        )}
 
                         <div className="mx-auto mt-10 hidden max-w-2xl items-center justify-between md:flex">
                           <button
