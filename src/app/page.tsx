@@ -910,7 +910,7 @@ export default function Home() {
         </div>
 
         {/* 상태 필터 */}
-        <div className="mt-5 flex gap-1.5 overflow-x-auto sm:mt-6 sm:gap-2">
+        <div className="mt-5 flex items-center gap-1.5 sm:mt-6 sm:gap-2">
           {[
             "전체",
             "읽는 중",

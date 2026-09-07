@@ -2826,27 +2826,10 @@ export default function DriveBrowser() {
                                   : "none"
                               }
                             />
-
                             {bookmarked
                               ? "북마크됨"
                               : "북마크"}
                           </button>
-
-                          {!editingContent && (
-                            <button
-                              onClick={
-                                startEditingContent
-                              }
-                              className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm transition"
-                              style={{
-                                color:
-                                  theme.muted,
-                              }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                              본문 수정
-                            </button>
-                          )}
                         </div>
 
                         {editError && (
@@ -3432,32 +3415,50 @@ export default function DriveBrowser() {
               </button>
             </div>
 
+
+
+            {!editingContent && (
+              <button
+                type="button"
+                onClick={startEditingContent}
+                className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm transition hover:opacity-80"
+                style={{
+                  color: theme.title,
+                  border: `1px solid ${theme.divider}`,
+                  backgroundColor: theme.bg,
+                }}
+              >
+                <Pencil className="h-4 w-4" />
+                본문 수정
+              </button>
+            )}
+
             <p
               className="mb-2 text-xs font-semibold"
               style={{
-                color:
-                  theme.text,
+                color: theme.text,
               }}
             >
               글자 크기
             </p>
-
+                        
             <div className="mb-5 flex items-center gap-3">
               <button
+                type="button"
                 onClick={() =>
-                  setFontSize(
-                    (s) =>
-                      Math.max(
-                        MIN_FONT_SIZE,
-                        s - 1
-                      )
+                  setFontSize((size) =>
+                    Math.max(
+                      MIN_FONT_SIZE,
+                      size - 1
+                    )
                   )
                 }
-                className="rounded-full px-2 py-1 text-xs font-medium"
+                disabled={
+                  fontSize <= MIN_FONT_SIZE
+                }
+                className="shrink-0 text-xs font-medium disabled:opacity-30"
                 style={{
-                  color:
-                    theme.title,
-                  border: `1px solid ${theme.divider}`,
+                  color: theme.text,
                 }}
               >
                 가-
@@ -3465,39 +3466,35 @@ export default function DriveBrowser() {
 
               <input
                 type="range"
-                min={
-                  MIN_FONT_SIZE
-                }
-                max={
-                  MAX_FONT_SIZE
-                }
+                min={MIN_FONT_SIZE}
+                max={MAX_FONT_SIZE}
                 step={1}
                 value={fontSize}
-                onChange={(e) =>
+                onChange={(event) =>
                   setFontSize(
-                    Number(
-                      e.target.value
-                    )
+                    Number(event.target.value)
                   )
                 }
-                className="flex-1"
+                className="min-w-0 flex-1"
+                aria-label="글자 크기"
               />
 
               <button
+                type="button"
                 onClick={() =>
-                  setFontSize(
-                    (s) =>
-                      Math.min(
-                        MAX_FONT_SIZE,
-                        s + 1
-                      )
+                  setFontSize((size) =>
+                    Math.min(
+                      MAX_FONT_SIZE,
+                      size + 1
+                    )
                   )
                 }
-                className="rounded-full px-2 py-1 text-xs font-medium"
+                disabled={
+                  fontSize >= MAX_FONT_SIZE
+                }
+                className="shrink-0 text-xs font-medium disabled:opacity-30"
                 style={{
-                  color:
-                    theme.title,
-                  border: `1px solid ${theme.divider}`,
+                  color: theme.text,
                 }}
               >
                 가+
@@ -3507,8 +3504,7 @@ export default function DriveBrowser() {
             <p
               className="mb-2 text-xs font-semibold"
               style={{
-                color:
-                  theme.text,
+                color: theme.text,
               }}
             >
               배경색
@@ -3567,6 +3563,55 @@ export default function DriveBrowser() {
             </div>
           </div>
         )}
+        <div className="flex flex-col items-end gap-1">
+          <button
+            type="button"
+            onClick={() => {
+              window.scrollTo({
+                top: 0,
+                behavior: "smooth",
+              });
+            }}
+            aria-label="페이지 맨 위로 이동"
+            className="flex h-9 w-9 items-center justify-center rounded-full transition hover:opacity-80"
+            style={{
+              backgroundColor:
+                theme.title,
+              color:
+                theme.bg,
+              boxShadow:
+                "0 3px 10px rgba(0,0,0,0.16)",
+            }}
+          >
+            <ChevronUp className="h-4 w-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              window.scrollTo({
+                top:
+                  document.documentElement
+                    .scrollHeight,
+                behavior: "smooth",
+              });
+            }}
+            aria-label="페이지 맨 아래로 이동"
+            className="flex h-9 w-9 items-center justify-center rounded-full transition hover:opacity-80"
+            style={{
+              backgroundColor:
+                theme.title,
+              color:
+                theme.bg,
+              boxShadow:
+                "0 3px 10px rgba(0,0,0,0.16)",
+            }}
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
+
+
 
         <button
           onClick={() =>
