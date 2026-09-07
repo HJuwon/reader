@@ -3,6 +3,56 @@ import { authOptions } from "@/auth";
 import { supabase } from "@/lib/supabase";
 
 // ======================================================
+// Supabase 전체 행 조회
+// 기본 1,000개 제한을 피하기 위해 1,000개씩 반복 조회
+// ======================================================
+
+async function fetchAllRows(
+  query: any
+): Promise<{
+  data: any[];
+  error: any;
+}> {
+  const pageSize = 1000;
+  let from = 0;
+  const allData: any[] = [];
+
+  while (true) {
+    const {
+      data,
+      error,
+    } = await query.range(
+      from,
+      from + pageSize - 1
+    );
+
+    if (error) {
+      return {
+        data: allData,
+        error,
+      };
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    allData.push(...data);
+
+    if (data.length < pageSize) {
+      break;
+    }
+
+    from += pageSize;
+  }
+
+  return {
+    data: allData,
+    error: null,
+  };
+}
+
+// ======================================================
 // GET
 // 소설 목록 조회
 // ======================================================
@@ -25,8 +75,11 @@ export async function GET() {
     // 1. 책 + 회차 병렬 조회
     // --------------------------------------------------
 
-    const [booksResult, roundsResult] =
-      await Promise.all([
+    const [
+      booksResult,
+      roundsResult,
+    ] = await Promise.all([
+      fetchAllRows(
         supabase
           .from("books")
           .select(
@@ -35,10 +88,11 @@ export async function GET() {
           .eq("user_id", userId)
           .order("updated_at", {
             ascending: false,
-          }),
+          })
+      ),
 
+      fetchAllRows(
         supabase
-
           .from("reading_rounds")
           .select(
             "id,user_id,book_id,round,status,started_at,completed_at,created_at"
@@ -46,9 +100,9 @@ export async function GET() {
           .eq("user_id", userId)
           .order("round", {
             ascending: true,
-          }),
-        
-      ]);
+          })
+      ),
+    ]);
 
     const {
       data: books,
@@ -87,6 +141,16 @@ export async function GET() {
     const bookList = books ?? [];
     const roundList = rounds ?? [];
 
+    console.log(
+      "BOOKS GET COUNT:",
+      bookList.length
+    );
+
+    console.log(
+      "READING ROUNDS GET COUNT:",
+      roundList.length
+    );
+
     if (bookList.length === 0) {
       return Response.json({
         success: true,
@@ -108,12 +172,14 @@ export async function GET() {
       const {
         data: progress,
         error: progressError,
-      } = await supabase
-        .from("reading_progress")
-        .select(
-          "id,round_id,episode,progress,scroll_position,updated_at"
-        )
-        .in("round_id", roundIds);
+      } = await fetchAllRows(
+        supabase
+          .from("reading_progress")
+          .select(
+            "id,round_id,episode,progress,scroll_position,updated_at"
+          )
+          .in("round_id", roundIds)
+      );
 
       if (progressError) {
         console.error(
@@ -132,6 +198,11 @@ export async function GET() {
 
       progressList = progress ?? [];
     }
+
+    console.log(
+      "READING PROGRESS GET COUNT:",
+      progressList.length
+    );
 
     // --------------------------------------------------
     // 3. Map 생성
@@ -249,6 +320,11 @@ export async function GET() {
           0,
       };
     });
+
+    console.log(
+      "BOOKS FINAL RESULT COUNT:",
+      result.length
+    );
 
     return Response.json({
       success: true,
@@ -877,7 +953,7 @@ export async function POST(
         return Response.json(
           {
             error:
-              "진행상황을 생성했지만 데이터를 가져오지 못했습니다.",
+              "진행상황을 생성했지만 저장된 데이터를 가져오지 못했습니다.",
           },
           { status: 500 }
         );
@@ -1470,4 +1546,3 @@ export async function PATCH(
     );
   }
 }
-
