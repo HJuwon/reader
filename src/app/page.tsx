@@ -967,7 +967,7 @@ export default function Home() {
         )}
 
         {/* 상태 필터 */}
-        <div className="mt-5 flex gap-1.5 sm:mt-6 sm:gap-2">
+        <div className="mt-5 flex gap-1 sm:mt-6 sm:gap-2">
           {["전체", "읽는 중", "완독", "안 읽음"].map((item) => (
             <button
               key={item}
@@ -977,7 +977,7 @@ export default function Home() {
                 setFilter(item);
                 setManagementMenuOpen(false);
               }}
-              className={`shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-medium transition sm:px-4 sm:py-2 ${
+              className={`shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:px-4 sm:py-2 sm:text-sm ${
                 managementFilter === "none" && filter === item
                   ? "bg-gray-900 text-white"
                   : "text-gray-600 hover:bg-gray-100"
@@ -987,17 +987,13 @@ export default function Home() {
             </button>
           ))}
 
+
           {/* 관리함 */}
-          <div
-            ref={managementMenuRef}
-            className="relative shrink-0"
-          >
+          <div ref={managementMenuRef} className="relative shrink-0">
             <button
               type="button"
-              onClick={() =>
-                setManagementMenuOpen((prev) => !prev)
-              }
-              className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition sm:px-4 sm:py-2 ${
+              onClick={() => setManagementMenuOpen((prev) => !prev)}
+              className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:px-4 sm:py-2 sm:text-sm ${
                 managementFilter !== "none"
                   ? "bg-gray-900 text-white"
                   : "text-gray-600 hover:bg-gray-100"
@@ -1005,9 +1001,9 @@ export default function Home() {
             >
               관리함 <span className="ml-1">▾</span>
             </button>
-
             {managementMenuOpen && (
-              <div className="absolute left-0 top-10 z-40 w-36 rounded-xl border bg-white p-1 shadow-lg">
+              <div className="absolute right-0 top-10 z-40 w-36 rounded-xl border bg-white p-1 shadow-lg">
+
                 <button
                   type="button"
                   onClick={() => {
@@ -1259,8 +1255,8 @@ export default function Home() {
           </div>
 
           {/* 정렬 + 태그 필터 열기 */}
-          <div className="mt-3 flex items-center justify-between gap-2 sm:mt-4">
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto text-xs sm:gap-2 sm:text-sm">
+          <div className="mt-3 flex flex-wrap items-center gap-2 sm:mt-4 sm:flex-nowrap sm:justify-between">
+            <div className="flex flex-wrap items-center gap-1.5 text-xs sm:gap-2 sm:text-sm">
               <span className="shrink-0 text-gray-400">정렬</span>
 
               {(
@@ -1274,7 +1270,7 @@ export default function Home() {
                   key={opt.key}
                   type="button"
                   onClick={() => changeSortOption(opt.key)}
-                  className={`shrink-0 rounded-full border px-3 py-1 font-medium transition ${
+                  className={`shrink-0 rounded-full border px-2.5 py-1 font-medium transition sm:px-3 ${
                     sortOption === opt.key
                       ? "border-gray-900 bg-gray-900 text-white"
                       : "border-gray-200 text-gray-500 hover:bg-gray-50"
@@ -1288,9 +1284,7 @@ export default function Home() {
             {managementFilter === "none" && (
               <button
                 type="button"
-                onClick={() =>
-                  setTagFilterOpen((prev) => !prev)
-                }
+                onClick={() => setTagFilterOpen((prev) => !prev)}
                 className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition sm:px-3.5 sm:py-1.5 sm:text-sm ${
                   activeTags.size > 0
                     ? "border-blue-600 bg-blue-50 text-blue-700"
@@ -1301,15 +1295,9 @@ export default function Home() {
               >
                 <Filter className="h-3.5 w-3.5" strokeWidth={1.75} />
                 필터
-                {activeTags.size > 0 && (
-                  <span className="ml-0.5">
-                    {activeTags.size}
-                  </span>
-                )}
+                {activeTags.size > 0 && <span className="ml-0.5">{activeTags.size}</span>}
                 <ChevronDown
-                  className={`h-3.5 w-3.5 transition-transform ${
-                    tagFilterOpen ? "rotate-180" : ""
-                  }`}
+                  className={`h-3.5 w-3.5 transition-transform ${tagFilterOpen ? "rotate-180" : ""}`}
                   strokeWidth={1.75}
                 />
               </button>
