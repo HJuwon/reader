@@ -1152,7 +1152,7 @@ export default function Home() {
             {availableIndexLetters.length >
               0 &&
               filteredBooks.length > 20 && (
-                <div className="pointer-events-none absolute inset-y-3 right-1 z-10 flex items-center sm:right-1.5">
+                <div className="pointer-events-none absolute inset-y-3 left-1 z-10 flex items-center sm:left-1.5">
                   <div className="pointer-events-auto flex max-h-full flex-col items-center gap-0.5 overflow-y-auto rounded-full bg-white/80 px-0.5 py-1.5 text-[9px] font-medium text-gray-400 shadow-sm backdrop-blur [scrollbar-width:none] sm:text-[10px] [&::-webkit-scrollbar]:hidden">
                     {availableIndexLetters.map(
                       (letter) => (
