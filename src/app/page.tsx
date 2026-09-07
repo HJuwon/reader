@@ -1303,7 +1303,7 @@ export default function Home() {
 
           {/* 완결 / 미완 / 단편 / 중편 / 장편 / 초기화 - 필터 버튼을 눌러야 열림 */}
           {managementFilter === "none" && tagFilterOpen && (
-            <div className="mt-3 flex items-center gap-1.5 overflow-x-auto sm:mt-4 sm:gap-2">
+            <div className="mt-3 flex items-center gap-1 overflow-x-auto sm:mt-4 sm:gap-2">
               {TOGGLE_TAGS.map((tag) => {
                 const isActive = activeTags.has(tag);
 
