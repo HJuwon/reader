@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   BookOpen,
   RotateCcw,
@@ -46,14 +46,138 @@ const progressBarColor: Record<string, string> = {
   "안 읽음": "bg-gray-300",
 };
 
+// 한글 초성 19개 (완성형 한글 유니코드 계산용)
+const CHOSUNG_LIST = [
+  "ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ",
+  "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+];
+
+// 된소리 초성(ㄲㄸㅃㅆㅉ)은 인덱스 바에서 자연스럽게 같은 그룹으로 묶어서 보여줌
+const CHOSUNG_GROUP: Record<string, string> = {
+  "ㄱ": "ㄱ", "ㄲ": "ㄱ",
+  "ㄴ": "ㄴ",
+  "ㄷ": "ㄷ", "ㄸ": "ㄷ",
+  "ㄹ": "ㄹ",
+  "ㅁ": "ㅁ",
+  "ㅂ": "ㅂ", "ㅃ": "ㅂ",
+  "ㅅ": "ㅅ", "ㅆ": "ㅅ",
+  "ㅇ": "ㅇ",
+  "ㅈ": "ㅈ", "ㅉ": "ㅈ",
+  "ㅊ": "ㅊ",
+  "ㅋ": "ㅋ",
+  "ㅌ": "ㅌ",
+  "ㅍ": "ㅍ",
+  "ㅎ": "ㅎ",
+};
+
+// 인덱스 바에 표시될 전체 순서 (자모 → 알파벳 → 기타)
+const INDEX_ORDER = [
+  "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+  ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
+  "#",
+];
+
+// 제목 끝에 보통 "1-120" 처럼 붙어있는 화수 범위에서 총 화수(뒤쪽 숫자)를 추출
+// (새로 동기화된 책은 파일을 한 번 열어보기 전까지 total_episodes가 0이라
+//  제목에 적힌 범위로 화수를 추정해서 "화수 많은순" 정렬에 사용한다)
+function getTitleEpisodeCount(title: string): number {
+  const matches = [...title.matchAll(/(\d+)\s*[-~]\s*(\d+)/g)];
+
+  if (matches.length === 0) {
+    return 0;
+  }
+
+  // 제목 안에 숫자 범위가 여러 개 있을 수도 있으니 가장 마지막(보통 맨 뒤) 것을 사용
+  const last = matches[matches.length - 1];
+  const count = parseInt(last[2], 10);
+
+  return Number.isFinite(count) ? count : 0;
+}
+
+// DB에 기록된 total_episodes와 제목에서 추정한 화수 중 더 큰 값을 사용
+function getEffectiveTotalEpisodes(book: Book): number {
+  return Math.max(book.total_episodes || 0, getTitleEpisodeCount(book.title));
+}
+
+// 화수 구간 (단편 / 중편 / 장편) + 완결 여부를 하나의 토글 그룹으로 묶어서 사용
+const TOGGLE_TAGS = ["완결", "미완", "단편", "중편", "장편"] as const;
+type ToggleTag = (typeof TOGGLE_TAGS)[number];
+
+// 완결 여부 태그 / 화수 구간 태그를 구분 (같은 그룹끼리는 OR, 그룹 간에는 AND로 필터링)
+const COMPLETION_TAGS: ToggleTag[] = ["완결", "미완"];
+const LENGTH_TAGS: ToggleTag[] = ["단편", "중편", "장편"];
+
+// 화수 기준으로 단편(500화 미만) / 중편(500~1000화) / 장편(1000화 초과)으로 분류
+function getLengthBucket(book: Book): "단편" | "중편" | "장편" {
+  const total = getEffectiveTotalEpisodes(book);
+
+  if (total > 1000) return "장편";
+  if (total >= 500) return "중편";
+  return "단편";
+}
+
+// 제목의 첫 글자를 기준으로 인덱스 바 그룹 키를 구한다
+function getIndexKey(title: string): string {
+  const trimmed = title.trim();
+
+  if (!trimmed) {
+    return "#";
+  }
+
+  const code = trimmed.charCodeAt(0);
+
+  // 완성형 한글 (가 ~ 힣)
+  if (code >= 0xac00 && code <= 0xd7a3) {
+    const choIndex = Math.floor((code - 0xac00) / (21 * 28));
+    const cho = CHOSUNG_LIST[choIndex];
+
+    return CHOSUNG_GROUP[cho] ?? "#";
+  }
+
+  const upper = trimmed[0].toUpperCase();
+
+  if (upper >= "A" && upper <= "Z") {
+    return upper;
+  }
+
+  return "#";
+}
+
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("전체");
+  // 완결/미완 + 화수 구간(단편/중편/장편)을 하나의 토글 그룹으로 관리
+  // (여러 개를 동시에 켤 수 있는 멀티 토글: 같은 그룹끼리는 OR, 그룹 간에는 AND)
+  const [activeTags, setActiveTags] = useState<Set<ToggleTag>>(
+    () => new Set()
+  );
+  // 정렬 기준: 기본(불러온 순서) / 화수 많은순 / 가나다순
+  const [sortOption, setSortOption] = useState<
+    "default" | "episodes" | "title"
+  >("default");
   const [search, setSearch] = useState("");
   const [showScrollTop, setShowScrollTop] = useState(false);
   const [syncing, setSyncing] = useState(false);
+
+  // 자모/알파벳 인덱스 바로 점프할 때, 각 소설 행의 DOM을 참조
+  const bookRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  // 토글 태그(완결/미완/단편/중편/장편) 켜고 끄기
+  function toggleTag(tag: ToggleTag) {
+    setActiveTags((prev) => {
+      const next = new Set(prev);
+
+      if (next.has(tag)) {
+        next.delete(tag);
+      } else {
+        next.add(tag);
+      }
+
+      return next;
+    });
+  }
 
   async function loadBooks() {
     setLoading(true);
@@ -103,7 +227,7 @@ export default function Home() {
     };
   }, []);
 
-  // 상태 필터 + 제목 검색
+  // 상태 필터 + 완결 여부 필터 + 제목 검색
   const filteredBooks = useMemo(() => {
     const keyword = search.trim().toLowerCase();
 
@@ -112,13 +236,99 @@ export default function Home() {
         filter === "전체" ||
         getDisplayStatus(book) === filter;
 
+      const activeCompletionTags = COMPLETION_TAGS.filter((tag) =>
+        activeTags.has(tag)
+      );
+
+      const matchesCompletion =
+        activeCompletionTags.length === 0 ||
+        activeCompletionTags.some(
+          (tag) =>
+            (tag === "완결" &&
+              book.series_status === "completed") ||
+            (tag === "미완" && book.series_status === "ongoing")
+        );
+
+      const activeLengthTags = LENGTH_TAGS.filter((tag) =>
+        activeTags.has(tag)
+      );
+
+      const matchesLength =
+        activeLengthTags.length === 0 ||
+        activeLengthTags.includes(getLengthBucket(book));
+
       const matchesSearch =
         keyword === "" ||
         book.title.toLowerCase().includes(keyword);
 
-      return matchesStatus && matchesSearch;
+      return (
+        matchesStatus &&
+        matchesCompletion &&
+        matchesLength &&
+        matchesSearch
+      );
     });
-  }, [books, filter, search]);
+  }, [books, filter, activeTags, search]);
+
+  // 정렬 적용 (화수 많은순 / 가나다순 / 기본)
+  const sortedBooks = useMemo(() => {
+    const list = [...filteredBooks];
+
+    if (sortOption === "episodes") {
+      list.sort(
+        (a, b) =>
+          getEffectiveTotalEpisodes(b) - getEffectiveTotalEpisodes(a)
+      );
+    } else if (sortOption === "title") {
+      list.sort((a, b) => a.title.localeCompare(b.title, "ko"));
+    }
+
+    return list;
+  }, [filteredBooks, sortOption]);
+
+  // 정렬된 목록 기준으로, 인덱스 바의 각 글자에 해당하는 첫 번째 소설을 찾는다
+  const indexAnchors = useMemo(() => {
+    const map = new Map<string, string>();
+
+    for (const book of sortedBooks) {
+      const key = getIndexKey(book.title);
+
+      if (!map.has(key)) {
+        map.set(key, book.id);
+      }
+    }
+
+    return map;
+  }, [sortedBooks]);
+
+  // 실제로 목록에 존재하는 글자만 인덱스 바에 노출
+  const availableIndexLetters = useMemo(
+    () => INDEX_ORDER.filter((letter) => indexAnchors.has(letter)),
+    [indexAnchors]
+  );
+
+  // 인덱스 글자 클릭 → 가나다순 정렬로 전환하고 해당 위치로 스크롤
+  // (정렬을 바꿔도 목록의 행 자체는 그대로 유지되고 순서만 바뀌므로,
+  //  가나다순 기준 위치를 먼저 계산해 바로 스크롤할 수 있다)
+  function jumpToIndex(letter: string) {
+    const titleSorted = [...filteredBooks].sort((a, b) =>
+      a.title.localeCompare(b.title, "ko")
+    );
+
+    const target = titleSorted.find(
+      (book) => getIndexKey(book.title) === letter
+    );
+
+    setSortOption("title");
+
+    if (target) {
+      bookRowRefs.current[target.id]?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+        inline: "nearest",
+      });
+    }
+  }
 
   // 최근 읽은 소설
   const recentBooks = useMemo(() => {
@@ -337,6 +547,31 @@ export default function Home() {
           ))}
         </div>
 
+        {/* 완결/미완 + 화수 구간(단편/중편/장편) 토글 — 여러 개 동시 선택 가능 */}
+        <div className="mt-2 flex gap-1.5 overflow-x-auto sm:mt-3 sm:gap-2">
+          {TOGGLE_TAGS.map((tag) => {
+            const isActive = activeTags.has(tag);
+            const isCompletionTag = COMPLETION_TAGS.includes(tag);
+
+            return (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleTag(tag)}
+                className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition sm:px-3.5 sm:py-1.5 ${
+                  isActive
+                    ? isCompletionTag
+                      ? "border-purple-600 bg-purple-50 text-purple-700"
+                      : "border-blue-600 bg-blue-50 text-blue-700"
+                    : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                {tag}
+              </button>
+            );
+          })}
+        </div>
+
         {/* 최근 읽은 소설 */}
         {filter === "전체" && (
           <section className="mt-8 sm:mt-10">
@@ -420,7 +655,7 @@ export default function Home() {
 
                           <span className="text-gray-500">
                             {getEpisode(book)}화 /{" "}
-                            {book.total_episodes}화
+                            {getEffectiveTotalEpisodes(book)}화
                           </span>
                         </div>
 
@@ -544,6 +779,31 @@ export default function Home() {
             )}
           </div>
 
+          {/* 정렬 기준 */}
+          <div className="mt-3 flex items-center gap-1.5 overflow-x-auto text-xs sm:mt-4 sm:gap-2 sm:text-sm">
+            <span className="shrink-0 text-gray-400">정렬</span>
+
+            {(
+              [
+                { key: "default", label: "기본순" },
+                { key: "episodes", label: "화수 많은순" },
+                { key: "title", label: "가나다순" },
+              ] as const
+            ).map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => setSortOption(opt.key)}
+                className={`shrink-0 rounded-full border px-3 py-1 font-medium transition ${
+                  sortOption === opt.key
+                    ? "border-gray-900 bg-gray-900 text-white"
+                    : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           {/* 검색 결과 수 */}
           {search.trim() && !loading && !error && (
             <p className="mt-2 text-xs text-gray-400">
@@ -552,7 +812,7 @@ export default function Home() {
           )}
 
           {/* 소설 목록 */}
-          <div className="mt-3 overflow-hidden rounded-2xl border bg-white sm:mt-4">
+          <div className="relative mt-3 overflow-hidden rounded-2xl border bg-white sm:mt-4">
             {loading ? (
               <div className="px-5 py-10 text-center text-sm text-gray-400 sm:px-6 sm:py-12">
                 불러오는 중...
@@ -568,13 +828,16 @@ export default function Home() {
                   : "표시할 소설이 없습니다."}
               </div>
             ) : (
-              <div className="max-h-[60vh] overflow-y-auto">
-                {filteredBooks.map((book, index) => (
+              <div className="custom-scrollbar max-h-[60vh] overflow-y-auto">
+                {sortedBooks.map((book, index) => (
                   <div
                     key={book.id}
+                    ref={(el) => {
+                      bookRowRefs.current[book.id] = el;
+                    }}
                     className={`flex items-start gap-3 px-4 py-3.5 transition hover:bg-gray-50 sm:gap-4 sm:px-5 sm:py-4 ${
                       index !==
-                      filteredBooks.length - 1
+                      sortedBooks.length - 1
                         ? "border-b"
                         : ""
                     }`}
@@ -665,6 +928,25 @@ export default function Home() {
                 ))}
               </div>
             )}
+
+            {/* 자모/알파벳 인덱스 바 (목록이 많을 때만 노출) */}
+            {availableIndexLetters.length > 0 &&
+              filteredBooks.length > 20 && (
+                <div className="pointer-events-none absolute inset-y-3 right-1 z-10 flex items-center sm:right-1.5">
+                  <div className="pointer-events-auto flex max-h-full flex-col items-center gap-0.5 overflow-y-auto rounded-full bg-white/80 px-0.5 py-1.5 text-[9px] font-medium text-gray-400 shadow-sm backdrop-blur [scrollbar-width:none] sm:text-[10px] [&::-webkit-scrollbar]:hidden">
+                    {availableIndexLetters.map((letter) => (
+                      <button
+                        key={letter}
+                        type="button"
+                        onClick={() => jumpToIndex(letter)}
+                        className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full transition hover:bg-gray-900 hover:text-white sm:h-4 sm:w-4"
+                      >
+                        {letter}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
           </div>
         </section>
       </section>
