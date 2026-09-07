@@ -12,7 +12,9 @@ import {
 export default function BottomNav() {
   const pathname = usePathname();
 
-  if (pathname.startsWith("/drive")) {
+  // The reader page renders its own floating control capsule for an
+  // immersive full-screen experience — the global nav must not double up.
+  if (pathname.startsWith("/drive") || pathname.startsWith("/reader")) {
     return null;
   }
 

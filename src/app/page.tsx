@@ -15,6 +15,9 @@ import {
   Search,
   X,
   MoreVertical,
+  ChevronRight,
+  ChevronDown,
+  Filter,
 } from "lucide-react";
 import LogoutButton from "./LogoutButton";
 
@@ -49,11 +52,55 @@ const statusStyle: Record<string, string> = {
   "안 읽음": "bg-gray-100 text-gray-500",
 };
 
-const progressBarColor: Record<string, string> = {
-  "읽는 중": "bg-blue-600",
-  완독: "bg-green-600",
-  "안 읽음": "bg-gray-300",
+const progressRingColor: Record<string, string> = {
+  "읽는 중": "text-blue-600",
+  완독: "text-green-600",
+  "안 읽음": "text-gray-300",
 };
+
+function ProgressRing({
+  percent,
+  status,
+  size = 40,
+}: {
+  percent: number;
+  status: string;
+  size?: number;
+}) {
+  const radius = (size - 6) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset =
+    circumference - (Math.min(100, Math.max(0, percent)) / 100) * circumference;
+
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="-rotate-90 shrink-0"
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        strokeWidth="3"
+        className="fill-none stroke-gray-100"
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        strokeWidth="3"
+        strokeDasharray={circumference}
+        strokeDashoffset={offset}
+        strokeLinecap="round"
+        className={`fill-none stroke-current transition-all ${
+          progressRingColor[status] || "text-gray-300"
+        }`}
+      />
+    </svg>
+  );
+}
 
 function getTitleEpisodeCount(title: string): number {
   const matches = [
@@ -154,6 +201,10 @@ export default function Home() {
     useState<ManagementFilter>("none");
 
   const [managementMenuOpen, setManagementMenuOpen] =
+    useState(false);
+
+  // 완결/미완/단편 등 태그 필터 열림 여부
+  const [tagFilterOpen, setTagFilterOpen] =
     useState(false);
 
   // 전체 소설 영역 위치
@@ -909,14 +960,15 @@ export default function Home() {
           </p>
         </div>
 
+        {error && (
+          <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-2.5 text-sm text-red-600">
+            {error}
+          </div>
+        )}
+
         {/* 상태 필터 */}
-        <div className="mt-5 flex items-center gap-1.5 sm:mt-6 sm:gap-2">
-          {[
-            "전체",
-            "읽는 중",
-            "완독",
-            "안 읽음",
-          ].map((item) => (
+        <div className="mt-5 flex gap-1.5 sm:mt-6 sm:gap-2">
+          {["전체", "읽는 중", "완독", "안 읽음"].map((item) => (
             <button
               key={item}
               type="button"
@@ -926,8 +978,7 @@ export default function Home() {
                 setManagementMenuOpen(false);
               }}
               className={`shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-medium transition sm:px-4 sm:py-2 ${
-                managementFilter === "none" &&
-                filter === item
+                managementFilter === "none" && filter === item
                   ? "bg-gray-900 text-white"
                   : "text-gray-600 hover:bg-gray-100"
               }`}
@@ -944,9 +995,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() =>
-                setManagementMenuOpen(
-                  (prev) => !prev
-                )
+                setManagementMenuOpen((prev) => !prev)
               }
               className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition sm:px-4 sm:py-2 ${
                 managementFilter !== "none"
@@ -954,10 +1003,7 @@ export default function Home() {
                   : "text-gray-600 hover:bg-gray-100"
               }`}
             >
-              관리함
-              <span className="ml-1">
-                ▾
-              </span>
+              관리함 <span className="ml-1">▾</span>
             </button>
 
             {managementMenuOpen && (
@@ -965,17 +1011,12 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => {
-                    setManagementFilter(
-                      "reread"
-                    );
+                    setManagementFilter("reread");
                     setFilter("전체");
-                    setManagementMenuOpen(
-                      false
-                    );
+                    setManagementMenuOpen(false);
                   }}
                   className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-xs font-medium transition sm:text-sm ${
-                    managementFilter ===
-                    "reread"
+                    managementFilter === "reread"
                       ? "bg-gray-100 text-gray-900"
                       : "text-gray-700 hover:bg-gray-100"
                   }`}
@@ -986,17 +1027,12 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={() => {
-                    setManagementFilter(
-                      "excluded"
-                    );
+                    setManagementFilter("excluded");
                     setFilter("전체");
-                    setManagementMenuOpen(
-                      false
-                    );
+                    setManagementMenuOpen(false);
                   }}
                   className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-xs font-medium transition sm:text-sm ${
-                    managementFilter ===
-                    "excluded"
+                    managementFilter === "excluded"
                       ? "bg-gray-100 text-gray-900"
                       : "text-gray-700 hover:bg-gray-100"
                   }`}
@@ -1004,21 +1040,16 @@ export default function Home() {
                   제외한 작품
                 </button>
 
-                {managementFilter !==
-                  "none" && (
+                {managementFilter !== "none" && (
                   <>
                     <div className="my-1 border-t" />
 
                     <button
                       type="button"
                       onClick={() => {
-                        setManagementFilter(
-                          "none"
-                        );
+                        setManagementFilter("none");
                         setFilter("전체");
-                        setManagementMenuOpen(
-                          false
-                        );
+                        setManagementMenuOpen(false);
                       }}
                       className="flex w-full items-center rounded-lg px-3 py-2 text-left text-xs font-medium text-gray-500 transition hover:bg-gray-100 sm:text-sm"
                     >
@@ -1031,7 +1062,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 최근 읽은 소설 */}
+        {/* 최근 읽은 소설 - 가로 스크롤 캐러셀 */}
         {filter === "전체" &&
           managementFilter === "none" && (
             <section className="mt-8 sm:mt-10">
@@ -1039,132 +1070,100 @@ export default function Home() {
                 <h3 className="text-base font-semibold sm:text-lg">
                   최근 읽은 소설
                 </h3>
+
+                {recentBooks.length > 0 && (
+                  <span className="flex items-center gap-0.5 text-xs text-gray-400">
+                    옆으로 스크롤
+                    <ChevronRight className="h-3.5 w-3.5" />
+                  </span>
+                )}
               </div>
 
               {loading ? (
                 <div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-gray-400 sm:mt-4 sm:px-6 sm:py-12">
                   서재를 불러오는 중...
                 </div>
-              ) : error ? (
-                <div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-red-500 sm:mt-4 sm:px-6 sm:py-12">
-                  {error}
-                </div>
               ) : recentBooks.length === 0 ? (
                 <div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-gray-400 sm:mt-4 sm:px-6 sm:py-12">
                   최근 읽은 소설이 없습니다.
                 </div>
               ) : (
-                <div className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-3">
-                  {recentBooks.map(
-                    (book) => (
-                      <div
-                        key={book.id}
-                        className="relative block rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5"
-                      >
-                        {renderBookMenu(book)}
+                <div className="mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto pb-2 sm:mt-4">
+                  {recentBooks.map((book) => (
+                    <div
+                      key={book.id}
+                      className="relative w-64 shrink-0 snap-start rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:w-72"
+                    >
+                      {renderBookMenu(book)}
 
+                      <div className="flex items-start justify-between gap-3 pr-6">
                         <div className="flex items-start gap-3">
-                          <div className="flex w-9 shrink-0 flex-col items-center">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100">
-                              <BookOpen
-                                className="h-4 w-4 text-gray-400"
-                                strokeWidth={
-                                  1.75
-                                }
-                              />
-                            </div>
-
-                            <span
-                              className={`mt-1.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[getDisplayStatus(book)]}`}
-                            >
-                              {getDisplayStatus(
-                                book
-                              )}
-                            </span>
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100">
+                            <BookOpen
+                              className="h-4.5 w-4.5 text-gray-400"
+                              strokeWidth={1.75}
+                            />
                           </div>
 
-                          <div className="min-w-0 flex-1 pr-7">
-                            <h4 className="line-clamp-2 text-sm font-semibold leading-5 sm:text-[15px]">
+                          <div className="min-w-0">
+                            <h4 className="line-clamp-2 text-sm font-semibold leading-5">
                               {book.title}
                             </h4>
 
-                            <div className="mt-1.5 flex items-center gap-2">
+                            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusStyle[getDisplayStatus(book)]}`}
+                              >
+                                {getDisplayStatus(book)}
+                              </span>
+
                               <span
                                 className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                  book.series_status ===
-                                  "completed"
+                                  book.series_status === "completed"
                                     ? "bg-purple-50 text-purple-700"
                                     : "bg-orange-50 text-orange-700"
                                 }`}
                               >
-                                {book.series_status ===
-                                "completed"
+                                {book.series_status === "completed"
                                   ? "완결"
                                   : "연재중"}
                               </span>
-
-                              <p className="text-xs text-gray-400">
-                                Google Drive
-                              </p>
                             </div>
                           </div>
                         </div>
 
-                        <div className="mt-5">
-                          <div className="flex items-center justify-between text-xs sm:text-sm">
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-gray-700">
-                                {getRound(book)}
-                                회독
-                              </span>
-
-                              <span className="text-gray-300">
-                                ·
-                              </span>
-
-                              <span className="text-gray-500">
-                                {getEpisode(book)}
-                                화 /{" "}
-                                {getEffectiveTotalEpisodes(
-                                  book
-                                )}
-                                화
-                              </span>
-                            </div>
-
-                            <span className="font-medium">
-                              {getProgress(book)}
-                              %
-                            </span>
-                          </div>
-
-                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                            <div
-                              className={`h-full rounded-full ${progressBarColor[book.status]}`}
-                              style={{
-                                width: `${getProgress(
-                                  book
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex items-center justify-between">
-                          <span className="text-[11px] text-gray-400">
-                            마지막 수정 ·{" "}
-                            {new Date(
-                              book.updated_at
-                            ).toLocaleDateString(
-                              "ko-KR"
-                            )}
-                          </span>
-
-                          {renderAction(book)}
+                        <div className="relative flex shrink-0 items-center justify-center">
+                          <ProgressRing
+                            percent={getProgress(book)}
+                            status={getDisplayStatus(book)}
+                            size={38}
+                          />
                         </div>
                       </div>
-                    )
-                  )}
+
+                      <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                        <span>
+                          {getRound(book)}회독 · {getEpisode(book)}화 /{" "}
+                          {getEffectiveTotalEpisodes(book)}화
+                        </span>
+
+                        <span className="font-semibold text-gray-700">
+                          {getProgress(book)}%
+                        </span>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between border-t pt-3">
+                        <span className="text-[11px] text-gray-400">
+                          {new Date(book.updated_at).toLocaleDateString(
+                            "ko-KR"
+                          )}{" "}
+                          수정
+                        </span>
+
+                        {renderAction(book)}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </section>
@@ -1178,6 +1177,10 @@ export default function Home() {
           <div className="flex items-center justify-between">
             <h3 className="text-base font-semibold sm:text-lg">
               {getSectionTitle()}
+
+              <span className="ml-1.5 text-sm font-normal text-gray-400">
+                {sortedBooks.length}
+              </span>
             </h3>
 
             <button
@@ -1188,18 +1191,15 @@ export default function Home() {
                 setError("");
 
                 try {
-                  const response =
-                    await fetch(
-                      "/api/books/sync"
-                    );
+                  const response = await fetch(
+                    "/api/books/sync"
+                  );
 
-                  const data =
-                    await response.json();
+                  const data = await response.json();
 
                   if (!response.ok) {
                     throw new Error(
-                      typeof data?.error ===
-                        "string"
+                      typeof data?.error === "string"
                         ? data.error
                         : "동기화에 실패했습니다."
                     );
@@ -1220,16 +1220,12 @@ export default function Home() {
             >
               <RotateCcw
                 className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${
-                  syncing
-                    ? "animate-spin"
-                    : ""
+                  syncing ? "animate-spin" : ""
                 }`}
                 strokeWidth={1.75}
               />
 
-              {syncing
-                ? "동기화 중..."
-                : "새로고침"}
+              {syncing ? "동기화 중..." : "새로고침"}
             </button>
           </div>
 
@@ -1253,102 +1249,104 @@ export default function Home() {
             {search && (
               <button
                 type="button"
-                onClick={() =>
-                  setSearch("")
-                }
+                onClick={() => setSearch("")}
                 aria-label="검색어 지우기"
                 className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
               >
-                <X
-                  className="h-3.5 w-3.5"
-                  strokeWidth={2}
+                <X className="h-3.5 w-3.5" strokeWidth={2} />
+              </button>
+            )}
+          </div>
+
+          {/* 정렬 + 태그 필터 열기 */}
+          <div className="mt-3 flex items-center justify-between gap-2 sm:mt-4">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto text-xs sm:gap-2 sm:text-sm">
+              <span className="shrink-0 text-gray-400">정렬</span>
+
+              {(
+                [
+                  { key: "default", label: "기본순" },
+                  { key: "episodes", label: "화수 많은순" },
+                  { key: "title", label: "가나다순" },
+                ] as const
+              ).map((opt) => (
+                <button
+                  key={opt.key}
+                  type="button"
+                  onClick={() => changeSortOption(opt.key)}
+                  className={`shrink-0 rounded-full border px-3 py-1 font-medium transition ${
+                    sortOption === opt.key
+                      ? "border-gray-900 bg-gray-900 text-white"
+                      : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {managementFilter === "none" && (
+              <button
+                type="button"
+                onClick={() =>
+                  setTagFilterOpen((prev) => !prev)
+                }
+                className={`flex shrink-0 items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition sm:px-3.5 sm:py-1.5 sm:text-sm ${
+                  activeTags.size > 0
+                    ? "border-blue-600 bg-blue-50 text-blue-700"
+                    : tagFilterOpen
+                      ? "border-gray-900 bg-gray-900 text-white"
+                      : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                }`}
+              >
+                <Filter className="h-3.5 w-3.5" strokeWidth={1.75} />
+                필터
+                {activeTags.size > 0 && (
+                  <span className="ml-0.5">
+                    {activeTags.size}
+                  </span>
+                )}
+                <ChevronDown
+                  className={`h-3.5 w-3.5 transition-transform ${
+                    tagFilterOpen ? "rotate-180" : ""
+                  }`}
+                  strokeWidth={1.75}
                 />
               </button>
             )}
           </div>
 
-          {/* 정렬 */}
-          <div className="mt-3 flex items-center gap-1.5 overflow-x-auto text-xs sm:mt-4 sm:gap-2 sm:text-sm">
-            <span className="shrink-0 text-gray-400">
-              정렬
-            </span>
-
-            {(
-              [
-                {
-                  key: "default",
-                  label: "기본순",
-                },
-                {
-                  key: "episodes",
-                  label: "화수 많은순",
-                },
-                {
-                  key: "title",
-                  label: "가나다순",
-                },
-              ] as const
-            ).map((opt) => (
-              <button
-                key={opt.key}
-                type="button"
-                onClick={() =>
-                  changeSortOption(
-                    opt.key
-                  )
-                }
-                className={`shrink-0 rounded-full border px-3 py-1 font-medium transition ${
-                  sortOption === opt.key
-                    ? "border-gray-900 bg-gray-900 text-white"
-                    : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-
-          {/* 완결 / 미완 / 단편 / 중편 / 장편 / 초기화 */}
-          {managementFilter ===
-            "none" && (
+          {/* 완결 / 미완 / 단편 / 중편 / 장편 / 초기화 - 필터 버튼을 눌러야 열림 */}
+          {managementFilter === "none" && tagFilterOpen && (
             <div className="mt-3 flex items-center gap-1.5 overflow-x-auto sm:mt-4 sm:gap-2">
-              {TOGGLE_TAGS.map(
-                (tag) => {
-                  const isActive =
-                    activeTags.has(tag);
+              {TOGGLE_TAGS.map((tag) => {
+                const isActive = activeTags.has(tag);
 
-                  const isCompletionTag =
-                    COMPLETION_TAGS.includes(
-                      tag
-                    );
+                const isCompletionTag =
+                  COMPLETION_TAGS.includes(tag);
 
-                  return (
-                    <button
-                      key={tag}
-                      type="button"
-                      onClick={() =>
-                        toggleTag(tag)
-                      }
-                      className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition sm:px-3.5 sm:py-1.5 ${
-                        isActive
-                          ? isCompletionTag
-                            ? "border-purple-600 bg-purple-50 text-purple-700"
-                            : "border-blue-600 bg-blue-50 text-blue-700"
-                          : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                      }`}
-                    >
-                      {tag}
-                    </button>
-                  );
-                }
-              )}
+                return (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => toggleTag(tag)}
+                    className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition sm:px-3.5 sm:py-1.5 ${
+                      isActive
+                        ? isCompletionTag
+                          ? "border-purple-600 bg-purple-50 text-purple-700"
+                          : "border-blue-600 bg-blue-50 text-blue-700"
+                        : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                );
+              })}
 
               <button
                 type="button"
                 onClick={resetTags}
-                disabled={
-                  activeTags.size === 0
-                }
+                disabled={activeTags.size === 0}
                 className="ml-1 shrink-0 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-400 transition hover:bg-gray-50 hover:text-gray-600 disabled:cursor-default disabled:opacity-40 sm:px-3.5 sm:py-1.5"
               >
                 초기화
@@ -1356,203 +1354,123 @@ export default function Home() {
             </div>
           )}
 
-          {/* 소설 목록 */}
-          <div className="mt-3 rounded-2xl border bg-white sm:mt-4">
-            {loading ? (
-              <div className="px-5 py-10 text-center text-sm text-gray-400 sm:px-6 sm:py-12">
-                불러오는 중...
-              </div>
-            ) : error ? (
-              <div className="px-5 py-10 text-center text-sm text-red-500 sm:px-6 sm:py-12">
-                {error}
-              </div>
-            ) : filteredBooks.length === 0 ? (
-              <div className="px-5 py-10 text-center text-sm text-gray-400 sm:px-6 sm:py-12">
-                {getEmptyMessage()}
-              </div>
-            ) : (
-              <>
-                {/* 실제 소설 목록 */}
-                <div className="overflow-visible rounded-2xl">
-                  {paginatedBooks.map(
-                    (book, index) => (
-                      <div
-                        key={book.id}
-                        className={`relative flex items-center gap-3 px-4 py-3.5 transition hover:bg-gray-50 sm:gap-4 sm:px-5 sm:py-4 ${
-                          index !==
-                          paginatedBooks.length -
-                            1
-                            ? "border-b"
-                            : ""
-                        }`}
-                      >
-                        {/* 오른쪽 위 작품 관리 메뉴 */}
-                        {renderBookMenu(
-                          book
-                        )}
 
-                        <div className="flex w-10 shrink-0 flex-col items-center sm:w-11">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 sm:h-10 sm:w-10">
-                            <BookOpen
-                              className="h-4 w-4 text-gray-400 sm:h-4.5 sm:w-4.5"
-                              strokeWidth={
-                                1.75
-                              }
-                            />
-                          </div>
+          {/* 소설 목록 - 가로형 카드 리스트 */}
+          {loading ? (
+            <div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-gray-400 sm:mt-4 sm:px-6 sm:py-12">
+              불러오는 중...
+            </div>
+          ) : filteredBooks.length === 0 ? (
+            <div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-gray-400 sm:mt-4 sm:px-6 sm:py-12">
+              {getEmptyMessage()}
+            </div>
+          ) : (
+            <>
+              <div className="mt-3 flex flex-col gap-2 sm:mt-4">
+                {paginatedBooks.map((book) => (
+                  <div
+                    key={book.id}
+                    className="relative flex items-center gap-3 rounded-2xl border bg-white px-4 py-3.5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:gap-4 sm:px-5 sm:py-4"
+                  >
+                    {renderBookMenu(book)}
 
-                          <span
-                            className={`mt-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[getDisplayStatus(book)]}`}
-                          >
-                            {getDisplayStatus(
-                              book
-                            )}
-                          </span>
-                        </div>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-gray-100 sm:h-11 sm:w-11">
+                      <BookOpen
+                        className="h-4 w-4 text-gray-400 sm:h-4.5 sm:w-4.5"
+                        strokeWidth={1.75}
+                      />
+                    </div>
 
-                        <div className="min-w-0 flex-1 pr-7">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h4 className="line-clamp-2 text-sm font-medium leading-5 sm:text-[15px]">
-                              {book.title}
-                            </h4>
+                    <div className="min-w-0 flex-1 pr-7">
+                      <h4 className="line-clamp-2 text-sm font-medium leading-5 sm:text-[15px]">
+                        {book.title}
+                      </h4>
 
-                            <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                book.series_status ===
-                                "completed"
-                                  ? "bg-purple-50 text-purple-700"
-                                  : "bg-orange-50 text-orange-700"
-                              }`}
-                            >
-                              {book.series_status ===
-                              "completed"
-                                ? "완결"
-                                : "연재중"}
-                            </span>
-                          </div>
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${statusStyle[getDisplayStatus(book)]}`}
+                        >
+                          {getDisplayStatus(book)}
+                        </span>
 
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <span className="text-xs font-medium text-gray-600">
-                              {getRound(book)}
-                              회독
-                            </span>
-
-                            <span className="text-xs text-gray-300">
-                              ·
-                            </span>
-
-                            <span className="text-xs text-gray-400">
-                              {getEpisode(book)}
-                              화 ·{" "}
-                              {getProgress(book)}
-                              %
-                            </span>
-                          </div>
-
-                          <div className="mt-2 h-1 w-full max-w-40 overflow-hidden rounded-full bg-gray-100 sm:hidden">
-                            <div
-                              className={`h-full rounded-full ${progressBarColor[book.status]}`}
-                              style={{
-                                width: `${getProgress(
-                                  book
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        <div className="hidden w-28 shrink-0 sm:block">
-                          <div className="flex justify-between text-[11px] text-gray-400">
-                            <span>
-                              진행률
-                            </span>
-
-                            <span>
-                              {getProgress(book)}
-                              %
-                            </span>
-                          </div>
-
-                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                            <div
-                              className={`h-full rounded-full ${progressBarColor[book.status]}`}
-                              style={{
-                                width: `${getProgress(
-                                  book
-                                )}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* 세로 중앙에 위치하는 읽기 버튼 */}
-                        {renderAction(
-                          book,
-                          true
-                        )}
-                      </div>
-                    )
-                  )}
-                </div>
-
-                {/* 페이지네이션 */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-center gap-1 border-t px-3 py-4 sm:gap-1.5 sm:px-5">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        changePage(
-                          currentPage - 1
-                        )
-                      }
-                      disabled={
-                        currentPage === 1
-                      }
-                      className="rounded-lg border px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-default disabled:opacity-30 sm:px-3 sm:text-sm"
-                    >
-                      이전
-                    </button>
-
-                    {pageNumbers.map(
-                      (page) => (
-                        <button
-                          key={page}
-                          type="button"
-                          onClick={() =>
-                            changePage(page)
-                          }
-                          className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-medium transition sm:h-9 sm:min-w-9 sm:text-sm ${
-                            currentPage ===
-                            page
-                              ? "bg-gray-900 text-white"
-                              : "text-gray-500 hover:bg-gray-100"
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                            book.series_status === "completed"
+                              ? "bg-purple-50 text-purple-700"
+                              : "bg-orange-50 text-orange-700"
                           }`}
                         >
-                          {page}
-                        </button>
-                      )
-                    )}
+                          {book.series_status === "completed"
+                            ? "완결"
+                            : "연재중"}
+                        </span>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        changePage(
-                          currentPage + 1
-                        )
-                      }
-                      disabled={
-                        currentPage ===
-                        totalPages
-                      }
-                      className="rounded-lg border px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-default disabled:opacity-30 sm:px-3 sm:text-sm"
-                    >
-                      다음
-                    </button>
+                        <span className="text-xs text-gray-400">
+                          {getRound(book)}회독 · {getEpisode(book)}화
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2.5">
+                      <div className="relative flex items-center justify-center">
+                        <ProgressRing
+                          percent={getProgress(book)}
+                          status={getDisplayStatus(book)}
+                          size={32}
+                        />
+                      </div>
+
+                      <div className="hidden sm:block">
+                        {renderAction(book, true)}
+                      </div>
+                    </div>
+
+                    <div className="absolute bottom-3 right-4 sm:hidden">
+                      {renderAction(book, true)}
+                    </div>
                   </div>
-                )}
-              </>
-            )}
-          </div>
+                ))}
+              </div>
+
+              {/* 페이지네이션 */}
+              {totalPages > 1 && (
+                <div className="mt-5 flex items-center justify-center gap-1 sm:gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => changePage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="rounded-lg border bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-default disabled:opacity-30 sm:px-3 sm:text-sm"
+                  >
+                    이전
+                  </button>
+
+                  {pageNumbers.map((page) => (
+                    <button
+                      key={page}
+                      type="button"
+                      onClick={() => changePage(page)}
+                      className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-medium transition sm:h-9 sm:min-w-9 sm:text-sm ${
+                        currentPage === page
+                          ? "bg-gray-900 text-white"
+                          : "bg-white text-gray-500 hover:bg-gray-100"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => changePage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="rounded-lg border bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-default disabled:opacity-30 sm:px-3 sm:text-sm"
+                  >
+                    다음
+                  </button>
+                </div>
+              )}
+            </>
+          )}
         </section>
       </section>
 
@@ -1564,10 +1482,7 @@ export default function Home() {
           aria-label="맨 위로"
           className="fixed bottom-20 right-5 z-20 flex h-10 w-10 items-center justify-center rounded-full border bg-white text-gray-600 shadow-md transition hover:bg-gray-50 hover:text-gray-900 sm:bottom-24 sm:right-8 sm:h-11 sm:w-11"
         >
-          <ArrowUp
-            className="h-4 w-4 sm:h-5 sm:w-5"
-            strokeWidth={1.75}
-          />
+          <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={1.75} />
         </button>
       )}
     </main>

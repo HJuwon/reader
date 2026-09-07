@@ -2404,48 +2404,44 @@ export default function DriveBrowser() {
                     (open) => !open
                   )
                 }
-                className="flex w-full items-center justify-between rounded-[4px] px-4 py-3 text-left transition hover:opacity-80"
+                className="flex w-full items-center gap-2.5 rounded-full px-4 py-2.5 text-left transition hover:opacity-80"
                 style={{
                   backgroundColor:
-                    theme.bg,
-                  boxShadow: `0 0 0 0.5px ${theme.divider}`,
+                    theme.divider,
                 }}
                 aria-expanded={
                   episodeListOpen
                 }
                 aria-label="회차 목록 열기"
               >
-                <div className="flex min-w-0 items-center gap-2">
+                <span
+                  className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
+                  style={{
+                    color: theme.bg,
+                    backgroundColor:
+                      theme.accent,
+                  }}
+                >
+                  회차
+                </span>
+
+                {selectedEpisode && (
                   <span
-                    className="shrink-0 text-xs"
+                    className="min-w-0 flex-1 truncate text-sm"
                     style={{
+                      fontFamily:
+                        SERIF,
                       color:
-                        theme.accent,
+                        theme.title,
                     }}
                   >
-                    회차 목록
+                    {selectedEpisode.episode}화 · {selectedEpisode.title}
                   </span>
-
-                  {selectedEpisode && (
-                    <span
-                      className="min-w-0 truncate text-sm"
-                      style={{
-                        fontFamily:
-                          SERIF,
-                        color:
-                          theme.title,
-                      }}
-                    >
-                      {selectedEpisode.episode}화
-                      {" · "}
-                      {selectedEpisode.title}
-                    </span>
-                  )}
-                </div>
+                )}
 
                 {episodeListOpen ? (
                   <ChevronUp
-                    className="ml-3 h-4 w-4 shrink-0"
+                    className="ml-auto h-4 w-4 shrink-0"
                     style={{
                       color:
                         theme.muted,
@@ -2453,7 +2449,7 @@ export default function DriveBrowser() {
                   />
                 ) : (
                   <ChevronDown
-                    className="ml-3 h-4 w-4 shrink-0"
+                    className="ml-auto h-4 w-4 shrink-0"
                     style={{
                       color:
                         theme.muted,
@@ -2563,15 +2559,20 @@ export default function DriveBrowser() {
                               style={{
                                 borderColor:
                                   theme.divider,
+                                borderLeft: `2px solid ${
+                                  isSelected
+                                    ? theme.accent
+                                    : "transparent"
+                                }`,
                                 backgroundColor:
                                   isSelected
-                                    ? `${theme.accent}10`
+                                    ? `${theme.accent}0c`
                                     : "transparent",
                               }}
                             >
                               <div className="flex items-center gap-2">
                                 <span
-                                  className="shrink-0 text-xs"
+                                  className="shrink-0 text-xs tabular-nums"
                                   style={{
                                     color:
                                       isSelected
@@ -2716,16 +2717,44 @@ export default function DriveBrowser() {
                               disabled={
                                 progressSaving
                               }
-                              className="w-full px-2 py-2.5 text-left transition disabled:opacity-50"
+                              className="flex w-full items-start gap-2.5 rounded-r-[4px] py-2.5 pl-2.5 pr-2 text-left transition disabled:opacity-50"
                               style={{
                                 color:
                                   isSelected
                                     ? theme.title
                                     : theme.muted,
+                                borderLeft: `2px solid ${
+                                  isSelected
+                                    ? theme.accent
+                                    : "transparent"
+                                }`,
+                                backgroundColor:
+                                  isSelected
+                                    ? `${theme.accent}0c`
+                                    : "transparent",
                               }}
                             >
+                              <span
+                                className="mt-0.5 shrink-0 text-[11px] tabular-nums"
+                                style={{
+                                  color:
+                                    isSelected
+                                      ? theme.accent
+                                      : theme.muted,
+                                  opacity:
+                                    isSelected
+                                      ? 1
+                                      : 0.7,
+                                }}
+                              >
+                                {
+                                  episode.episode
+                                }
+                                화
+                              </span>
+
                               <p
-                                className="truncate text-sm"
+                                className="min-w-0 truncate text-sm"
                                 style={{
                                   fontFamily:
                                     SERIF,
@@ -2738,21 +2767,6 @@ export default function DriveBrowser() {
                                 {
                                   episode.title
                                 }
-                              </p>
-
-                              <p
-                                className="mt-0.5 text-xs"
-                                style={{
-                                  color:
-                                    theme.muted,
-                                  opacity:
-                                    0.7,
-                                }}
-                              >
-                                {
-                                  episode.episode
-                                }
-                                화
                               </p>
                             </button>
                           );
@@ -2798,7 +2812,7 @@ export default function DriveBrowser() {
                           }
                         </h2>
 
-                        <div className="mt-4 flex items-center">
+                        <div className="mt-4 flex items-center gap-2">
                           <button
                             onClick={
                               toggleBookmark
@@ -2806,7 +2820,16 @@ export default function DriveBrowser() {
                             disabled={
                               bookmarkLoading
                             }
-                            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm transition disabled:opacity-50"
+                            aria-label={
+                              bookmarked
+                                ? "북마크 해제"
+                                : "북마크"
+                            }
+                            className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
+                              bodySearchOpen
+                                ? "hidden sm:flex"
+                                : ""
+                            }`}
                             style={{
                               color:
                                 bookmarked
@@ -2814,12 +2837,12 @@ export default function DriveBrowser() {
                                   : theme.muted,
                               backgroundColor:
                                 bookmarked
-                                  ? `${theme.accent}12`
-                                  : "transparent",
+                                  ? `${theme.accent}14`
+                                  : theme.divider,
                             }}
                           >
                             <Bookmark
-                              className="h-4 w-4"
+                              className="h-3.5 w-3.5"
                               fill={
                                 bookmarked
                                   ? "currentColor"
@@ -2830,15 +2853,7 @@ export default function DriveBrowser() {
                               ? "북마크됨"
                               : "북마크"}
                           </button>
-                        </div>
 
-                        {editError && (
-                          <p className="mt-2 text-xs text-red-500">
-                            {editError}
-                          </p>
-                        )}
-
-                        <div className="mt-5">
                           {!bodySearchOpen ? (
                             <button
                               onClick={() => {
@@ -2849,10 +2864,12 @@ export default function DriveBrowser() {
                                   0
                                 );
                               }}
-                              className="flex items-center gap-1.5 text-xs hover:opacity-70"
+                              className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition hover:opacity-80"
                               style={{
                                 color:
                                   theme.muted,
+                                backgroundColor:
+                                  theme.divider,
                               }}
                             >
                               <Search className="h-3.5 w-3.5" />
@@ -2860,13 +2877,13 @@ export default function DriveBrowser() {
                             </button>
                           ) : (
                             <div
-                              className="flex items-center gap-2 rounded-[4px] px-3 py-2"
+                              className="flex min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1.5"
                               style={{
                                 boxShadow: `0 0 0 0.5px ${theme.divider}`,
                               }}
                             >
                               <Search
-                                className="h-4 w-4 shrink-0"
+                                className="h-3.5 w-3.5 shrink-0"
                                 style={{
                                   color:
                                     theme.muted,
@@ -2920,7 +2937,7 @@ export default function DriveBrowser() {
 
                               {bodySearch.trim() && (
                                 <span
-                                  className="shrink-0 text-[11px]"
+                                  className="shrink-0 text-[11px] tabular-nums"
                                   style={{
                                     color:
                                       theme.muted,
@@ -2943,7 +2960,7 @@ export default function DriveBrowser() {
                                   bodySearchMatches.length ===
                                   0
                                 }
-                                className="p-1 disabled:opacity-30"
+                                className="shrink-0 rounded-full p-1 disabled:opacity-30"
                                 style={{
                                   color:
                                     theme.title,
@@ -2963,7 +2980,7 @@ export default function DriveBrowser() {
                                   bodySearchMatches.length ===
                                   0
                                 }
-                                className="p-1 disabled:opacity-30"
+                                className="shrink-0 rounded-full p-1 disabled:opacity-30"
                                 style={{
                                   color:
                                     theme.title,
@@ -2982,7 +2999,7 @@ export default function DriveBrowser() {
                                     false
                                   );
                                 }}
-                                className="p-1"
+                                className="shrink-0 rounded-full p-1"
                                 style={{
                                   color:
                                     theme.muted,
@@ -2994,6 +3011,12 @@ export default function DriveBrowser() {
                             </div>
                           )}
                         </div>
+
+                        {editError && (
+                          <p className="mt-2 text-xs text-red-500">
+                            {editError}
+                          </p>
+                        )}
 
                         {editingContent ? (
                           <div className="mx-auto mt-8 max-w-2xl">
