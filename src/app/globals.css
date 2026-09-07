@@ -24,18 +24,3 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
-
-/* 소설 목록 스크롤바 */
-.custom-scrollbar {
-  scrollbar-width: auto;
-}
-
-@media (max-width: 639px) {
-  .custom-scrollbar {
-    scrollbar-width: none;
-  }
-
-  .custom-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-}

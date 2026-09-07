@@ -7,7 +7,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type PointerEvent,
 } from "react";
 import {
   BookOpen,
@@ -52,71 +51,10 @@ const progressBarColor: Record<string, string> = {
   "안 읽음": "bg-gray-300",
 };
 
-const CHOSUNG_LIST = [
-  "ㄱ",
-  "ㄲ",
-  "ㄴ",
-  "ㄷ",
-  "ㄸ",
-  "ㄹ",
-  "ㅁ",
-  "ㅂ",
-  "ㅃ",
-  "ㅅ",
-  "ㅆ",
-  "ㅇ",
-  "ㅈ",
-  "ㅉ",
-  "ㅊ",
-  "ㅋ",
-  "ㅌ",
-  "ㅍ",
-  "ㅎ",
-];
-
-const CHOSUNG_GROUP: Record<string, string> = {
-  "ㄱ": "ㄱ",
-  "ㄲ": "ㄱ",
-  "ㄴ": "ㄴ",
-  "ㄷ": "ㄷ",
-  "ㄸ": "ㄷ",
-  "ㄹ": "ㄹ",
-  "ㅁ": "ㅁ",
-  "ㅂ": "ㅂ",
-  "ㅃ": "ㅂ",
-  "ㅅ": "ㅅ",
-  "ㅆ": "ㅅ",
-  "ㅇ": "ㅇ",
-  "ㅈ": "ㅈ",
-  "ㅉ": "ㅈ",
-  "ㅊ": "ㅊ",
-  "ㅋ": "ㅋ",
-  "ㅌ": "ㅌ",
-  "ㅍ": "ㅍ",
-  "ㅎ": "ㅎ",
-};
-
-const INDEX_ORDER = [
-  "ㄱ",
-  "ㄴ",
-  "ㄷ",
-  "ㄹ",
-  "ㅁ",
-  "ㅂ",
-  "ㅅ",
-  "ㅇ",
-  "ㅈ",
-  "ㅊ",
-  "ㅋ",
-  "ㅌ",
-  "ㅍ",
-  "ㅎ",
-  ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
-  "#",
-];
-
 function getTitleEpisodeCount(title: string): number {
-  const matches = [...title.matchAll(/(\d+)\s*[-~]\s*(\d+)/g)];
+  const matches = [
+    ...title.matchAll(/(\d+)\s*[-~]\s*(\d+)/g),
+  ];
 
   if (matches.length === 0) {
     return 0;
@@ -167,33 +105,7 @@ function getLengthBucket(
   return "단편";
 }
 
-function getIndexKey(title: string): string {
-  const trimmed = title.trim();
-
-  if (!trimmed) {
-    return "#";
-  }
-
-  const code = trimmed.charCodeAt(0);
-
-  if (code >= 0xac00 && code <= 0xd7a3) {
-    const choIndex = Math.floor(
-      (code - 0xac00) / (21 * 28)
-    );
-
-    const cho = CHOSUNG_LIST[choIndex];
-
-    return CHOSUNG_GROUP[cho] ?? "#";
-  }
-
-  const upper = trimmed[0].toUpperCase();
-
-  if (upper >= "A" && upper <= "Z") {
-    return upper;
-  }
-
-  return "#";
-}
+const ITEMS_PER_PAGE = 20;
 
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
@@ -214,31 +126,13 @@ export default function Home() {
     useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  const bookRowRefs = useRef<
-    Record<string, HTMLDivElement | null>
-  >({});
+  // 페이지네이션
+  const [currentPage, setCurrentPage] =
+    useState(1);
 
-  // 실제 소설 목록 스크롤 영역
-  const bookListScrollRef =
-    useRef<HTMLDivElement | null>(null);
-
-  // 오른쪽 커스텀 스크롤바 트랙
-  const scrollBarRef =
-    useRef<HTMLDivElement | null>(null);
-
-  // 커스텀 스크롤바 thumb 크기 / 위치
-  const [scrollThumb, setScrollThumb] = useState({
-    height: 0,
-    top: 0,
-  });
-
-  // thumb 드래그 상태
-  const isDraggingScrollThumb =
-    useRef(false);
-
-  // 손가락이 thumb의 어느 위치를 잡았는지
-  const scrollDragOffset =
-    useRef(0);
+  // 전체 소설 영역 위치
+  const allBooksSectionRef =
+    useRef<HTMLElement>(null);
 
   function toggleTag(tag: ToggleTag) {
     setActiveTags((prev) => {
@@ -258,81 +152,9 @@ export default function Home() {
     setActiveTags(new Set());
   }
 
-  // 커스텀 스크롤바의 위치와 높이 계산
-  function updateScrollThumb() {
-    const container =
-      bookListScrollRef.current;
-
-    const scrollBar =
-      scrollBarRef.current;
-
-    if (!container || !scrollBar) {
-      return;
-    }
-
-    const {
-      scrollHeight,
-      clientHeight,
-      scrollTop,
-    } = container;
-
-    if (scrollHeight <= clientHeight) {
-      setScrollThumb({
-        height: 0,
-        top: 0,
-      });
-
-      return;
-    }
-
-    const trackHeight =
-      scrollBar.clientHeight;
-
-    if (trackHeight <= 0) {
-      return;
-    }
-
-    const calculatedThumbHeight =
-      (clientHeight / scrollHeight) *
-      trackHeight;
-
-    const thumbHeight = Math.max(
-      42,
-      calculatedThumbHeight
-    );
-
-    const safeThumbHeight = Math.min(
-      thumbHeight,
-      trackHeight
-    );
-
-    const maxThumbTop = Math.max(
-      0,
-      trackHeight - safeThumbHeight
-    );
-
-    const maxScrollTop =
-      scrollHeight - clientHeight;
-
-    const thumbTop =
-      maxScrollTop > 0
-        ? (scrollTop / maxScrollTop) *
-          maxThumbTop
-        : 0;
-
-    setScrollThumb({
-      height: safeThumbHeight,
-      top: thumbTop,
-    });
-  }
-
   function changeSortOption(
     option: "default" | "episodes" | "title"
   ) {
-    if (bookListScrollRef.current) {
-      bookListScrollRef.current.scrollTop = 0;
-    }
-
     startTransition(() => {
       setSortOption(option);
     });
@@ -373,6 +195,16 @@ export default function Home() {
   useEffect(() => {
     loadBooks();
   }, []);
+
+  // 검색 / 필터 / 태그 / 정렬이 변경되면 1페이지로 이동
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    search,
+    filter,
+    activeTags,
+    sortOption,
+  ]);
 
   // 페이지 전체 스크롤에 따른 맨 위로 버튼
   useEffect(() => {
@@ -476,134 +308,93 @@ export default function Home() {
     sortOption,
   ]);
 
-  // =========================================================
-  // 중요:
-  // sortedBooks가 선언된 이후에 스크롤바 effect를 배치한다.
-  // 기존 ReferenceError:
-  // Cannot access 'sortedBooks' before initialization
-  // 를 방지한다.
-  // =========================================================
-  useEffect(() => {
-    const container =
-      bookListScrollRef.current;
+  // 전체 페이지 수
+  const totalPages = Math.ceil(
+    sortedBooks.length /
+      ITEMS_PER_PAGE
+  );
 
-    const scrollBar =
-      scrollBarRef.current;
+  // 현재 페이지에 표시할 소설
+  const paginatedBooks = useMemo(() => {
+    const start =
+      (currentPage - 1) *
+      ITEMS_PER_PAGE;
 
-    if (!container || !scrollBar) {
+    return sortedBooks.slice(
+      start,
+      start + ITEMS_PER_PAGE
+    );
+  }, [
+    sortedBooks,
+    currentPage,
+  ]);
+
+  // 페이지 번호는 현재 페이지 주변만 표시
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 5) {
+      return Array.from(
+        { length: totalPages },
+        (_, index) => index + 1
+      );
+    }
+
+    let start = Math.max(
+      1,
+      currentPage - 2
+    );
+
+    let end = Math.min(
+      totalPages,
+      start + 4
+    );
+
+    if (end - start < 4) {
+      start = Math.max(
+        1,
+        end - 4
+      );
+    }
+
+    return Array.from(
+      { length: end - start + 1 },
+      (_, index) => start + index
+    );
+  }, [
+    currentPage,
+    totalPages,
+  ]);
+
+  function changePage(page: number) {
+    if (
+      page < 1 ||
+      page > totalPages ||
+      page === currentPage
+    ) {
       return;
     }
 
-    let frameId = 0;
+    setCurrentPage(page);
 
-    function handleScroll() {
-      if (frameId) {
-        return;
-      }
-
-      frameId = requestAnimationFrame(() => {
-        updateScrollThumb();
-        frameId = 0;
-      });
-    }
-
-    container.addEventListener(
-      "scroll",
-      handleScroll,
-      { passive: true }
-    );
-
-    const resizeObserver =
-      new ResizeObserver(() => {
-        updateScrollThumb();
-      });
-
-    resizeObserver.observe(container);
-    resizeObserver.observe(scrollBar);
-
-    window.addEventListener(
-      "resize",
-      updateScrollThumb
-    );
-
-    requestAnimationFrame(() => {
-      updateScrollThumb();
-    });
-
-    return () => {
-      container.removeEventListener(
-        "scroll",
-        handleScroll
-      );
-
-      resizeObserver.disconnect();
-
-      window.removeEventListener(
-        "resize",
-        updateScrollThumb
-      );
-
-      if (frameId) {
-        cancelAnimationFrame(frameId);
-      }
-    };
-  }, [sortedBooks.length]);
-
-
-
-
-
-  const indexAnchors = useMemo(() => {
-    const map = new Map<string, string>();
-
-    for (const book of sortedBooks) {
-      const key = getIndexKey(book.title);
-
-      if (!map.has(key)) {
-        map.set(key, book.id);
-      }
-    }
-
-    return map;
-  }, [sortedBooks]);
-
-  const availableIndexLetters = useMemo(
-    () =>
-      INDEX_ORDER.filter((letter) =>
-        indexAnchors.has(letter)
-      ),
-    [indexAnchors]
-  );
-
-  function jumpToIndex(letter: string) {
-    const titleSorted = [
-      ...filteredBooks,
-    ].sort((a, b) =>
-      a.title.localeCompare(
-        b.title,
-        "ko"
-      )
-    );
-
-    const target = titleSorted.find(
-      (book) =>
-        getIndexKey(book.title) ===
-        letter
-    );
-
-    setSortOption("title");
-
-    if (target) {
+    // 전체 탭에서는 최근 읽은 소설을 지나
+    // 전체 소설 영역의 시작 부분까지만 이동
+    if (filter === "전체") {
       requestAnimationFrame(() => {
-        bookRowRefs.current[
-          target.id
-        ]?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-          inline: "nearest",
-        });
+        allBooksSectionRef.current?.scrollIntoView(
+          {
+            behavior: "smooth",
+            block: "start",
+          }
+        );
       });
+
+      return;
     }
+
+    // 그 외 상태 탭에서는 기존처럼 화면 맨 위로 이동
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
   }
 
   const recentBooks = useMemo(() => {
@@ -735,129 +526,6 @@ export default function Home() {
     }
 
     return book.status;
-  }
-
-  // 스크롤바 thumb을 손가락으로 잡기 시작
-  function handleScrollThumbPointerDown(
-    event: PointerEvent<HTMLDivElement>
-  ) {
-    const thumb =
-      event.currentTarget;
-
-    const container =
-      bookListScrollRef.current;
-
-    const scrollBar =
-      scrollBarRef.current;
-
-    if (
-      !container ||
-      !scrollBar ||
-      scrollThumb.height <= 0
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    isDraggingScrollThumb.current =
-      true;
-
-    const thumbRect =
-      thumb.getBoundingClientRect();
-
-    // 손가락이 thumb의 어느 지점을 잡았는지 기억
-    scrollDragOffset.current =
-      event.clientY -
-      thumbRect.top;
-
-    try {
-      thumb.setPointerCapture(
-        event.pointerId
-      );
-    } catch {
-      // pointer capture 실패 시 무시
-    }
-  }
-
-  // thumb을 잡은 상태에서 손가락 이동
-  function handleScrollThumbPointerMove(
-    event: PointerEvent<HTMLDivElement>
-  ) {
-    if (
-      !isDraggingScrollThumb.current
-    ) {
-      return;
-    }
-
-    const container =
-      bookListScrollRef.current;
-
-    const scrollBar =
-      scrollBarRef.current;
-
-    if (
-      !container ||
-      !scrollBar ||
-      scrollThumb.height <= 0
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const trackRect =
-      scrollBar.getBoundingClientRect();
-
-    const trackHeight =
-      trackRect.height;
-
-    const maxThumbTop =
-      trackHeight -
-      scrollThumb.height;
-
-    if (maxThumbTop <= 0) {
-      return;
-    }
-
-    let thumbTop =
-      event.clientY -
-      trackRect.top -
-      scrollDragOffset.current;
-
-    thumbTop = Math.max(
-      0,
-      Math.min(
-        thumbTop,
-        maxThumbTop
-      )
-    );
-
-    const ratio =
-      thumbTop / maxThumbTop;
-
-    container.scrollTop =
-      ratio *
-      (container.scrollHeight -
-        container.clientHeight);
-  }
-
-  // thumb 드래그 종료
-  function handleScrollThumbPointerUp(
-    event: PointerEvent<HTMLDivElement>
-  ) {
-    isDraggingScrollThumb.current =
-      false;
-
-    try {
-      event.currentTarget.releasePointerCapture(
-        event.pointerId
-      );
-    } catch {
-      // pointer capture가 이미 해제된 경우 무시
-    }
   }
 
   function renderAction(
@@ -1102,7 +770,10 @@ export default function Home() {
         )}
 
         {/* 전체 소설 */}
-        <section className="mt-10 sm:mt-12">
+        <section
+          ref={allBooksSectionRef}
+          className="mt-10 sm:mt-12"
+        >
           <div className="flex items-center justify-between">
             <h3 className="text-base font-semibold sm:text-lg">
               전체 소설
@@ -1279,7 +950,7 @@ export default function Home() {
           </div>
 
           {/* 소설 목록 */}
-          <div className="relative mt-3 overflow-hidden rounded-2xl border bg-white sm:mt-4">
+          <div className="mt-3 overflow-hidden rounded-2xl border bg-white sm:mt-4">
             {loading ? (
               <div className="px-5 py-10 text-center text-sm text-gray-400 sm:px-6 sm:py-12">
                 불러오는 중...
@@ -1296,23 +967,15 @@ export default function Home() {
               </div>
             ) : (
               <>
-                {/* 실제 스크롤 영역 */}
-                <div
-                  ref={bookListScrollRef}
-                  className="custom-scrollbar max-h-[60vh] overflow-y-auto pr-4"
-                >
-                  {sortedBooks.map(
+                {/* 실제 소설 목록 */}
+                <div>
+                  {paginatedBooks.map(
                     (book, index) => (
                       <div
                         key={book.id}
-                        ref={(el) => {
-                          bookRowRefs.current[
-                            book.id
-                          ] = el;
-                        }}
                         className={`flex items-start gap-3 px-4 py-3.5 transition hover:bg-gray-50 sm:gap-4 sm:px-5 sm:py-4 ${
                           index !==
-                          sortedBooks.length -
+                          paginatedBooks.length -
                             1
                             ? "border-b"
                             : ""
@@ -1420,71 +1083,64 @@ export default function Home() {
                     )
                   )}
                 </div>
-              </>
-            )}
 
-            {/* =====================================================
-                모바일 커스텀 스크롤바
+                {/* 페이지네이션 */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-1 border-t px-3 py-4 sm:gap-1.5 sm:px-5">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        changePage(
+                          currentPage - 1
+                        )
+                      }
+                      disabled={
+                        currentPage === 1
+                      }
+                      className="rounded-lg border px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-default disabled:opacity-30 sm:px-3 sm:text-sm"
+                    >
+                      이전
+                    </button>
 
-                track은 항상 DOM에 존재시킨다.
-                그래야 최초 렌더링 때도 scrollThumb을 계산할 수 있다.
-               ===================================================== */}
-            {!loading &&
-              !error &&
-              filteredBooks.length > 0 && (
-                <div
-                  ref={scrollBarRef}
-                  className="absolute inset-y-2.5 right-1.5 z-20 w-3 touch-none sm:hidden"
-                >
-                  {scrollThumb.height > 0 && (
-                    <div
-                      className="absolute left-0 w-3 touch-none rounded-full bg-gray-400/90 shadow-sm"
-                      style={{
-                        height: `${scrollThumb.height}px`,
-                        transform: `translateY(${scrollThumb.top}px)`,
-                      }}
-                      onPointerDown={
-                        handleScrollThumbPointerDown
-                      }
-                      onPointerMove={
-                        handleScrollThumbPointerMove
-                      }
-                      onPointerUp={
-                        handleScrollThumbPointerUp
-                      }
-                      onPointerCancel={
-                        handleScrollThumbPointerUp
-                      }
-                    />
-                  )}
-                </div>
-              )}
-
-            {/* 자모/알파벳 인덱스 바 */}
-            {availableIndexLetters.length >
-              0 &&
-              filteredBooks.length > 20 && (
-                <div className="pointer-events-none absolute inset-y-3 left-1 z-10 flex items-center sm:left-1.5">
-                  <div className="pointer-events-auto flex max-h-full flex-col items-center gap-0.5 overflow-y-auto rounded-full bg-white/80 px-0.5 py-1.5 text-[9px] font-medium text-gray-400 shadow-sm backdrop-blur [scrollbar-width:none] sm:text-[10px] [&::-webkit-scrollbar]:hidden">
-                    {availableIndexLetters.map(
-                      (letter) => (
+                    {pageNumbers.map(
+                      (page) => (
                         <button
-                          key={letter}
+                          key={page}
                           type="button"
                           onClick={() =>
-                            jumpToIndex(
-                              letter
-                            )
+                            changePage(page)
                           }
-                          className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full transition hover:bg-gray-900 hover:text-white sm:h-4 sm:w-4"
+                          className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-2 text-xs font-medium transition sm:h-9 sm:min-w-9 sm:text-sm ${
+                            currentPage ===
+                            page
+                              ? "bg-gray-900 text-white"
+                              : "text-gray-500 hover:bg-gray-100"
+                          }`}
                         >
-                          {letter}
+                          {page}
                         </button>
                       )
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        changePage(
+                          currentPage + 1
+                        )
+                      }
+                      disabled={
+                        currentPage ===
+                        totalPages
+                      }
+                      className="rounded-lg border px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-default disabled:opacity-30 sm:px-3 sm:text-sm"
+                    >
+                      다음
+                    </button>
                   </div>
-                </div>
-              )}
+                )}
+              </>
+            )}
           </div>
         </section>
       </section>
