@@ -218,6 +218,9 @@ export default function DriveBrowser() {
   const [settingsOpen, setSettingsOpen] =
     useState(false);
 
+  const [chromeVisible, setChromeVisible] =
+    useState(true);
+
   const [highlightLoading, setHighlightLoading] =
     useState(false);
 
@@ -1603,6 +1606,33 @@ export default function DriveBrowser() {
     }, 50);
   }
 
+  function handleContentTap(
+    event: React.MouseEvent<HTMLDivElement>
+  ) {
+    const target =
+      event.target as HTMLElement;
+
+    if (
+      target.closest(
+        "button, a, input, textarea"
+      )
+    ) {
+      return;
+    }
+
+    const selection =
+      window.getSelection?.();
+
+    if (
+      selection &&
+      selection.toString().length > 0
+    ) {
+      return;
+    }
+
+    setChromeVisible((visible) => !visible);
+  }
+
   async function savePendingHighlight() {
     if (
       !selectedTextForHighlight ||
@@ -1774,6 +1804,8 @@ export default function DriveBrowser() {
       setEpisodeListOpen(false);
       return;
     }
+
+    setChromeVisible(true);
 
     const currentScrollPosition =
       Math.max(
@@ -2275,7 +2307,13 @@ export default function DriveBrowser() {
           theme.title,
       }}
     >
-      <header>
+      <header
+        className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
+          chromeVisible
+            ? "max-h-40 opacity-100"
+            : "max-h-0 opacity-0"
+        }`}
+      >
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6 md:px-8 md:py-8">
           <div className="min-w-0">
             <button
@@ -3093,7 +3131,12 @@ export default function DriveBrowser() {
                             </div>
                           </div>
                         ) : (
-                        <div className="mx-auto mt-8 max-w-2xl">
+                        <div
+                          className="mx-auto mt-8 max-w-2xl"
+                          onClick={
+                            handleContentTap
+                          }
+                        >
                           <div
                             ref={
                               contentRef
@@ -3396,7 +3439,13 @@ export default function DriveBrowser() {
           </div>
         )}
 
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
+      <div
+        className={`fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 transition-opacity duration-300 ${
+          chromeVisible || settingsOpen
+            ? "opacity-100"
+            : "pointer-events-none opacity-0"
+        }`}
+      >
         {settingsOpen && (
           <div
             className="w-64 rounded-2xl p-5"
