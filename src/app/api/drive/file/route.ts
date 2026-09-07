@@ -1,129 +1,129 @@
-import NextAuth from "next-auth";
-import GoogleProvider from "next-auth/providers/google";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/auth";
 
-export const authOptions = {
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+export async function GET(request: Request) {
+  const session: any = await getServerSession(authOptions);
 
-      authorization: {
-        params: {
-          // 본문 수정 후 구글 드라이브에 다시 저장하려면
-          // 읽기 전용(drive.readonly)이 아닌 쓰기 가능한 권한이 필요하다.
-          scope:
-            "openid email profile https://www.googleapis.com/auth/drive",
+  if (!session?.accessToken) {
+    return Response.json(
+      { error: "로그인이 필요합니다." },
+      { status: 401 }
+    );
+  }
 
-          // Google refresh_token을 받기 위해 사용
-          access_type: "offline",
+  const { searchParams } = new URL(request.url);
+  const fileId = searchParams.get("fileId");
 
-          // 기존에 권한을 승인했더라도 다시 refresh_token을 받을 수 있도록 함
-          prompt: "consent",
-        },
+  if (!fileId) {
+    return Response.json(
+      { error: "fileId가 필요합니다." },
+      { status: 400 }
+    );
+  }
+
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    {
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
       },
-    }),
-  ],
+    }
+  );
 
-  callbacks: {
-    async jwt({ token, account }: any) {
-      // =====================================================
-      // 최초 Google 로그인
-      // =====================================================
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
 
-      if (account) {
-        token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
-        token.accessTokenExpires =
-          Date.now() +
-          (account.expires_in ?? 3600) * 1000;
+    return Response.json(
+      {
+        error: data.error?.message || "파일을 가져오지 못했습니다.",
+      },
+      { status: response.status }
+    );
+  }
 
-        return token;
-      }
+  const content = await response.text();
 
-      // =====================================================
-      // access token이 아직 유효하면 그대로 사용
-      // =====================================================
+  return Response.json({
+    fileId,
+    content,
+  });
+}
 
-      if (
-        token.accessToken &&
-        token.accessTokenExpires &&
-        Date.now() <
-          token.accessTokenExpires - 60 * 1000
-      ) {
-        return token;
-      }
+// ======================================================
+// PUT
+// 수정된 본문을 구글 드라이브 파일에 다시 저장
+// ======================================================
 
-      // =====================================================
-      // access token 만료 → refresh token으로 갱신
-      // =====================================================
+export async function PUT(request: Request) {
+  const session: any = await getServerSession(authOptions);
 
-      if (!token.refreshToken) {
-        console.error(
-          "Google refresh token이 없습니다."
-        );
+  if (!session?.accessToken) {
+    return Response.json(
+      { error: "로그인이 필요합니다." },
+      { status: 401 }
+    );
+  }
 
-        return token;
-      }
+  const { searchParams } = new URL(request.url);
+  const fileId = searchParams.get("fileId");
 
-      try {
-        const response = await fetch(
-          "https://oauth2.googleapis.com/token",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/x-www-form-urlencoded",
-            },
-            body: new URLSearchParams({
-              client_id:
-                process.env.GOOGLE_CLIENT_ID!,
-              client_secret:
-                process.env.GOOGLE_CLIENT_SECRET!,
-              grant_type: "refresh_token",
-              refresh_token:
-                token.refreshToken,
-            }),
-          }
-        );
+  if (!fileId) {
+    return Response.json(
+      { error: "fileId가 필요합니다." },
+      { status: 400 }
+    );
+  }
 
-        const refreshedTokens =
-          await response.json();
+  let body: any;
 
-        if (!response.ok) {
-          throw refreshedTokens;
-        }
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json(
+      { error: "요청 본문이 올바르지 않습니다." },
+      { status: 400 }
+    );
+  }
 
-        token.accessToken =
-          refreshedTokens.access_token;
+  const { content } = body;
 
-        token.accessTokenExpires =
-          Date.now() +
-          (refreshedTokens.expires_in ?? 3600) *
-            1000;
+  if (typeof content !== "string") {
+    return Response.json(
+      { error: "content(문자열)가 필요합니다." },
+      { status: 400 }
+    );
+  }
 
-        // Google이 새 refresh_token을 주는 경우에만 교체
-        if (refreshedTokens.refresh_token) {
-          token.refreshToken =
-            refreshedTokens.refresh_token;
-        }
+  // Google Drive의 media upload 엔드포인트로 파일 내용을 통째로 교체한다.
+  const response = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+    {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${session.accessToken}`,
+        "Content-Type": "text/plain; charset=utf-8",
+      },
+      body: content,
+    }
+  );
 
-        return token;
-      } catch (error) {
-        console.error(
-          "Google access token 갱신 실패:",
-          error
-        );
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
 
-        return token;
-      }
-    },
+    return Response.json(
+      {
+        error:
+          data.error?.message ||
+          "파일을 저장하지 못했습니다.",
+      },
+      { status: response.status }
+    );
+  }
 
-    async session({ session, token }: any) {
-      session.accessToken = token.accessToken;
+  const data = await response.json();
 
-      return session;
-    },
-  },
-};
-
-export default NextAuth(authOptions);
+  return Response.json({
+    success: true,
+    fileId: data.id,
+  });
+}
