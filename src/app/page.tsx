@@ -14,6 +14,7 @@ import {
   ArrowUp,
   Search,
   X,
+  MoreVertical,
 } from "lucide-react";
 import LogoutButton from "./LogoutButton";
 
@@ -29,7 +30,6 @@ type Book = {
   created_at: string;
   updated_at: string;
   series_status: "ongoing" | "completed";
-
   round_count?: number;
   completed_round_count?: number;
   current_round?: number | null;
@@ -37,17 +37,21 @@ type Book = {
   current_episode?: number | null;
   current_progress?: number | null;
   current_scroll_position?: number | null;
+
+  // 작품 관리
+  is_reread_wanted?: boolean;
+  is_excluded?: boolean;
 };
 
 const statusStyle: Record<string, string> = {
   "읽는 중": "bg-blue-50 text-blue-700",
-  "완독": "bg-green-50 text-green-700",
+  완독: "bg-green-50 text-green-700",
   "안 읽음": "bg-gray-100 text-gray-500",
 };
 
 const progressBarColor: Record<string, string> = {
   "읽는 중": "bg-blue-600",
-  "완독": "bg-green-600",
+  완독: "bg-green-600",
   "안 읽음": "bg-gray-300",
 };
 
@@ -99,18 +103,29 @@ function getLengthBucket(
 ): "단편" | "중편" | "장편" {
   const total = getEffectiveTotalEpisodes(book);
 
-  if (total > 1000) return "장편";
-  if (total >= 500) return "중편";
+  if (total > 1000) {
+    return "장편";
+  }
+
+  if (total >= 500) {
+    return "중편";
+  }
 
   return "단편";
 }
 
 const ITEMS_PER_PAGE = 20;
 
+type ManagementFilter =
+  | "none"
+  | "reread"
+  | "excluded";
+
 export default function Home() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
   const [filter, setFilter] = useState("전체");
 
   const [activeTags, setActiveTags] = useState<
@@ -130,9 +145,23 @@ export default function Home() {
   const [currentPage, setCurrentPage] =
     useState(1);
 
+  // 작품 관리 메뉴
+  const [openMenuId, setOpenMenuId] =
+    useState<string | null>(null);
+
+  // 관리함
+  const [managementFilter, setManagementFilter] =
+    useState<ManagementFilter>("none");
+
+  const [managementMenuOpen, setManagementMenuOpen] =
+    useState(false);
+
   // 전체 소설 영역 위치
   const allBooksSectionRef =
     useRef<HTMLElement>(null);
+
+  const managementMenuRef =
+    useRef<HTMLDivElement>(null);
 
   function toggleTag(tag: ToggleTag) {
     setActiveTags((prev) => {
@@ -196,7 +225,7 @@ export default function Home() {
     loadBooks();
   }, []);
 
-  // 검색 / 필터 / 태그 / 정렬이 변경되면 1페이지로 이동
+  // 검색 / 필터 / 태그 / 정렬 / 관리함이 변경되면 1페이지로 이동
   useEffect(() => {
     setCurrentPage(1);
   }, [
@@ -204,6 +233,7 @@ export default function Home() {
     filter,
     activeTags,
     sortOption,
+    managementFilter,
   ]);
 
   // 페이지 전체 스크롤에 따른 맨 위로 버튼
@@ -227,12 +257,75 @@ export default function Home() {
     };
   }, []);
 
+  // 메뉴 바깥을 클릭하면 닫기
+  useEffect(() => {
+    function handleClickOutside(
+      event: MouseEvent
+    ) {
+      const target = event.target as Node;
+
+      if (
+        managementMenuRef.current &&
+        !managementMenuRef.current.contains(target)
+      ) {
+        setManagementMenuOpen(false);
+      }
+
+      const bookMenuTarget =
+        (target as HTMLElement)?.closest?.(
+          "[data-book-menu]"
+        );
+
+      if (!bookMenuTarget) {
+        setOpenMenuId(null);
+      }
+    }
+
+    document.addEventListener(
+      "mousedown",
+      handleClickOutside
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleClickOutside
+      );
+    };
+  }, []);
+
   const filteredBooks = useMemo(() => {
     const keyword =
       search.trim().toLowerCase();
 
     return books.filter((book) => {
+      // 제외된 작품은 일반 목록에서 숨김
+      if (
+        managementFilter === "none" &&
+        book.is_excluded
+      ) {
+        return false;
+      }
+
+      // 관리함 - 다시 볼 작품
+      if (
+        managementFilter === "reread" &&
+        !book.is_reread_wanted
+      ) {
+        return false;
+      }
+
+      // 관리함 - 제외한 작품
+      if (
+        managementFilter === "excluded" &&
+        !book.is_excluded
+      ) {
+        return false;
+      }
+
+      // 관리함을 보고 있을 때는 기존 상태 필터를 적용하지 않음
       const matchesStatus =
+        managementFilter !== "none" ||
         filter === "전체" ||
         getDisplayStatus(book) === filter;
 
@@ -282,6 +375,7 @@ export default function Home() {
     filter,
     activeTags,
     search,
+    managementFilter,
   ]);
 
   const sortedBooks = useMemo(() => {
@@ -377,7 +471,10 @@ export default function Home() {
 
     // 전체 탭에서는 최근 읽은 소설을 지나
     // 전체 소설 영역의 시작 부분까지만 이동
-    if (filter === "전체") {
+    if (
+      filter === "전체" &&
+      managementFilter === "none"
+    ) {
       requestAnimationFrame(() => {
         allBooksSectionRef.current?.scrollIntoView(
           {
@@ -390,7 +487,7 @@ export default function Home() {
       return;
     }
 
-    // 그 외 상태 탭에서는 기존처럼 화면 맨 위로 이동
+    // 그 외 상태 탭 / 관리함에서는 화면 맨 위로 이동
     window.scrollTo({
       top: 0,
       behavior: "smooth",
@@ -401,9 +498,10 @@ export default function Home() {
     return [...books]
       .filter(
         (book) =>
-          book.status === "읽는 중" ||
-          (book.progress > 0 &&
-            book.progress < 100)
+          !book.is_excluded &&
+          (book.status === "읽는 중" ||
+            (book.progress > 0 &&
+              book.progress < 100))
       )
       .sort(
         (a, b) =>
@@ -473,6 +571,99 @@ export default function Home() {
         error instanceof Error
           ? error.message
           : "다시 읽기를 시작하지 못했습니다."
+      );
+    }
+  }
+
+  // 작품 관리 상태 변경
+  async function updateBookManagement(
+    book: Book,
+    type:
+      | "reread"
+      | "excluded"
+  ) {
+    const isReread =
+      Boolean(book.is_reread_wanted);
+
+    const isExcluded =
+      Boolean(book.is_excluded);
+
+    let nextReread = isReread;
+    let nextExcluded = isExcluded;
+
+    if (type === "reread") {
+      nextReread = !isReread;
+
+      // 다시 볼 작품으로 지정하면
+      // 제외 상태는 해제
+      if (nextReread) {
+        nextExcluded = false;
+      }
+    }
+
+    if (type === "excluded") {
+      nextExcluded = !isExcluded;
+
+      // 제외하기로 지정하면
+      // 다시 볼 작품 상태는 해제
+      if (nextExcluded) {
+        nextReread = false;
+      }
+    }
+
+    try {
+      setError("");
+
+      const response = await fetch(
+        "/api/books/manage",
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            bookId: book.id,
+            isRereadWanted:
+              nextReread,
+            isExcluded:
+              nextExcluded,
+          }),
+        }
+      );
+
+      const data =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          typeof data?.error === "string"
+            ? data.error
+            : "작품 상태를 변경하지 못했습니다."
+        );
+      }
+
+      setBooks((prev) =>
+        prev.map((item) =>
+          item.id === book.id
+            ? {
+                ...item,
+                is_reread_wanted:
+                  nextReread,
+                is_excluded:
+                  nextExcluded,
+              }
+            : item
+        )
+      );
+
+      setOpenMenuId(null);
+      setCurrentPage(1);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "작품 상태를 변경하지 못했습니다."
       );
     }
   }
@@ -579,6 +770,115 @@ export default function Home() {
     );
   }
 
+  function renderBookMenu(book: Book) {
+    const isOpen =
+      openMenuId === book.id;
+
+    return (
+      <div
+        data-book-menu
+        className="absolute right-2 top-2 z-30"
+      >
+        <button
+          type="button"
+          aria-label="소설 관리"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+
+            setOpenMenuId(
+              isOpen ? null : book.id
+            );
+          }}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-400 transition hover:bg-gray-100 hover:text-gray-700"
+        >
+          <MoreVertical
+            className="h-4 w-4"
+            strokeWidth={2}
+          />
+        </button>
+
+        {isOpen && (
+          <div className="absolute right-0 top-9 w-36 rounded-xl border bg-white p-1 shadow-lg">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                updateBookManagement(
+                  book,
+                  "reread"
+                );
+              }}
+              className="flex w-full items-center rounded-lg px-3 py-2 text-left text-xs font-medium text-gray-700 transition hover:bg-gray-100 sm:text-sm"
+            >
+              {book.is_reread_wanted
+                ? "다시 볼 작품 해제"
+                : "다시 볼 작품"}
+            </button>
+
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                updateBookManagement(
+                  book,
+                  "excluded"
+                );
+              }}
+              className="flex w-full items-center rounded-lg px-3 py-2 text-left text-xs font-medium text-gray-700 transition hover:bg-gray-100 sm:text-sm"
+            >
+              {book.is_excluded
+                ? "제외 해제"
+                : "제외하기"}
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function getSectionTitle() {
+    if (
+      managementFilter === "reread"
+    ) {
+      return "다시 볼 작품";
+    }
+
+    if (
+      managementFilter === "excluded"
+    ) {
+      return "제외한 작품";
+    }
+
+    return "전체 소설";
+  }
+
+  function getEmptyMessage() {
+    if (
+      managementFilter === "reread"
+    ) {
+      return search.trim()
+        ? "검색 결과가 없습니다."
+        : "다시 볼 작품이 없습니다.";
+    }
+
+    if (
+      managementFilter === "excluded"
+    ) {
+      return search.trim()
+        ? "검색 결과가 없습니다."
+        : "제외한 작품이 없습니다.";
+    }
+
+    return search.trim()
+      ? "검색 결과가 없습니다."
+      : "표시할 소설이 없습니다.";
+  }
+
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
       <header className="sticky top-0 z-10 border-b bg-white/95 backdrop-blur">
@@ -619,10 +919,14 @@ export default function Home() {
           ].map((item) => (
             <button
               key={item}
-              onClick={() =>
-                setFilter(item)
-              }
+              type="button"
+              onClick={() => {
+                setManagementFilter("none");
+                setFilter(item);
+                setManagementMenuOpen(false);
+              }}
               className={`shrink-0 rounded-lg px-3.5 py-1.5 text-sm font-medium transition sm:px-4 sm:py-2 ${
+                managementFilter === "none" &&
                 filter === item
                   ? "bg-gray-900 text-white"
                   : "text-gray-600 hover:bg-gray-100"
@@ -631,155 +935,253 @@ export default function Home() {
               {item}
             </button>
           ))}
-        </div>
 
-        {/* 최근 읽은 소설 */}
-        {filter === "전체" && (
-          <section className="mt-8 sm:mt-10">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold sm:text-lg">
-                최근 읽은 소설
-              </h3>
-            </div>
+          {/* 관리함 */}
+          <div
+            ref={managementMenuRef}
+            className="relative shrink-0"
+          >
+            <button
+              type="button"
+              onClick={() =>
+                setManagementMenuOpen(
+                  (prev) => !prev
+                )
+              }
+              className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition sm:px-4 sm:py-2 ${
+                managementFilter !== "none"
+                  ? "bg-gray-900 text-white"
+                  : "text-gray-600 hover:bg-gray-100"
+              }`}
+            >
+              관리함
+              <span className="ml-1">
+                ▾
+              </span>
+            </button>
 
-            {loading ? (
-              <div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-gray-400 sm:mt-4 sm:px-6 sm:py-12">
-                서재를 불러오는 중...
-              </div>
-            ) : error ? (
-              <div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-red-500 sm:mt-4 sm:px-6 sm:py-12">
-                {error}
-              </div>
-            ) : recentBooks.length === 0 ? (
-              <div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-gray-400 sm:mt-4 sm:px-6 sm:py-12">
-                최근 읽은 소설이 없습니다.
-              </div>
-            ) : (
-              <div className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-3">
-                {recentBooks.map(
-                  (book) => (
-                    <div
-                      key={book.id}
-                      className="block rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5"
+            {managementMenuOpen && (
+              <div className="absolute left-0 top-10 z-40 w-36 rounded-xl border bg-white p-1 shadow-lg">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManagementFilter(
+                      "reread"
+                    );
+                    setFilter("전체");
+                    setManagementMenuOpen(
+                      false
+                    );
+                  }}
+                  className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-xs font-medium transition sm:text-sm ${
+                    managementFilter ===
+                    "reread"
+                      ? "bg-gray-100 text-gray-900"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  다시 볼 작품
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManagementFilter(
+                      "excluded"
+                    );
+                    setFilter("전체");
+                    setManagementMenuOpen(
+                      false
+                    );
+                  }}
+                  className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-xs font-medium transition sm:text-sm ${
+                    managementFilter ===
+                    "excluded"
+                      ? "bg-gray-100 text-gray-900"
+                      : "text-gray-700 hover:bg-gray-100"
+                  }`}
+                >
+                  제외한 작품
+                </button>
+
+                {managementFilter !==
+                  "none" && (
+                  <>
+                    <div className="my-1 border-t" />
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setManagementFilter(
+                          "none"
+                        );
+                        setFilter("전체");
+                        setManagementMenuOpen(
+                          false
+                        );
+                      }}
+                      className="flex w-full items-center rounded-lg px-3 py-2 text-left text-xs font-medium text-gray-500 transition hover:bg-gray-100 sm:text-sm"
                     >
-                      <div className="flex items-start gap-3">
-                        <div className="flex w-9 shrink-0 flex-col items-center">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100">
-                            <BookOpen
-                              className="h-4 w-4 text-gray-400"
-                              strokeWidth={
-                                1.75
-                              }
-                            />
-                          </div>
-
-                          <span
-                            className={`mt-1.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[getDisplayStatus(book)]}`}
-                          >
-                            {getDisplayStatus(
-                              book
-                            )}
-                          </span>
-                        </div>
-
-                        <div className="min-w-0 flex-1">
-                          <h4 className="line-clamp-2 text-sm font-semibold leading-5 sm:text-[15px]">
-                            {book.title}
-                          </h4>
-
-                          <div className="mt-1.5 flex items-center gap-2">
-                            <span
-                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                book.series_status ===
-                                "completed"
-                                  ? "bg-purple-50 text-purple-700"
-                                  : "bg-orange-50 text-orange-700"
-                              }`}
-                            >
-                              {book.series_status ===
-                              "completed"
-                                ? "완결"
-                                : "연재중"}
-                            </span>
-
-                            <p className="text-xs text-gray-400">
-                              Google Drive
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-5">
-                        <div className="flex items-center justify-between text-xs sm:text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-700">
-                              {getRound(book)}
-                              회독
-                            </span>
-
-                            <span className="text-gray-300">
-                              ·
-                            </span>
-
-                            <span className="text-gray-500">
-                              {getEpisode(book)}
-                              화 /{" "}
-                              {getEffectiveTotalEpisodes(
-                                book
-                              )}
-                              화
-                            </span>
-                          </div>
-
-                          <span className="font-medium">
-                            {getProgress(book)}
-                            %
-                          </span>
-                        </div>
-
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                          <div
-                            className={`h-full rounded-full ${progressBarColor[book.status]}`}
-                            style={{
-                              width: `${getProgress(
-                                book
-                              )}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between">
-                        <span className="text-[11px] text-gray-400">
-                          마지막 수정 ·{" "}
-                          {new Date(
-                            book.updated_at
-                          ).toLocaleDateString(
-                            "ko-KR"
-                          )}
-                        </span>
-
-                        {renderAction(book)}
-                      </div>
-                    </div>
-                  )
+                      일반 목록
+                    </button>
+                  </>
                 )}
               </div>
             )}
-          </section>
-        )}
+          </div>
+        </div>
 
-        {/* 전체 소설 */}
+        {/* 최근 읽은 소설 */}
+        {filter === "전체" &&
+          managementFilter === "none" && (
+            <section className="mt-8 sm:mt-10">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold sm:text-lg">
+                  최근 읽은 소설
+                </h3>
+              </div>
+
+              {loading ? (
+                <div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-gray-400 sm:mt-4 sm:px-6 sm:py-12">
+                  서재를 불러오는 중...
+                </div>
+              ) : error ? (
+                <div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-red-500 sm:mt-4 sm:px-6 sm:py-12">
+                  {error}
+                </div>
+              ) : recentBooks.length === 0 ? (
+                <div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-gray-400 sm:mt-4 sm:px-6 sm:py-12">
+                  최근 읽은 소설이 없습니다.
+                </div>
+              ) : (
+                <div className="mt-3 grid gap-3 sm:mt-4 sm:grid-cols-3">
+                  {recentBooks.map(
+                    (book) => (
+                      <div
+                        key={book.id}
+                        className="relative block rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5"
+                      >
+                        {renderBookMenu(book)}
+
+                        <div className="flex items-start gap-3">
+                          <div className="flex w-9 shrink-0 flex-col items-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100">
+                              <BookOpen
+                                className="h-4 w-4 text-gray-400"
+                                strokeWidth={
+                                  1.75
+                                }
+                              />
+                            </div>
+
+                            <span
+                              className={`mt-1.5 whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[getDisplayStatus(book)]}`}
+                            >
+                              {getDisplayStatus(
+                                book
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="min-w-0 flex-1 pr-7">
+                            <h4 className="line-clamp-2 text-sm font-semibold leading-5 sm:text-[15px]">
+                              {book.title}
+                            </h4>
+
+                            <div className="mt-1.5 flex items-center gap-2">
+                              <span
+                                className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                  book.series_status ===
+                                  "completed"
+                                    ? "bg-purple-50 text-purple-700"
+                                    : "bg-orange-50 text-orange-700"
+                                }`}
+                              >
+                                {book.series_status ===
+                                "completed"
+                                  ? "완결"
+                                  : "연재중"}
+                              </span>
+
+                              <p className="text-xs text-gray-400">
+                                Google Drive
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="mt-5">
+                          <div className="flex items-center justify-between text-xs sm:text-sm">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-700">
+                                {getRound(book)}
+                                회독
+                              </span>
+
+                              <span className="text-gray-300">
+                                ·
+                              </span>
+
+                              <span className="text-gray-500">
+                                {getEpisode(book)}
+                                화 /{" "}
+                                {getEffectiveTotalEpisodes(
+                                  book
+                                )}
+                                화
+                              </span>
+                            </div>
+
+                            <span className="font-medium">
+                              {getProgress(book)}
+                              %
+                            </span>
+                          </div>
+
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                            <div
+                              className={`h-full rounded-full ${progressBarColor[book.status]}`}
+                              style={{
+                                width: `${getProgress(
+                                  book
+                                )}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex items-center justify-between">
+                          <span className="text-[11px] text-gray-400">
+                            마지막 수정 ·{" "}
+                            {new Date(
+                              book.updated_at
+                            ).toLocaleDateString(
+                              "ko-KR"
+                            )}
+                          </span>
+
+                          {renderAction(book)}
+                        </div>
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
+        {/* 전체 소설 / 관리함 */}
         <section
           ref={allBooksSectionRef}
           className="mt-10 sm:mt-12"
         >
           <div className="flex items-center justify-between">
             <h3 className="text-base font-semibold sm:text-lg">
-              전체 소설
+              {getSectionTitle()}
             </h3>
 
             <button
+              type="button"
               disabled={syncing}
               onClick={async () => {
                 setSyncing(true);
@@ -850,6 +1252,7 @@ export default function Home() {
 
             {search && (
               <button
+                type="button"
                 onClick={() =>
                   setSearch("")
                 }
@@ -888,6 +1291,7 @@ export default function Home() {
             ).map((opt) => (
               <button
                 key={opt.key}
+                type="button"
                 onClick={() =>
                   changeSortOption(
                     opt.key
@@ -905,52 +1309,55 @@ export default function Home() {
           </div>
 
           {/* 완결 / 미완 / 단편 / 중편 / 장편 / 초기화 */}
-          <div className="mt-3 flex items-center gap-1.5 overflow-x-auto sm:mt-4 sm:gap-2">
-            {TOGGLE_TAGS.map(
-              (tag) => {
-                const isActive =
-                  activeTags.has(tag);
+          {managementFilter ===
+            "none" && (
+            <div className="mt-3 flex items-center gap-1.5 overflow-x-auto sm:mt-4 sm:gap-2">
+              {TOGGLE_TAGS.map(
+                (tag) => {
+                  const isActive =
+                    activeTags.has(tag);
 
-                const isCompletionTag =
-                  COMPLETION_TAGS.includes(
-                    tag
+                  const isCompletionTag =
+                    COMPLETION_TAGS.includes(
+                      tag
+                    );
+
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() =>
+                        toggleTag(tag)
+                      }
+                      className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition sm:px-3.5 sm:py-1.5 ${
+                        isActive
+                          ? isCompletionTag
+                            ? "border-purple-600 bg-purple-50 text-purple-700"
+                            : "border-blue-600 bg-blue-50 text-blue-700"
+                          : "border-gray-200 text-gray-500 hover:bg-gray-50"
+                      }`}
+                    >
+                      {tag}
+                    </button>
                   );
+                }
+              )}
 
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() =>
-                      toggleTag(tag)
-                    }
-                    className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition sm:px-3.5 sm:py-1.5 ${
-                      isActive
-                        ? isCompletionTag
-                          ? "border-purple-600 bg-purple-50 text-purple-700"
-                          : "border-blue-600 bg-blue-50 text-blue-700"
-                        : "border-gray-200 text-gray-500 hover:bg-gray-50"
-                    }`}
-                  >
-                    {tag}
-                  </button>
-                );
-              }
-            )}
-
-            <button
-              type="button"
-              onClick={resetTags}
-              disabled={
-                activeTags.size === 0
-              }
-              className="ml-1 shrink-0 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-400 transition hover:bg-gray-50 hover:text-gray-600 disabled:cursor-default disabled:opacity-40 sm:px-3.5 sm:py-1.5"
-            >
-              초기화
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={resetTags}
+                disabled={
+                  activeTags.size === 0
+                }
+                className="ml-1 shrink-0 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-400 transition hover:bg-gray-50 hover:text-gray-600 disabled:cursor-default disabled:opacity-40 sm:px-3.5 sm:py-1.5"
+              >
+                초기화
+              </button>
+            </div>
+          )}
 
           {/* 소설 목록 */}
-          <div className="mt-3 overflow-hidden rounded-2xl border bg-white sm:mt-4">
+          <div className="mt-3 rounded-2xl border bg-white sm:mt-4">
             {loading ? (
               <div className="px-5 py-10 text-center text-sm text-gray-400 sm:px-6 sm:py-12">
                 불러오는 중...
@@ -961,19 +1368,17 @@ export default function Home() {
               </div>
             ) : filteredBooks.length === 0 ? (
               <div className="px-5 py-10 text-center text-sm text-gray-400 sm:px-6 sm:py-12">
-                {search.trim()
-                  ? "검색 결과가 없습니다."
-                  : "표시할 소설이 없습니다."}
+                {getEmptyMessage()}
               </div>
             ) : (
               <>
                 {/* 실제 소설 목록 */}
-                <div>
+                <div className="overflow-visible rounded-2xl">
                   {paginatedBooks.map(
                     (book, index) => (
                       <div
                         key={book.id}
-                        className={`flex items-start gap-3 px-4 py-3.5 transition hover:bg-gray-50 sm:gap-4 sm:px-5 sm:py-4 ${
+                        className={`relative flex items-center gap-3 px-4 py-3.5 transition hover:bg-gray-50 sm:gap-4 sm:px-5 sm:py-4 ${
                           index !==
                           paginatedBooks.length -
                             1
@@ -981,6 +1386,11 @@ export default function Home() {
                             : ""
                         }`}
                       >
+                        {/* 오른쪽 위 작품 관리 메뉴 */}
+                        {renderBookMenu(
+                          book
+                        )}
+
                         <div className="flex w-10 shrink-0 flex-col items-center sm:w-11">
                           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 sm:h-10 sm:w-10">
                             <BookOpen
@@ -1000,7 +1410,7 @@ export default function Home() {
                           </span>
                         </div>
 
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex-1 pr-7">
                           <div className="flex flex-wrap items-center gap-2">
                             <h4 className="line-clamp-2 text-sm font-medium leading-5 sm:text-[15px]">
                               {book.title}
@@ -1075,6 +1485,7 @@ export default function Home() {
                           </div>
                         </div>
 
+                        {/* 세로 중앙에 위치하는 읽기 버튼 */}
                         {renderAction(
                           book,
                           true
@@ -1148,6 +1559,7 @@ export default function Home() {
       {/* 맨 위로 */}
       {showScrollTop && (
         <button
+          type="button"
           onClick={scrollToTop}
           aria-label="맨 위로"
           className="fixed bottom-20 right-5 z-20 flex h-10 w-10 items-center justify-center rounded-full border bg-white text-gray-600 shadow-md transition hover:bg-gray-50 hover:text-gray-900 sm:bottom-24 sm:right-8 sm:h-11 sm:w-11"
