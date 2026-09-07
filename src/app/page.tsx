@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type PointerEvent,
 } from "react";
 import {
   BookOpen,
@@ -30,7 +31,6 @@ type Book = {
   updated_at: string;
   series_status: "ongoing" | "completed";
 
-  // 회독 정보
   round_count?: number;
   completed_round_count?: number;
   current_round?: number | null;
@@ -52,13 +52,28 @@ const progressBarColor: Record<string, string> = {
   "안 읽음": "bg-gray-300",
 };
 
-// 한글 초성 19개 (완성형 한글 유니코드 계산용)
 const CHOSUNG_LIST = [
-  "ㄱ", "ㄲ", "ㄴ", "ㄷ", "ㄸ", "ㄹ", "ㅁ", "ㅂ", "ㅃ", "ㅅ",
-  "ㅆ", "ㅇ", "ㅈ", "ㅉ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+  "ㄱ",
+  "ㄲ",
+  "ㄴ",
+  "ㄷ",
+  "ㄸ",
+  "ㄹ",
+  "ㅁ",
+  "ㅂ",
+  "ㅃ",
+  "ㅅ",
+  "ㅆ",
+  "ㅇ",
+  "ㅈ",
+  "ㅉ",
+  "ㅊ",
+  "ㅋ",
+  "ㅌ",
+  "ㅍ",
+  "ㅎ",
 ];
 
-// 된소리 초성(ㄲㄸㅃㅆㅉ)은 인덱스 바에서 자연스럽게 같은 그룹으로 묶어서 보여줌
 const CHOSUNG_GROUP: Record<string, string> = {
   "ㄱ": "ㄱ",
   "ㄲ": "ㄱ",
@@ -81,16 +96,25 @@ const CHOSUNG_GROUP: Record<string, string> = {
   "ㅎ": "ㅎ",
 };
 
-// 인덱스 바에 표시될 전체 순서 (자모 → 알파벳 → 기타)
 const INDEX_ORDER = [
-  "ㄱ", "ㄴ", "ㄷ", "ㄹ", "ㅁ", "ㅂ", "ㅅ", "ㅇ", "ㅈ", "ㅊ", "ㅋ", "ㅌ", "ㅍ", "ㅎ",
+  "ㄱ",
+  "ㄴ",
+  "ㄷ",
+  "ㄹ",
+  "ㅁ",
+  "ㅂ",
+  "ㅅ",
+  "ㅇ",
+  "ㅈ",
+  "ㅊ",
+  "ㅋ",
+  "ㅌ",
+  "ㅍ",
+  "ㅎ",
   ..."ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
   "#",
 ];
 
-// 제목 끝에 보통 "1-120" 처럼 붙어있는 화수 범위에서 총 화수(뒤쪽 숫자)를 추출
-// (새로 동기화된 책은 파일을 한 번 열어보기 전까지 total_episodes가 0이라
-// 제목에 적힌 범위로 화수를 추정해서 "화수 많은순" 정렬에 사용한다)
 function getTitleEpisodeCount(title: string): number {
   const matches = [...title.matchAll(/(\d+)\s*[-~]\s*(\d+)/g)];
 
@@ -98,14 +122,12 @@ function getTitleEpisodeCount(title: string): number {
     return 0;
   }
 
-  // 제목 안에 숫자 범위가 여러 개 있을 수도 있으니 가장 마지막(보통 맨 뒤) 것을 사용
   const last = matches[matches.length - 1];
   const count = parseInt(last[2], 10);
 
   return Number.isFinite(count) ? count : 0;
 }
 
-// DB에 기록된 total_episodes와 제목에서 추정한 화수 중 더 큰 값을 사용
 function getEffectiveTotalEpisodes(book: Book): number {
   return Math.max(
     book.total_episodes || 0,
@@ -113,7 +135,6 @@ function getEffectiveTotalEpisodes(book: Book): number {
   );
 }
 
-// 화수 구간 (단편 / 중편 / 장편) + 완결 여부를 하나의 토글 그룹으로 묶어서 사용
 const TOGGLE_TAGS = [
   "완결",
   "미완",
@@ -124,8 +145,6 @@ const TOGGLE_TAGS = [
 
 type ToggleTag = (typeof TOGGLE_TAGS)[number];
 
-// 완결 여부 태그 / 화수 구간 태그를 구분
-// (같은 그룹끼리는 OR, 그룹 간에는 AND로 필터링)
 const COMPLETION_TAGS: ToggleTag[] = [
   "완결",
   "미완",
@@ -137,7 +156,6 @@ const LENGTH_TAGS: ToggleTag[] = [
   "장편",
 ];
 
-// 화수 기준으로 단편(500화 미만) / 중편(500~1000화) / 장편(1000화 초과)으로 분류
 function getLengthBucket(
   book: Book
 ): "단편" | "중편" | "장편" {
@@ -149,7 +167,6 @@ function getLengthBucket(
   return "단편";
 }
 
-// 제목의 첫 글자를 기준으로 인덱스 바 그룹 키를 구한다
 function getIndexKey(title: string): string {
   const trimmed = title.trim();
 
@@ -159,7 +176,6 @@ function getIndexKey(title: string): string {
 
   const code = trimmed.charCodeAt(0);
 
-  // 완성형 한글 (가 ~ 힣)
   if (code >= 0xac00 && code <= 0xd7a3) {
     const choIndex = Math.floor(
       (code - 0xac00) / (21 * 28)
@@ -185,14 +201,10 @@ export default function Home() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("전체");
 
-  // 완결/미완 + 화수 구간(단편/중편/장편)을 하나의 토글 그룹으로 관리
-  // (여러 개를 동시에 켤 수 있는 멀티 토글:
-  // 같은 그룹끼리는 OR, 그룹 간에는 AND)
   const [activeTags, setActiveTags] = useState<
     Set<ToggleTag>
   >(() => new Set());
 
-  // 정렬 기준: 기본(불러온 순서) / 화수 많은순 / 가나다순
   const [sortOption, setSortOption] = useState<
     "default" | "episodes" | "title"
   >("default");
@@ -202,17 +214,32 @@ export default function Home() {
     useState(false);
   const [syncing, setSyncing] = useState(false);
 
-  // 자모/알파벳 인덱스 바로 점프할 때,
-  // 각 소설 행의 DOM을 참조
   const bookRowRefs = useRef<
     Record<string, HTMLDivElement | null>
   >({});
 
-  // 전체 소설 목록의 실제 스크롤 영역
+  // 실제 소설 목록 스크롤 영역
   const bookListScrollRef =
     useRef<HTMLDivElement | null>(null);
 
-  // 토글 태그(완결/미완/단편/중편/장편) 켜고 끄기
+  // 오른쪽 커스텀 스크롤바 트랙
+  const scrollBarRef =
+    useRef<HTMLDivElement | null>(null);
+
+  // 커스텀 스크롤바 thumb 크기 / 위치
+  const [scrollThumb, setScrollThumb] = useState({
+    height: 0,
+    top: 0,
+  });
+
+  // thumb 드래그 상태
+  const isDraggingScrollThumb =
+    useRef(false);
+
+  // 손가락이 thumb의 어느 위치를 잡았는지
+  const scrollDragOffset =
+    useRef(0);
+
   function toggleTag(tag: ToggleTag) {
     setActiveTags((prev) => {
       const next = new Set(prev);
@@ -227,15 +254,78 @@ export default function Home() {
     });
   }
 
-  // 토글 초기화
   function resetTags() {
     setActiveTags(new Set());
   }
 
-  // 정렬 변경
-  // 정렬 버튼을 누르면 소설 목록 내부 스크롤을 맨 위로 이동한다.
-  // startTransition을 사용해 많은 목록을 다시 정렬/렌더링하는 작업을
-  // 긴급한 UI 업데이트와 분리한다.
+  // 커스텀 스크롤바의 위치와 높이 계산
+  function updateScrollThumb() {
+    const container =
+      bookListScrollRef.current;
+
+    const scrollBar =
+      scrollBarRef.current;
+
+    if (!container || !scrollBar) {
+      return;
+    }
+
+    const {
+      scrollHeight,
+      clientHeight,
+      scrollTop,
+    } = container;
+
+    if (scrollHeight <= clientHeight) {
+      setScrollThumb({
+        height: 0,
+        top: 0,
+      });
+
+      return;
+    }
+
+    const trackHeight =
+      scrollBar.clientHeight;
+
+    if (trackHeight <= 0) {
+      return;
+    }
+
+    const calculatedThumbHeight =
+      (clientHeight / scrollHeight) *
+      trackHeight;
+
+    const thumbHeight = Math.max(
+      42,
+      calculatedThumbHeight
+    );
+
+    const safeThumbHeight = Math.min(
+      thumbHeight,
+      trackHeight
+    );
+
+    const maxThumbTop = Math.max(
+      0,
+      trackHeight - safeThumbHeight
+    );
+
+    const maxScrollTop =
+      scrollHeight - clientHeight;
+
+    const thumbTop =
+      maxScrollTop > 0
+        ? (scrollTop / maxScrollTop) *
+          maxThumbTop
+        : 0;
+
+    setScrollThumb({
+      height: safeThumbHeight,
+      top: thumbTop,
+    });
+  }
+
   function changeSortOption(
     option: "default" | "episodes" | "title"
   ) {
@@ -253,9 +343,12 @@ export default function Home() {
     setError("");
 
     try {
-      const response = await fetch("/api/books");
+      const response = await fetch(
+        "/api/books"
+      );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
@@ -278,15 +371,15 @@ export default function Home() {
   }
 
   useEffect(() => {
-    // 페이지 로드(새로고침) 시에는 DB만 조회한다.
-    // 구글 드라이브 동기화는 "새로고침" 버튼을 눌렀을 때만 실행된다.
     loadBooks();
   }, []);
 
-  // 스크롤 위치에 따라 맨 위로 버튼 표시
+  // 페이지 전체 스크롤에 따른 맨 위로 버튼
   useEffect(() => {
     function handleScroll() {
-      setShowScrollTop(window.scrollY > 400);
+      setShowScrollTop(
+        window.scrollY > 400
+      );
     }
 
     window.addEventListener(
@@ -302,9 +395,9 @@ export default function Home() {
     };
   }, []);
 
-  // 상태 필터 + 완결 여부 필터 + 제목 검색
   const filteredBooks = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
+    const keyword =
+      search.trim().toLowerCase();
 
     return books.filter((book) => {
       const matchesStatus =
@@ -321,9 +414,11 @@ export default function Home() {
         activeCompletionTags.some(
           (tag) =>
             (tag === "완결" &&
-              book.series_status === "completed") ||
+              book.series_status ===
+                "completed") ||
             (tag === "미완" &&
-              book.series_status === "ongoing")
+              book.series_status ===
+                "ongoing")
         );
 
       const activeLengthTags =
@@ -357,7 +452,6 @@ export default function Home() {
     search,
   ]);
 
-  // 정렬 적용 (화수 많은순 / 가나다순 / 기본)
   const sortedBooks = useMemo(() => {
     const list = [...filteredBooks];
 
@@ -369,7 +463,10 @@ export default function Home() {
       );
     } else if (sortOption === "title") {
       list.sort((a, b) =>
-        a.title.localeCompare(b.title, "ko")
+        a.title.localeCompare(
+          b.title,
+          "ko"
+        )
       );
     }
 
@@ -379,8 +476,83 @@ export default function Home() {
     sortOption,
   ]);
 
-  // 정렬된 목록 기준으로,
-  // 인덱스 바의 각 글자에 해당하는 첫 번째 소설을 찾는다
+  // =========================================================
+  // 중요:
+  // sortedBooks가 선언된 이후에 스크롤바 effect를 배치한다.
+  // 기존 ReferenceError:
+  // Cannot access 'sortedBooks' before initialization
+  // 를 방지한다.
+  // =========================================================
+  useEffect(() => {
+    const container =
+      bookListScrollRef.current;
+
+    const scrollBar =
+      scrollBarRef.current;
+
+    if (!container || !scrollBar) {
+      return;
+    }
+
+    let frameId = 0;
+
+    function handleScroll() {
+      if (frameId) {
+        return;
+      }
+
+      frameId = requestAnimationFrame(() => {
+        updateScrollThumb();
+        frameId = 0;
+      });
+    }
+
+    container.addEventListener(
+      "scroll",
+      handleScroll,
+      { passive: true }
+    );
+
+    const resizeObserver =
+      new ResizeObserver(() => {
+        updateScrollThumb();
+      });
+
+    resizeObserver.observe(container);
+    resizeObserver.observe(scrollBar);
+
+    window.addEventListener(
+      "resize",
+      updateScrollThumb
+    );
+
+    requestAnimationFrame(() => {
+      updateScrollThumb();
+    });
+
+    return () => {
+      container.removeEventListener(
+        "scroll",
+        handleScroll
+      );
+
+      resizeObserver.disconnect();
+
+      window.removeEventListener(
+        "resize",
+        updateScrollThumb
+      );
+
+      if (frameId) {
+        cancelAnimationFrame(frameId);
+      }
+    };
+  }, [sortedBooks.length]);
+
+
+
+
+
   const indexAnchors = useMemo(() => {
     const map = new Map<string, string>();
 
@@ -395,7 +567,6 @@ export default function Home() {
     return map;
   }, [sortedBooks]);
 
-  // 실제로 목록에 존재하는 글자만 인덱스 바에 노출
   const availableIndexLetters = useMemo(
     () =>
       INDEX_ORDER.filter((letter) =>
@@ -404,34 +575,37 @@ export default function Home() {
     [indexAnchors]
   );
 
-  // 인덱스 글자 클릭 →
-  // 가나다순 정렬로 전환하고 해당 위치로 스크롤
   function jumpToIndex(letter: string) {
-    const titleSorted = [...filteredBooks].sort(
-      (a, b) =>
-        a.title.localeCompare(b.title, "ko")
+    const titleSorted = [
+      ...filteredBooks,
+    ].sort((a, b) =>
+      a.title.localeCompare(
+        b.title,
+        "ko"
+      )
     );
 
     const target = titleSorted.find(
       (book) =>
-        getIndexKey(book.title) === letter
+        getIndexKey(book.title) ===
+        letter
     );
 
     setSortOption("title");
 
     if (target) {
-      bookRowRefs.current[target.id]?.scrollIntoView(
-        {
+      requestAnimationFrame(() => {
+        bookRowRefs.current[
+          target.id
+        ]?.scrollIntoView({
           behavior: "smooth",
           block: "start",
           inline: "nearest",
-        }
-      );
+        });
+      });
     }
   }
 
-  // 최근 읽은 소설
-  // 전체 소설 필터/토글/검색/정렬과 독립적으로 동작한다.
   const recentBooks = useMemo(() => {
     return [...books]
       .filter(
@@ -442,13 +616,16 @@ export default function Home() {
       )
       .sort(
         (a, b) =>
-          new Date(b.updated_at).getTime() -
-          new Date(a.updated_at).getTime()
+          new Date(
+            b.updated_at
+          ).getTime() -
+          new Date(
+            a.updated_at
+          ).getTime()
       )
       .slice(0, 3);
   }, [books]);
 
-  // 리더 이동 URL
   function getReaderUrl(book: Book) {
     return `/drive?fileId=${encodeURIComponent(
       book.drive_file_id
@@ -457,8 +634,6 @@ export default function Home() {
     )}`;
   }
 
-  // 다시 읽기
-  // 완독 상태에서 새로운 회독을 만들고 1화부터 시작
   async function restartReading(book: Book) {
     if (book.status !== "완독") {
       return;
@@ -486,20 +661,20 @@ export default function Home() {
         }
       );
 
-      const data = await response.json();
+      const data =
+        await response.json();
 
       if (!response.ok) {
         throw new Error(
-          typeof data?.error === "string"
+          typeof data?.error ===
+            "string"
             ? data.error
             : "다시 읽기를 시작하지 못했습니다."
         );
       }
 
-      // 새 회독 상태를 먼저 반영
       await loadBooks();
 
-      // 새 회독은 1화부터 리더 진입
       window.location.href =
         getReaderUrl(book);
     } catch (error) {
@@ -518,7 +693,6 @@ export default function Home() {
     });
   }
 
-  // 회독 번호
   function getRound(book: Book) {
     return (
       book.current_round ??
@@ -527,11 +701,11 @@ export default function Home() {
     );
   }
 
-  // 현재 에피소드
   function getEpisode(book: Book) {
     if (
       book.current_episode !== null &&
-      book.current_episode !== undefined &&
+      book.current_episode !==
+        undefined &&
       book.current_episode > 0
     ) {
       return book.current_episode;
@@ -544,7 +718,6 @@ export default function Home() {
     return 1;
   }
 
-  // 현재 진행률
   function getProgress(book: Book) {
     return (
       book.current_progress ??
@@ -553,13 +726,10 @@ export default function Home() {
     );
   }
 
-  // 화면에 보여줄 상태 배지
-  // 한 번이라도 완독한 적이 있으면,
-  // 다시 읽는 중이어도 배지는 계속 "완독"으로 유지한다.
-  // (회독수만 올라감)
   function getDisplayStatus(book: Book) {
     if (
-      (book.completed_round_count ?? 0) > 0
+      (book.completed_round_count ??
+        0) > 0
     ) {
       return "완독";
     }
@@ -567,7 +737,129 @@ export default function Home() {
     return book.status;
   }
 
-  // 버튼
+  // 스크롤바 thumb을 손가락으로 잡기 시작
+  function handleScrollThumbPointerDown(
+    event: PointerEvent<HTMLDivElement>
+  ) {
+    const thumb =
+      event.currentTarget;
+
+    const container =
+      bookListScrollRef.current;
+
+    const scrollBar =
+      scrollBarRef.current;
+
+    if (
+      !container ||
+      !scrollBar ||
+      scrollThumb.height <= 0
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    isDraggingScrollThumb.current =
+      true;
+
+    const thumbRect =
+      thumb.getBoundingClientRect();
+
+    // 손가락이 thumb의 어느 지점을 잡았는지 기억
+    scrollDragOffset.current =
+      event.clientY -
+      thumbRect.top;
+
+    try {
+      thumb.setPointerCapture(
+        event.pointerId
+      );
+    } catch {
+      // pointer capture 실패 시 무시
+    }
+  }
+
+  // thumb을 잡은 상태에서 손가락 이동
+  function handleScrollThumbPointerMove(
+    event: PointerEvent<HTMLDivElement>
+  ) {
+    if (
+      !isDraggingScrollThumb.current
+    ) {
+      return;
+    }
+
+    const container =
+      bookListScrollRef.current;
+
+    const scrollBar =
+      scrollBarRef.current;
+
+    if (
+      !container ||
+      !scrollBar ||
+      scrollThumb.height <= 0
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    const trackRect =
+      scrollBar.getBoundingClientRect();
+
+    const trackHeight =
+      trackRect.height;
+
+    const maxThumbTop =
+      trackHeight -
+      scrollThumb.height;
+
+    if (maxThumbTop <= 0) {
+      return;
+    }
+
+    let thumbTop =
+      event.clientY -
+      trackRect.top -
+      scrollDragOffset.current;
+
+    thumbTop = Math.max(
+      0,
+      Math.min(
+        thumbTop,
+        maxThumbTop
+      )
+    );
+
+    const ratio =
+      thumbTop / maxThumbTop;
+
+    container.scrollTop =
+      ratio *
+      (container.scrollHeight -
+        container.clientHeight);
+  }
+
+  // thumb 드래그 종료
+  function handleScrollThumbPointerUp(
+    event: PointerEvent<HTMLDivElement>
+  ) {
+    isDraggingScrollThumb.current =
+      false;
+
+    try {
+      event.currentTarget.releasePointerCapture(
+        event.pointerId
+      );
+    } catch {
+      // pointer capture가 이미 해제된 경우 무시
+    }
+  }
+
   function renderAction(
     book: Book,
     compact = false
@@ -576,7 +868,6 @@ export default function Home() {
       ? "shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-medium transition sm:px-3 sm:py-2 sm:text-sm"
       : "rounded-lg px-2.5 py-1.5 text-xs font-medium transition";
 
-    // 완독 → 다시 읽기
     if (book.status === "완독") {
       return (
         <button
@@ -593,7 +884,6 @@ export default function Home() {
       );
     }
 
-    // 안 읽음 → 읽기 시작
     if (book.status === "안 읽음") {
       return (
         <Link
@@ -608,7 +898,6 @@ export default function Home() {
       );
     }
 
-    // 읽는 중 → 이어읽기
     return (
       <Link
         href={getReaderUrl(book)}
@@ -624,7 +913,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-gray-50 text-gray-900">
-      {/* 상단 헤더 */}
       <header className="sticky top-0 z-10 border-b bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5 sm:px-6">
           <div className="flex items-center gap-2">
@@ -643,7 +931,6 @@ export default function Home() {
       </header>
 
       <section className="mx-auto max-w-6xl px-5 pb-24 pt-8 sm:px-6 sm:pb-28 sm:pt-10">
-        {/* 페이지 제목 */}
         <div>
           <h2 className="text-xl font-semibold tracking-tight sm:text-2xl">
             내 서재
@@ -654,9 +941,7 @@ export default function Home() {
           </p>
         </div>
 
-        {/* 상태 필터
-            최근 읽은 소설 위에 위치
-            기존처럼 전체 / 읽는 중 / 완독 / 안 읽음으로 필터링 */}
+        {/* 상태 필터 */}
         <div className="mt-5 flex gap-1.5 overflow-x-auto sm:mt-6 sm:gap-2">
           {[
             "전체",
@@ -680,8 +965,7 @@ export default function Home() {
           ))}
         </div>
 
-        {/* 최근 읽은 소설
-            기존처럼 전체 상태에서만 표시 */}
+        {/* 최근 읽은 소설 */}
         {filter === "전체" && (
           <section className="mt-8 sm:mt-10">
             <div className="flex items-center justify-between">
@@ -710,7 +994,6 @@ export default function Home() {
                       key={book.id}
                       className="block rounded-2xl border bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md sm:p-5"
                     >
-                      {/* 아이콘 + 상태 + 제목 */}
                       <div className="flex items-start gap-3">
                         <div className="flex w-9 shrink-0 flex-col items-center">
                           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100">
@@ -731,7 +1014,6 @@ export default function Home() {
                           </span>
                         </div>
 
-                        {/* 제목 */}
                         <div className="min-w-0 flex-1">
                           <h4 className="line-clamp-2 text-sm font-semibold leading-5 sm:text-[15px]">
                             {book.title}
@@ -759,7 +1041,6 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* 회독 + 진행률 */}
                       <div className="mt-5">
                         <div className="flex items-center justify-between text-xs sm:text-sm">
                           <div className="flex items-center gap-2">
@@ -800,7 +1081,6 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* 하단 */}
                       <div className="mt-4 flex items-center justify-between">
                         <span className="text-[11px] text-gray-400">
                           마지막 수정 ·{" "}
@@ -823,7 +1103,6 @@ export default function Home() {
 
         {/* 전체 소설 */}
         <section className="mt-10 sm:mt-12">
-          {/* 제목 + 새로고침 */}
           <div className="flex items-center justify-between">
             <h3 className="text-base font-semibold sm:text-lg">
               전체 소설
@@ -881,7 +1160,7 @@ export default function Home() {
             </button>
           </div>
 
-          {/* 검색창 */}
+          {/* 검색 */}
           <div className="relative mt-4 sm:mt-5">
             <Search
               className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
@@ -914,7 +1193,7 @@ export default function Home() {
             )}
           </div>
 
-          {/* 정렬 기준 */}
+          {/* 정렬 */}
           <div className="mt-3 flex items-center gap-1.5 overflow-x-auto text-xs sm:mt-4 sm:gap-2 sm:text-sm">
             <span className="shrink-0 text-gray-400">
               정렬
@@ -954,7 +1233,7 @@ export default function Home() {
             ))}
           </div>
 
-          {/* 완결/미완 + 화수 구간 토글 */}
+          {/* 완결 / 미완 / 단편 / 중편 / 장편 / 초기화 */}
           <div className="mt-3 flex items-center gap-1.5 overflow-x-auto sm:mt-4 sm:gap-2">
             {TOGGLE_TAGS.map(
               (tag) => {
@@ -987,7 +1266,6 @@ export default function Home() {
               }
             )}
 
-            {/* 토글 초기화 */}
             <button
               type="button"
               onClick={resetTags}
@@ -1017,138 +1295,172 @@ export default function Home() {
                   : "표시할 소설이 없습니다."}
               </div>
             ) : (
-              <div
-                ref={bookListScrollRef}
-                className="custom-scrollbar max-h-[60vh] overflow-y-auto"
-              >
-                {sortedBooks.map(
-                  (book, index) => (
-                    <div
-                      key={book.id}
-                      ref={(el) => {
-                        bookRowRefs.current[
-                          book.id
-                        ] = el;
-                      }}
-                      className={`flex items-start gap-3 px-4 py-3.5 transition hover:bg-gray-50 sm:gap-4 sm:px-5 sm:py-4 ${
-                        index !==
-                        sortedBooks.length -
-                          1
-                          ? "border-b"
-                          : ""
-                      }`}
-                    >
-                      {/* 아이콘 + 상태 */}
-                      <div className="flex w-10 shrink-0 flex-col items-center sm:w-11">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 sm:h-10 sm:w-10">
-                          <BookOpen
-                            className="h-4 w-4 text-gray-400 sm:h-4.5 sm:w-4.5"
-                            strokeWidth={
-                              1.75
-                            }
-                          />
-                        </div>
-
-                        <span
-                          className={`mt-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[getDisplayStatus(book)]}`}
-                        >
-                          {getDisplayStatus(
-                            book
-                          )}
-                        </span>
-                      </div>
-
-                      {/* 제목 + 회독 + 진행률 */}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="line-clamp-2 text-sm font-medium leading-5 sm:text-[15px]">
-                            {book.title}
-                          </h4>
+              <>
+                {/* 실제 스크롤 영역 */}
+                <div
+                  ref={bookListScrollRef}
+                  className="custom-scrollbar max-h-[60vh] overflow-y-auto pr-4"
+                >
+                  {sortedBooks.map(
+                    (book, index) => (
+                      <div
+                        key={book.id}
+                        ref={(el) => {
+                          bookRowRefs.current[
+                            book.id
+                          ] = el;
+                        }}
+                        className={`flex items-start gap-3 px-4 py-3.5 transition hover:bg-gray-50 sm:gap-4 sm:px-5 sm:py-4 ${
+                          index !==
+                          sortedBooks.length -
+                            1
+                            ? "border-b"
+                            : ""
+                        }`}
+                      >
+                        <div className="flex w-10 shrink-0 flex-col items-center sm:w-11">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gray-100 sm:h-10 sm:w-10">
+                            <BookOpen
+                              className="h-4 w-4 text-gray-400 sm:h-4.5 sm:w-4.5"
+                              strokeWidth={
+                                1.75
+                              }
+                            />
+                          </div>
 
                           <span
-                            className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                              book.series_status ===
-                              "completed"
-                                ? "bg-purple-50 text-purple-700"
-                                : "bg-orange-50 text-orange-700"
-                            }`}
+                            className={`mt-1.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium leading-3 sm:text-[10px] ${statusStyle[getDisplayStatus(book)]}`}
                           >
-                            {book.series_status ===
-                            "completed"
-                              ? "완결"
-                              : "연재중"}
+                            {getDisplayStatus(
+                              book
+                            )}
                           </span>
                         </div>
 
-                        <div className="mt-1.5 flex items-center gap-2">
-                          <span className="text-xs font-medium text-gray-600">
-                            {getRound(book)}
-                            회독
-                          </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="line-clamp-2 text-sm font-medium leading-5 sm:text-[15px]">
+                              {book.title}
+                            </h4>
 
-                          <span className="text-xs text-gray-300">
-                            ·
-                          </span>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                book.series_status ===
+                                "completed"
+                                  ? "bg-purple-50 text-purple-700"
+                                  : "bg-orange-50 text-orange-700"
+                              }`}
+                            >
+                              {book.series_status ===
+                              "completed"
+                                ? "완결"
+                                : "연재중"}
+                            </span>
+                          </div>
 
-                          <span className="text-xs text-gray-400">
-                            {getEpisode(book)}
-                            화 ·{" "}
-                            {getProgress(book)}
-                            %
-                          </span>
+                          <div className="mt-1.5 flex items-center gap-2">
+                            <span className="text-xs font-medium text-gray-600">
+                              {getRound(book)}
+                              회독
+                            </span>
+
+                            <span className="text-xs text-gray-300">
+                              ·
+                            </span>
+
+                            <span className="text-xs text-gray-400">
+                              {getEpisode(book)}
+                              화 ·{" "}
+                              {getProgress(book)}
+                              %
+                            </span>
+                          </div>
+
+                          <div className="mt-2 h-1 w-full max-w-40 overflow-hidden rounded-full bg-gray-100 sm:hidden">
+                            <div
+                              className={`h-full rounded-full ${progressBarColor[book.status]}`}
+                              style={{
+                                width: `${getProgress(
+                                  book
+                                )}%`,
+                              }}
+                            />
+                          </div>
                         </div>
 
-                        {/* 모바일 진행률 */}
-                        <div className="mt-2 h-1 w-full max-w-40 overflow-hidden rounded-full bg-gray-100 sm:hidden">
-                          <div
-                            className={`h-full rounded-full ${progressBarColor[book.status]}`}
-                            style={{
-                              width: `${getProgress(
-                                book
-                              )}%`,
-                            }}
-                          />
+                        <div className="hidden w-28 shrink-0 sm:block">
+                          <div className="flex justify-between text-[11px] text-gray-400">
+                            <span>
+                              진행률
+                            </span>
+
+                            <span>
+                              {getProgress(book)}
+                              %
+                            </span>
+                          </div>
+
+                          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100">
+                            <div
+                              className={`h-full rounded-full ${progressBarColor[book.status]}`}
+                              style={{
+                                width: `${getProgress(
+                                  book
+                                )}%`,
+                              }}
+                            />
+                          </div>
                         </div>
+
+                        {renderAction(
+                          book,
+                          true
+                        )}
                       </div>
-
-                      {/* 데스크톱 진행률 */}
-                      <div className="hidden w-28 shrink-0 sm:block">
-                        <div className="flex justify-between text-[11px] text-gray-400">
-                          <span>
-                            진행률
-                          </span>
-
-                          <span>
-                            {getProgress(book)}
-                            %
-                          </span>
-                        </div>
-
-                        <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-gray-100">
-                          <div
-                            className={`h-full rounded-full ${progressBarColor[book.status]}`}
-                            style={{
-                              width: `${getProgress(
-                                book
-                              )}%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* 상태별 버튼 */}
-                      {renderAction(
-                        book,
-                        true
-                      )}
-                    </div>
-                  )
-                )}
-              </div>
+                    )
+                  )}
+                </div>
+              </>
             )}
 
-            {/* 자모/알파벳 인덱스 바
-                (목록이 많을 때만 노출) */}
+            {/* =====================================================
+                모바일 커스텀 스크롤바
+
+                track은 항상 DOM에 존재시킨다.
+                그래야 최초 렌더링 때도 scrollThumb을 계산할 수 있다.
+               ===================================================== */}
+            {!loading &&
+              !error &&
+              filteredBooks.length > 0 && (
+                <div
+                  ref={scrollBarRef}
+                  className="absolute inset-y-2.5 right-1.5 z-20 w-3 touch-none sm:hidden"
+                >
+                  {scrollThumb.height > 0 && (
+                    <div
+                      className="absolute left-0 w-3 touch-none rounded-full bg-gray-400/90 shadow-sm"
+                      style={{
+                        height: `${scrollThumb.height}px`,
+                        transform: `translateY(${scrollThumb.top}px)`,
+                      }}
+                      onPointerDown={
+                        handleScrollThumbPointerDown
+                      }
+                      onPointerMove={
+                        handleScrollThumbPointerMove
+                      }
+                      onPointerUp={
+                        handleScrollThumbPointerUp
+                      }
+                      onPointerCancel={
+                        handleScrollThumbPointerUp
+                      }
+                    />
+                  )}
+                </div>
+              )}
+
+            {/* 자모/알파벳 인덱스 바 */}
             {availableIndexLetters.length >
               0 &&
               filteredBooks.length > 20 && (
