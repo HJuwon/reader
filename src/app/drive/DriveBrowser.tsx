@@ -2717,7 +2717,7 @@ async function deleteEpisodeRule(
                         theme.title,
                     }}
                   >
-                    {selectedEpisode.episode}화 · {selectedEpisode.title}
+                    {selectedEpisode.title}
                   </span>
                 )}
 
