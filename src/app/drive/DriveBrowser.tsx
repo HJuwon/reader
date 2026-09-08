@@ -584,13 +584,13 @@ async function addEpisodeRule() {
 
 				// 현재 열려 있는 작품에도
 				// 방금 추가한 규칙을 즉시 적용
-				if (fileData?.content) {
+				if (fileContent) {
 					setParsedNovel(
 						parseNovel(
-							fileData.content,
+							fileContent,
 							[
-								...episodeRules,
-								data.data,
+							    ...episodeRules,
+							    data.data,
 							]
 						)
 					);
@@ -654,10 +654,10 @@ async function deleteEpisodeRule(
 
 			// 현재 열려 있는 작품에도
 			// 삭제된 규칙을 즉시 반영
-			if (fileData?.content) {
+			if (fileContent) {
 				setParsedNovel(
 					parseNovel(
-						fileData.content,
+						fileContent,
 						nextRules
 					)
 				);
