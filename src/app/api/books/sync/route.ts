@@ -162,6 +162,19 @@ export async function GET() {
       );
     });
 
+    // DB에는 있지만 이번에 조회한 Drive 파일 목록에는 없는 항목.
+    // = 드라이브에서 삭제(휴지통 이동)되었거나 이 폴더 밖으로
+    //   이동되어 더 이상 이 폴더 안에 없는 파일.
+    // (q 자체가 "폴더 안 + trashed=false" 기준이라
+    //  삭제/이동 둘 다 자연스럽게 files 목록에서 빠진다.)
+    const currentFileIds = new Set(
+      files.map((file: any) => file.id)
+    );
+
+    const removedIds = Array.from(existingIds).filter(
+      (id) => !currentFileIds.has(id)
+    );
+
     // =========================================================
     // 4. 새 파일 등록 — 내용 다운로드/파싱 없이 메타데이터만
     //    (total_episodes는 0으로 두고, 책을 처음 열 때
@@ -239,7 +252,30 @@ export async function GET() {
     }
 
     // =========================================================
-    // 6. 결과 반환
+    // 6. 드라이브에서 삭제/이동되어 사라진 파일을 DB에서도 제거
+    //    (진행상황이 아까워도, 실제 파일이 없으니 목록에서 정리한다)
+    // =========================================================
+
+    let deletedCount = 0;
+    const deleteBatches = chunk(removedIds, 50);
+
+    for (const batch of deleteBatches) {
+      const { error, count } = await supabase
+        .from("books")
+        .delete({ count: "exact" })
+        .eq("user_id", session.user.email)
+        .in("drive_file_id", batch);
+
+      if (error) {
+        console.error("삭제된 파일 DB 정리 실패:", error);
+        continue;
+      }
+
+      deletedCount += count ?? batch.length;
+    }
+
+    // =========================================================
+    // 7. 결과 반환
     // =========================================================
 
     return Response.json({
@@ -248,6 +284,7 @@ export async function GET() {
       newFiles: newFiles.length,
       inserted: insertedBooks.length,
       updated: updatedCount,
+      removed: deletedCount,
       books: insertedBooks,
     });
   } catch (error) {
