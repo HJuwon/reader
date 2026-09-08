@@ -237,6 +237,21 @@ export default function DriveBrowser() {
   const [episodeListOpen, setEpisodeListOpen] =
     useState(false);
 
+  const [episodeRules, setEpisodeRules] =
+    useState<EpisodeRule[]>([]);
+
+  const [episodeRuleInput, setEpisodeRuleInput] =
+    useState("");
+
+  const [episodeRulesLoading, setEpisodeRulesLoading] =
+    useState(false);
+
+  const [episodeRuleSaving, setEpisodeRuleSaving] =
+    useState(false);
+
+  const [episodeRuleError, setEpisodeRuleError] =
+    useState("");
+
   const [bodySearch, setBodySearch] =
     useState("");
 
@@ -388,6 +403,14 @@ export default function DriveBrowser() {
   ]);
 
   useEffect(() => {
+    if (!settingsOpen) {
+      return;
+    }
+
+    void loadEpisodeRules();
+  }, [settingsOpen]);
+
+  useEffect(() => {
     setShowHighlightButton(false);
     setSelectedTextForHighlight("");
     setSelectedHighlightRange(null);
@@ -455,6 +478,176 @@ export default function DriveBrowser() {
     }
 
     return fallback;
+  }
+
+  async function loadEpisodeRules() {
+    setEpisodeRulesLoading(true);
+    setEpisodeRuleError("");
+
+    try {
+      const response = await fetch(
+        "/api/episode-rules"
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          extractErrorMessage(
+            data,
+            "회차 규칙을 불러오지 못했습니다."
+          )
+        );
+      }
+
+      setEpisodeRules(
+        Array.isArray(data?.data)
+          ? data.data
+          : []
+      );
+    } catch (error) {
+      console.error(
+        "회차 규칙 불러오기 실패:",
+        error
+      );
+
+      setEpisodeRuleError(
+        error instanceof Error
+          ? error.message
+          : "회차 규칙을 불러오지 못했습니다."
+      );
+    } finally {
+      setEpisodeRulesLoading(false);
+    }
+  }
+
+  async function addEpisodeRule() {
+    const rule =
+      episodeRuleInput.trim();
+
+    if (!rule) {
+      return;
+    }
+
+    if (!rule.includes("xxx")) {
+      setEpisodeRuleError(
+        "규칙에는 xxx가 포함되어야 합니다."
+      );
+      return;
+    }
+
+    setEpisodeRuleSaving(true);
+    setEpisodeRuleError("");
+
+    try {
+      const response = await fetch(
+        "/api/episode-rules",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            rule,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          extractErrorMessage(
+            data,
+            "회차 규칙을 추가하지 못했습니다."
+          )
+        );
+      }
+
+      if (data?.data) {
+        setEpisodeRules((current) => {
+          const exists = current.some(
+            (item) =>
+              item.id === data.data.id
+          );
+
+          if (exists) {
+            return current;
+          }
+
+          return [
+            ...current,
+            data.data,
+          ];
+        });
+      }
+
+      setEpisodeRuleInput("");
+    } catch (error) {
+      console.error(
+        "회차 규칙 추가 실패:",
+        error
+      );
+
+      setEpisodeRuleError(
+        error instanceof Error
+          ? error.message
+          : "회차 규칙을 추가하지 못했습니다."
+      );
+    } finally {
+      setEpisodeRuleSaving(false);
+    }
+  }
+
+  async function deleteEpisodeRule(
+    id: string
+  ) {
+    setEpisodeRuleError("");
+
+    try {
+      const response = await fetch(
+        "/api/episode-rules",
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: JSON.stringify({
+            id,
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          extractErrorMessage(
+            data,
+            "회차 규칙을 삭제하지 못했습니다."
+          )
+        );
+      }
+
+      setEpisodeRules((current) =>
+        current.filter(
+          (item) => item.id !== id
+        )
+      );
+    } catch (error) {
+      console.error(
+        "회차 규칙 삭제 실패:",
+        error
+      );
+
+      setEpisodeRuleError(
+        error instanceof Error
+          ? error.message
+          : "회차 규칙을 삭제하지 못했습니다."
+      );
+    }
   }
 
   async function initializeReadingState(
@@ -752,7 +945,12 @@ export default function DriveBrowser() {
 
       // 로컬 상태도 새 본문 기준으로 다시 계산한다.
       setFileContent(newFullText);
-      setParsedNovel(parseNovel(newFullText));
+      setParsedNovel(
+        parseNovel(
+          newFullText,
+          episodeRules
+        )
+      );
       setEditingContent(false);
       setEditedText("");
     } catch (error) {
@@ -1921,6 +2119,7 @@ export default function DriveBrowser() {
         const [
           infoResponse,
           fileResponse,
+          rulesResponse,
         ] = await Promise.all([
           fetch(
             `/api/drive/file-info?fileId=${encodeURIComponent(
@@ -1933,14 +2132,18 @@ export default function DriveBrowser() {
               fileId
             )}`
           ),
+
+          fetch("/api/episode-rules"),
         ]);
 
         const [
           infoData,
           fileData,
+          rulesData,
         ] = await Promise.all([
           infoResponse.json(),
           fileResponse.json(),
+          rulesResponse.json(),
         ]);
 
         if (!infoResponse.ok) {
@@ -1965,9 +2168,20 @@ export default function DriveBrowser() {
           return;
         }
 
+        const loadedEpisodeRules: EpisodeRule[] =
+          rulesResponse.ok &&
+          Array.isArray(rulesData?.data)
+            ? rulesData.data
+            : [];
+
+        setEpisodeRules(
+          loadedEpisodeRules
+        );
+
         const parsed =
           parseNovel(
-            fileData.content
+            fileData.content,
+            loadedEpisodeRules
           );
 
         console.log(
@@ -3637,6 +3851,148 @@ export default function DriveBrowser() {
                 );
               })}
             </div>
+
+            <div
+              className="mt-6 border-t pt-5"
+              style={{
+                borderColor: theme.divider,
+              }}
+            >
+              <p
+                className="mb-2 text-xs font-semibold"
+                style={{
+                  color: theme.text,
+                }}
+              >
+                회차 설정
+              </p>
+
+              <p
+                className="mb-3 text-[11px] leading-5"
+                style={{
+                  color: theme.muted,
+                }}
+              >
+                작품 전체에 공통으로 적용할 회차 형식을
+                등록할 수 있습니다.
+                <br />
+                숫자 부분은 <b>xxx</b>로 입력하세요.
+              </p>
+
+              <div className="mb-3 flex gap-2">
+                <input
+                  type="text"
+                  value={episodeRuleInput}
+                  onChange={(event) =>
+                    setEpisodeRuleInput(
+                      event.target.value
+                    )
+                  }
+                  onKeyDown={(event) => {
+                    if (
+                      event.key === "Enter" &&
+                      !episodeRuleSaving
+                    ) {
+                      void addEpisodeRule();
+                    }
+                  }}
+                  placeholder="예: 외전 제xxx화"
+                  className="min-w-0 flex-1 rounded-lg px-3 py-2 text-xs outline-none"
+                  style={{
+                    color: theme.title,
+                    backgroundColor: theme.bg,
+                    border: `1px solid ${theme.divider}`,
+                  }}
+                  disabled={episodeRuleSaving}
+                />
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    void addEpisodeRule()
+                  }
+                  disabled={
+                    episodeRuleSaving ||
+                    !episodeRuleInput.trim()
+                  }
+                  className="shrink-0 rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-40"
+                  style={{
+                    backgroundColor:
+                      theme.title,
+                    color: theme.bg,
+                  }}
+                >
+                  {episodeRuleSaving
+                    ? "저장 중"
+                    : "추가"}
+                </button>
+              </div>
+
+              {episodeRulesLoading ? (
+                <p
+                  className="text-[11px]"
+                  style={{
+                    color: theme.muted,
+                  }}
+                >
+                  불러오는 중...
+                </p>
+              ) : episodeRules.length > 0 ? (
+                <div className="space-y-1.5">
+                  {episodeRules.map((rule) => (
+                    <div
+                      key={rule.id ?? rule.rule}
+                      className="flex items-center justify-between gap-2 rounded-lg px-3 py-2"
+                      style={{
+                        backgroundColor:
+                          theme.divider,
+                      }}
+                    >
+                      <span
+                        className="min-w-0 flex-1 truncate text-xs"
+                        style={{
+                          color: theme.text,
+                        }}
+                      >
+                        {rule.rule}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (rule.id) {
+                            void deleteEpisodeRule(
+                              rule.id
+                            );
+                          }
+                        }}
+                        className="shrink-0 text-[11px] hover:opacity-60"
+                        style={{
+                          color: theme.muted,
+                        }}
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p
+                  className="text-[11px]"
+                  style={{
+                    color: theme.muted,
+                  }}
+                >
+                  등록된 공통 회차 규칙이 없습니다.
+                </p>
+              )}
+
+              {episodeRuleError && (
+                <p className="mt-2 text-[11px] text-red-500">
+                  {episodeRuleError}
+                </p>
+              )}
+            </div>
           </div>
         )}
         <div className="flex flex-col items-end gap-1">
@@ -3659,6 +4015,7 @@ export default function DriveBrowser() {
                 "0 3px 10px rgba(0,0,0,0.16)",
             }}
           >
+      
             <ChevronUp className="h-4 w-4" />
           </button>
 
@@ -3712,3 +4069,4 @@ export default function DriveBrowser() {
     </main>
   );
 }
+
