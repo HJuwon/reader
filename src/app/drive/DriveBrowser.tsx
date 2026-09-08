@@ -1,6 +1,10 @@
 "use client";
 
-import { parseNovel, type ParsedNovel } from "@/lib/parser";
+import {
+  parseNovel,
+  type EpisodeRule,
+  type ParsedNovel,
+} from "@/lib/parser";
 import { getLines } from "@/lib/parser/normalize";
 import {
   useEffect,
