@@ -103,9 +103,7 @@ function ProgressRing({
 }
 
 function getTitleEpisodeCount(title: string): number {
-  const matches = [
-    ...title.matchAll(/(\d+)\s*[-~]\s*(\d+)/g),
-  ];
+  const matches = [...title.matchAll(/(\d+)\s*[-~]\s*(\d+)/g)];
 
   if (matches.length === 0) {
     return 0;
@@ -286,6 +284,20 @@ export default function Home() {
     sortOption,
     managementFilter,
   ]);
+
+  // 현재 페이지가 필터 결과의 마지막 페이지보다 커진 경우에만 보정
+  useEffect(() => {
+    setCurrentPage((page) => {
+      const safeTotalPages = Math.max(
+        1,
+        totalPages
+      );
+
+      return page > safeTotalPages
+        ? safeTotalPages
+        : page;
+    });
+  }, [totalPages]);
 
   // 페이지 전체 스크롤에 따른 맨 위로 버튼
   useEffect(() => {
@@ -613,8 +625,6 @@ export default function Home() {
         );
       }
 
-      await loadBooks();
-
       window.location.href =
         getReaderUrl(book);
     } catch (error) {
@@ -709,7 +719,6 @@ export default function Home() {
       );
 
       setOpenMenuId(null);
-      setCurrentPage(1);
     } catch (error) {
       setError(
         error instanceof Error
@@ -987,7 +996,6 @@ export default function Home() {
             </button>
           ))}
 
-
           {/* 관리함 */}
           <div ref={managementMenuRef} className="relative shrink-0">
             <button
@@ -1003,7 +1011,6 @@ export default function Home() {
             </button>
             {managementMenuOpen && (
               <div className="absolute right-0 top-10 z-40 w-36 rounded-xl border bg-white p-1 shadow-lg">
-
                 <button
                   type="button"
                   onClick={() => {
@@ -1300,7 +1307,6 @@ export default function Home() {
             )}
           </div>
 
-
           {/* 완결 / 미완 / 단편 / 중편 / 장편 / 초기화 - 필터 버튼을 눌러야 열림 */}
           {managementFilter === "none" && tagFilterOpen && (
             <div className="mt-3 flex items-center gap-1 overflow-x-auto sm:mt-4 sm:gap-2">
@@ -1338,7 +1344,6 @@ export default function Home() {
               </button>
             </div>
           )}
-
 
           {/* 소설 목록 - 가로형 카드 리스트 */}
           {loading ? (
