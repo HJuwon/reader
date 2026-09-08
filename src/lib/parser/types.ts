@@ -1,3 +1,8 @@
+export type EpisodeRule = {
+  id?: string;
+  rule: string;
+};
+
 export type EpisodeCandidate = {
   lineIndex: number;
   number?: number;
