@@ -1,4 +1,6 @@
 import { EpisodeCandidate } from "./types";
+import type { EpisodeRule } from "./types";
+
 
 type Pattern = {
   name: string;
@@ -106,8 +108,10 @@ const patterns: Pattern[] = [
     getTitle: (m) => m[2]?.trim() || "",
   },
 ];
-
-export function detectCandidates(lines: string[]): EpisodeCandidate[] {
+export function detectCandidates(
+  lines: string[],
+  customRules: EpisodeRule[] = []
+): EpisodeCandidate[] {
   const candidates: EpisodeCandidate[] = [];
 
   lines.forEach((line, lineIndex) => {
