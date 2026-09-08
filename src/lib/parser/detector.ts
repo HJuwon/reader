@@ -175,8 +175,13 @@ function buildCustomRulePattern(
   const suffixPattern =
     escapeRegExp(suffix);
 
+  // suffix(예: "화", ".") 뒤에는 구분자(-, ., :, · 등)가 있을 수도 있고
+  // 없이 공백만 두고 바로 제목이 이어질 수도 있다.
+  // (예: "#001. 첫 번째 화 제목" → suffix "." 를 이미 소비했으므로
+  //  그 뒤에는 별도 구분자 없이 공백 + 제목만 온다.)
+  // 따라서 구분자 자체를 옵셔널로 두고, 제목 캡처 그룹은 항상 존재하게 한다.
   return new RegExp(
-    `^\\s*${prefixPattern}\\s*(\\d{1,6})\\s*${suffixPattern}(?:\\s*[-.:·]\\s*(.*?))?\\s*$`,
+    `^\\s*${prefixPattern}\\s*(\\d{1,6})\\s*${suffixPattern}\\s*(?:[-.:·]\\s*)?(.*?)\\s*$`,
     "i"
   );
 }
