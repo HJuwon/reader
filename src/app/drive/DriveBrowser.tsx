@@ -521,134 +521,160 @@ export default function DriveBrowser() {
     }
   }
 
-  async function addEpisodeRule() {
-    const rule =
-      episodeRuleInput.trim();
+async function addEpisodeRule() {
+		const rule =
+			episodeRuleInput.trim();
 
-    if (!rule) {
-      return;
-    }
+		if (!rule) {
+			return;
+		}
 
-    if (!rule.includes("xxx")) {
-      setEpisodeRuleError(
-        "규칙에는 xxx가 포함되어야 합니다."
-      );
-      return;
-    }
+		if (!rule.includes("xxx")) {
+			setEpisodeRuleError(
+				"규칙에는 xxx가 포함되어야 합니다."
+			);
+			return;
+		}
 
-    setEpisodeRuleSaving(true);
-    setEpisodeRuleError("");
+		setEpisodeRuleSaving(true);
+		setEpisodeRuleError("");
 
-    try {
-      const response = await fetch(
-        "/api/episode-rules",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            rule,
-          }),
-        }
-      );
+		try {
+			const response = await fetch(
+				"/api/episode-rules",
+				{
+					method: "POST",
+					headers: {
+						"Content-Type":
+							"application/json",
+					},
+					body: JSON.stringify({
+						rule,
+					}),
+				}
+			);
 
-      const data = await response.json();
+			const data = await response.json();
 
-      if (!response.ok) {
-        throw new Error(
-          extractErrorMessage(
-            data,
-            "회차 규칙을 추가하지 못했습니다."
-          )
-        );
-      }
+			if (!response.ok) {
+				throw new Error(
+					extractErrorMessage(
+						data,
+						"회차 규칙을 추가하지 못했습니다."
+					)
+				);
+			}
 
-      if (data?.data) {
-        setEpisodeRules((current) => {
-          const exists = current.some(
-            (item) =>
-              item.id === data.data.id
-          );
+			if (data?.data) {
+				setEpisodeRules((current) => {
+					const exists = current.some(
+						(item) =>
+							item.id === data.data.id
+					);
 
-          if (exists) {
-            return current;
-          }
+					if (exists) {
+						return current;
+					}
 
-          return [
-            ...current,
-            data.data,
-          ];
-        });
-      }
+					return [
+						...current,
+						data.data,
+					];
+				});
 
-      setEpisodeRuleInput("");
-    } catch (error) {
-      console.error(
-        "회차 규칙 추가 실패:",
-        error
-      );
+				// 현재 열려 있는 작품에도
+				// 방금 추가한 규칙을 즉시 적용
+				if (fileData?.content) {
+					setParsedNovel(
+						parseNovel(
+							fileData.content,
+							[
+								...episodeRules,
+								data.data,
+							]
+						)
+					);
+				}
+			}
 
-      setEpisodeRuleError(
-        error instanceof Error
-          ? error.message
-          : "회차 규칙을 추가하지 못했습니다."
-      );
-    } finally {
-      setEpisodeRuleSaving(false);
-    }
-  }
+			setEpisodeRuleInput("");
+		} catch (error) {
+			console.error(
+				"회차 규칙 추가 실패:",
+				error
+			);
 
-  async function deleteEpisodeRule(
-    id: string
-  ) {
-    setEpisodeRuleError("");
+			setEpisodeRuleError(
+				error instanceof Error
+					? error.message
+					: "회차 규칙을 추가하지 못했습니다."
+			);
+		} finally {
+			setEpisodeRuleSaving(false);
+		}
+	}
 
-    try {
-      const response = await fetch(
-        "/api/episode-rules",
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-          body: JSON.stringify({
-            id,
-          }),
-        }
-      );
+async function deleteEpisodeRule(
+		id: string
+	) {
+		setEpisodeRuleError("");
 
-      const data = await response.json();
+		try {
+			const response = await fetch(
+				"/api/episode-rules",
+				{
+					method: "DELETE",
+					headers: {
+						"Content-Type":
+							"application/json",
+					},
+					body: JSON.stringify({
+						id,
+					}),
+				}
+			);
 
-      if (!response.ok) {
-        throw new Error(
-          extractErrorMessage(
-            data,
-            "회차 규칙을 삭제하지 못했습니다."
-          )
-        );
-      }
+			const data = await response.json();
 
-      setEpisodeRules((current) =>
-        current.filter(
-          (item) => item.id !== id
-        )
-      );
-    } catch (error) {
-      console.error(
-        "회차 규칙 삭제 실패:",
-        error
-      );
+			if (!response.ok) {
+				throw new Error(
+					extractErrorMessage(
+						data,
+						"회차 규칙을 삭제하지 못했습니다."
+					)
+				);
+			}
 
-      setEpisodeRuleError(
-        error instanceof Error
-          ? error.message
-          : "회차 규칙을 삭제하지 못했습니다."
-      );
-    }
-  }
+			const nextRules =
+				episodeRules.filter(
+					(item) => item.id !== id
+				);
+
+			setEpisodeRules(nextRules);
+
+			// 현재 열려 있는 작품에도
+			// 삭제된 규칙을 즉시 반영
+			if (fileData?.content) {
+				setParsedNovel(
+					parseNovel(
+						fileData.content,
+						nextRules
+					)
+				);
+			}
+		} catch (error) {
+			console.error(
+				"회차 규칙 삭제 실패:",
+				error
+			);
+
+			setEpisodeRuleError(
+				error instanceof Error
+					? error.message
+					: "회차 규칙을 삭제하지 못했습니다."
+			);
+		}
+	}
 
   async function initializeReadingState(
     fileId: string,
