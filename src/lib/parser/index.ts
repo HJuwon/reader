@@ -1,30 +1,65 @@
 import { detectCandidates } from "./detector";
 import { buildEpisodes } from "./episode";
-import { normalizeText, getLines } from "./normalize";
-import { scoreCandidates, selectCandidates } from "./scorer";
-import { ParsedNovel } from "./types";
+import {
+  normalizeText,
+  getLines,
+} from "./normalize";
+import {
+  scoreCandidates,
+  selectCandidates,
+} from "./scorer";
 
-export function parseNovel(text: string): ParsedNovel {
-  const normalized = normalizeText(text);
-  const lines = getLines(normalized);
+import type {
+  Episode,
+  EpisodeCandidate,
+  EpisodeRule,
+  ParsedNovel,
+} from "./types";
 
-  const detected = detectCandidates(lines);
+export function parseNovel(
+  text: string,
+  customRules: EpisodeRule[] = []
+): ParsedNovel {
+  const normalized =
+    normalizeText(text);
 
-  const scored = scoreCandidates(detected, lines);
+  const lines =
+    getLines(normalized);
 
-  const selected = selectCandidates(scored);
+  const detected =
+    detectCandidates(
+      lines,
+      customRules
+    );
 
-  const { episodes, preface } = buildEpisodes(lines, selected);
+  const scored =
+    scoreCandidates(
+      detected,
+      lines
+    );
+
+  const selected =
+    selectCandidates(scored);
+
+  const {
+    episodes,
+    preface,
+  } = buildEpisodes(
+    lines,
+    selected
+  );
 
   return {
     episodes,
     preface,
-    totalEpisodes: episodes.length,
+    totalEpisodes:
+      episodes.length,
   };
 }
 
 export type {
   Episode,
   EpisodeCandidate,
+  EpisodeRule,
   ParsedNovel,
 } from "./types";
