@@ -23,6 +23,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	ChevronUp,
+	ListOrdered,
 	Loader2,
 	Pencil,
 	Search,
@@ -254,6 +255,10 @@ export default function DriveBrowser() {
 
 	// 등록된 회차 규칙 관리 화면
 	const [episodeRuleManagerOpen, setEpisodeRuleManagerOpen] =
+		useState(false);
+
+	// 회차 수정 패널 (설정 팝업에서 분리된 별도 패널)
+	const [episodeEditPanelOpen, setEpisodeEditPanelOpen] =
 		useState(false);
 
 	const [episodeRuleSearch, setEpisodeRuleSearch] =
@@ -504,6 +509,32 @@ export default function DriveBrowser() {
 			);
 		};
 	}, [episodeRuleManagerOpen]);
+
+	// 회차 수정 패널이 열려 있을 때
+	// ESC로 닫을 수 있도록 처리
+	useEffect(() => {
+		if (!episodeEditPanelOpen) {
+			return;
+		}
+
+		function handleKeyDown(event: KeyboardEvent) {
+			if (event.key === "Escape") {
+				setEpisodeEditPanelOpen(false);
+			}
+		}
+
+		window.addEventListener(
+			"keydown",
+			handleKeyDown
+		);
+
+		return () => {
+			window.removeEventListener(
+				"keydown",
+				handleKeyDown
+			);
+		};
+	}, [episodeEditPanelOpen]);
 
 	// 규칙을 적용하여 다시 파싱하면서
 	// 현재 보고 있던 회차를 최대한 유지한다.
@@ -3990,23 +4021,45 @@ export default function DriveBrowser() {
 						</div>
 
 						{!editingContent && (
-							<button
-								type="button"
-								onClick={
-									startEditingContent
-								}
-								className="mb-4 flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm transition hover:opacity-80"
-								style={{
-									color:
-										theme.title,
-									border: `1px solid ${theme.divider}`,
-									backgroundColor:
-										theme.bg,
-								}}
-							>
-								<Pencil className="h-4 w-4" />
-								본문 수정
-							</button>
+							<div className="mb-4 grid grid-cols-2 gap-2">
+								<button
+									type="button"
+									onClick={() =>
+										setEpisodeEditPanelOpen(
+											true
+										)
+									}
+									className="flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm transition hover:opacity-80"
+									style={{
+										color:
+											theme.title,
+										border: `1px solid ${theme.divider}`,
+										backgroundColor:
+											theme.bg,
+									}}
+								>
+									<ListOrdered className="h-4 w-4" />
+									회차 수정
+								</button>
+
+								<button
+									type="button"
+									onClick={
+										startEditingContent
+									}
+									className="flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm transition hover:opacity-80"
+									style={{
+										color:
+											theme.title,
+										border: `1px solid ${theme.divider}`,
+										backgroundColor:
+											theme.bg,
+									}}
+								>
+									<Pencil className="h-4 w-4" />
+									본문 수정
+								</button>
+							</div>
 						)}
 
 						<p
@@ -4167,54 +4220,83 @@ export default function DriveBrowser() {
 								}
 							)}
 						</div>
+					</div>
+				)}
+
+				{/* =====================================================
+				    회차 수정 패널 (설정 팝업에서 분리)
+				    ===================================================== */}
+				{episodeEditPanelOpen && (
+					<div
+						className="fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-6"
+						role="dialog"
+						aria-modal="true"
+						aria-label="회차 수정"
+					>
+						<button
+							type="button"
+							aria-label="회차 수정 닫기"
+							onClick={() =>
+								setEpisodeEditPanelOpen(
+									false
+								)
+							}
+							className="absolute inset-0"
+							style={{
+								backgroundColor:
+									"rgba(0,0,0,0.35)",
+							}}
+						/>
 
 						<div
-							className="mt-6 border-t pt-5"
+							className="relative flex w-full max-w-md flex-col overflow-hidden rounded-t-2xl p-5 sm:rounded-2xl"
 							style={{
-								borderColor:
-									theme.divider,
+								backgroundColor:
+									theme.bg,
+								color:
+									theme.title,
+								boxShadow:
+									"0 8px 40px rgba(0,0,0,0.22)",
 							}}
 						>
-							<div className="mb-3 flex items-center justify-between">
-								<div>
-									<p
-										className="text-xs font-semibold"
-										style={{
-											color:
-												theme.text,
-										}}
-									>
-										회차 설정
-									</p>
+							<div className="mb-4 flex items-center justify-between">
+								<p
+									className="text-sm font-semibold"
+									style={{
+										color:
+											theme.title,
+									}}
+								>
+									회차 수정
+								</p>
 
-									<p
-										className="mt-1 text-[10px]"
-										style={{
-											color:
-												theme.muted,
-										}}
-									>
-										작품 전체에 공통으로 적용됩니다.
-									</p>
-								</div>
-
-								{episodeRules.length >
-									0 && (
-									<span
-										className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-										style={{
-											color:
-												theme.accent,
-											backgroundColor:
-												`${theme.accent}14`,
-										}}
-									>
-										{
-											episodeRules.length
-										}
-									</span>
-								)}
+								<button
+									type="button"
+									onClick={() =>
+										setEpisodeEditPanelOpen(
+											false
+										)
+									}
+									aria-label="닫기"
+									className="flex h-8 w-8 items-center justify-center rounded-full hover:opacity-70"
+									style={{
+										color:
+											theme.muted,
+									}}
+								>
+									<X className="h-4 w-4" />
+								</button>
 							</div>
+
+							<p
+								className="mb-2 text-xs font-semibold"
+								style={{
+									color:
+										theme.text,
+								}}
+							>
+								회차 규칙 추가
+							</p>
 
 							<p
 								className="mb-3 text-[11px] leading-5"
@@ -4294,7 +4376,7 @@ export default function DriveBrowser() {
 							</div>
 
 							{episodeRuleError && (
-								<p className="mb-3 text-[11px] text-red-500">
+								<p className="mb-4 text-[11px] text-red-500">
 									{
 										episodeRuleError
 									}
@@ -4325,7 +4407,7 @@ export default function DriveBrowser() {
 												theme.title,
 										}}
 									>
-										등록된 규칙 관리
+										등록된 회차 규칙 관리
 									</p>
 
 									<p
@@ -4637,7 +4719,7 @@ export default function DriveBrowser() {
 												theme.muted,
 										}}
 									>
-										회차 설정에서 새로운 규칙을
+										회차 수정에서 새로운 규칙을
 										등록하세요.
 									</p>
 								</div>
