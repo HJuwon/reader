@@ -16,7 +16,6 @@ import type {
 } from "@/lib/parser";
 
 import {
-	useEffect,
 	useRef,
 	useState,
 } from "react";
@@ -31,7 +30,9 @@ import { useEpisodeNavigation } from "./hooks/useEpisodeNavigation";
 import { useFileClose } from "./hooks/useFileClose";
 import { useReaderChrome } from "./hooks/useReaderChrome";
 import { useEpisodeList } from "./hooks/useEpisodeList";
+import { useEpisodePanel } from "./hooks/useEpisodePanel";
 import { useFileOpen } from "./hooks/useFileOpen";
+import { useHighlightRenderer } from "./hooks/useHighlightRenderer";
 
 import {
 	MAX_FONT_SIZE,
@@ -40,9 +41,6 @@ import {
 	useReaderSettings,
 	type ThemeKey,
 } from "./hooks/useReaderSettings";
-
-
-import type { ReactNode } from "react";
 
 import {
 	ArrowLeft,
@@ -103,15 +101,6 @@ export default function DriveBrowser() {
 	const [selectedEpisodeIndex, setSelectedEpisodeIndex] =
 		useState(0);
 
-	const [episodeRuleManagerOpen, setEpisodeRuleManagerOpen] =
-		useState(false);
-
-	const [episodeEditPanelOpen, setEpisodeEditPanelOpen] =
-		useState(false);
-
-	const [bodySearchOpen, setBodySearchOpen] =
-		useState(false);
-
 	const contentRef =
 		useRef<HTMLDivElement | null>(null);
 
@@ -119,6 +108,8 @@ export default function DriveBrowser() {
 		parsedNovel?.episodes[
 			selectedEpisodeIndex
 		];
+
+
 	const {
 		themeKey,
 		setThemeKey,
@@ -129,11 +120,13 @@ export default function DriveBrowser() {
 		theme,
 	} = useReaderSettings();
 
+
 	const {
 		chromeVisible,
 		setChromeVisible,
 		handleContentTap,
 	} = useReaderChrome();
+
 
 	const {
 		episodeSearch,
@@ -148,26 +141,36 @@ export default function DriveBrowser() {
 		selectedEpisodeIndex,
 	});
 
+
+	const {
+		episodeRuleManagerOpen,
+		setEpisodeRuleManagerOpen,
+		episodeEditPanelOpen,
+		setEpisodeEditPanelOpen,
+	} = useEpisodePanel();
+
+
 	/*
 	 * 읽기 진행도
 	 */
 	const {
-	bookId,
-	roundId,
-	roundStatus,
-	progressSaving,
-	initializeReadingState,
-	saveProgress,
-	saveScrollPosition,
-	scrollPositionRef,
-	restoreScrollPositionRef,
-	skipScrollRestoreRef,
+		bookId,
+		roundId,
+		roundStatus,
+		progressSaving,
+		initializeReadingState,
+		saveProgress,
+		saveScrollPosition,
+		scrollPositionRef,
+		restoreScrollPositionRef,
+		skipScrollRestoreRef,
 	} = useReadingProgress({
-	selectedFile,
-	parsedNovel,
-	selectedEpisode,
-	selectedEpisodeIndex,
+		selectedFile,
+		parsedNovel,
+		selectedEpisode,
+		selectedEpisodeIndex,
 	});
+
 
 	/*
 	 * 회차 규칙
@@ -197,6 +200,7 @@ export default function DriveBrowser() {
 		setSelectedEpisodeIndex,
 	});
 
+
 	const {
 		editingContent,
 		editedText,
@@ -215,12 +219,15 @@ export default function DriveBrowser() {
 		setParsedNovel,
 	});
 
+
 	/*
 	 * 본문 검색
 	 */
 	const {
 		bodySearch,
 		setBodySearch,
+		bodySearchOpen,
+		setBodySearchOpen,
 		bodySearchIndex,
 		setBodySearchIndex,
 		bodySearchMatches,
@@ -249,6 +256,7 @@ export default function DriveBrowser() {
 			selectedEpisode?.episode ?? null,
 	});
 
+
 	const {
 		changeEpisode,
 		goToPrevEpisode,
@@ -270,6 +278,7 @@ export default function DriveBrowser() {
 		restoreScrollPositionRef,
 	});
 
+
 	const {
 		closeFile,
 	} = useFileClose({
@@ -280,6 +289,7 @@ export default function DriveBrowser() {
 		roundStatus,
 		saveScrollPosition,
 	});
+
 
 	/*
 	 * 하이라이트
@@ -294,6 +304,7 @@ export default function DriveBrowser() {
 		episode:
 			selectedEpisode?.episode ?? null,
 	});
+
 
 	const {
 		selectedTextForHighlight,
@@ -314,68 +325,18 @@ export default function DriveBrowser() {
 		scrollPositionRef,
 	});
 
-	/*
-	 * 회차 규칙 관리 ESC
-	 */
-	useEffect(() => {
-		if (!episodeRuleManagerOpen) {
-			return;
-		}
-
-		function handleKeyDown(
-			event: KeyboardEvent
-		) {
-			if (event.key === "Escape") {
-				setEpisodeRuleManagerOpen(false);
-			}
-		}
-
-		window.addEventListener(
-			"keydown",
-			handleKeyDown
-		);
-
-		return () => {
-			window.removeEventListener(
-				"keydown",
-				handleKeyDown
-			);
-		};
-	}, [
-		episodeRuleManagerOpen,
-	]);
-
 
 	/*
-	 * 회차 수정 패널 ESC
+	 * 하이라이트 렌더링
 	 */
-	useEffect(() => {
-		if (!episodeEditPanelOpen) {
-			return;
-		}
+	const {
+		highlightedContent,
+	} = useHighlightRenderer({
+		content:
+			selectedEpisode?.content ?? "",
+		highlights,
+	});
 
-		function handleKeyDown(
-			event: KeyboardEvent
-		) {
-			if (event.key === "Escape") {
-				setEpisodeEditPanelOpen(false);
-			}
-		}
-
-		window.addEventListener(
-			"keydown",
-			handleKeyDown
-		);
-
-		return () => {
-			window.removeEventListener(
-				"keydown",
-				handleKeyDown
-			);
-		};
-	}, [
-		episodeEditPanelOpen,
-	]);
 
 	useFileOpen({
 		fileId:
@@ -1390,152 +1351,7 @@ export default function DriveBrowser() {
 																	"text",
 															}}
 														>
-															{(() => {
-																const content =
-																	selectedEpisode.content;
-
-																if (
-																	highlights.length ===
-																	0
-																) {
-																	return content;
-																}
-
-																const validHighlights =
-																	highlights
-																		.filter(
-																			(
-																				highlight
-																			) =>
-																				typeof highlight.start_offset ===
-																					"number" &&
-																				typeof highlight.end_offset ===
-																					"number" &&
-																				highlight.end_offset >
-																					highlight.start_offset
-																		)
-																		.map(
-																			(
-																				highlight
-																			) => ({
-																				...highlight,
-																				start_offset:
-																					highlight.start_offset as number,
-																				end_offset:
-																					highlight.end_offset as number,
-																			})
-																		)
-																		.filter(
-																			(
-																				highlight
-																			) =>
-																				highlight.start_offset >=
-																					0 &&
-																				highlight.end_offset <=
-																					content.length
-																		)
-																		.sort(
-																			(
-																				a,
-																				b
-																			) =>
-																				a.start_offset -
-																				b.start_offset
-																		);
-
-																if (
-																	validHighlights.length ===
-																	0
-																) {
-																	return content;
-																}
-
-																const parts: ReactNode[] =
-																	[];
-
-																let currentPosition =
-																	0;
-
-																validHighlights.forEach(
-																	(
-																		highlight,
-																		index
-																	) => {
-																		const start =
-																			highlight.start_offset;
-
-																		const end =
-																			highlight.end_offset;
-
-																		if (
-																			start >
-																			currentPosition
-																		) {
-																			parts.push(
-																				<span
-																					key={`text-${index}`}
-																				>
-																					{content.slice(
-																						currentPosition,
-																						start
-																					)}
-																				</span>
-																			);
-																		}
-
-																		if (
-																			end >
-																			currentPosition
-																		) {
-																			const actualStart =
-																				Math.max(
-																					start,
-																					currentPosition
-																				);
-
-																			parts.push(
-																				<span
-																					key={`highlight-${highlight.id}`}
-																					data-highlight-id={
-																						highlight.id
-																					}
-																					style={{
-																						backgroundColor:
-																							"rgba(255, 225, 120, 0.5)",
-																						borderRadius:
-																							"2px",
-																					}}
-																				>
-																					{content.slice(
-																						actualStart,
-																						end
-																					)}
-																				</span>
-																			);
-
-																			currentPosition =
-																				end;
-																		}
-																	}
-																);
-
-																if (
-																	currentPosition <
-																	content.length
-																) {
-																	parts.push(
-																		<span
-																			key="text-last"
-																		>
-																			{content.slice(
-																				currentPosition
-																			)}
-																		</span>
-																	);
-																}
-
-																return parts;
-															})()}
+															{highlightedContent}
 														</div>
 													</div>
 												)}

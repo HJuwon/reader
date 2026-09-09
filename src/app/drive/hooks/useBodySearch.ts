@@ -18,11 +18,14 @@ export function useBodySearch({
 	selectedEpisodeContent,
 	selectedEpisodeIndex,
 }: UseBodySearchParams) {
-	const [bodySearch, setBodySearch] =
-		useState("");
+    const [bodySearch, setBodySearch] =
+        useState("");
 
-	const [bodySearchIndex, setBodySearchIndex] =
-		useState(0);
+    const [bodySearchOpen, setBodySearchOpen] =
+        useState(false);
+
+    const [bodySearchIndex, setBodySearchIndex] =
+        useState(0);
 
 	const bodySearchMatches =
 		useMemo(() => {
@@ -202,12 +205,16 @@ export function useBodySearch({
 			]
 		);
 
-	return {
-		bodySearch,
-		setBodySearch,
-		bodySearchIndex,
-		setBodySearchIndex,
-		bodySearchMatches,
-		scrollToBodySearchMatch,
-	};
+    return {
+        bodySearch,
+        setBodySearch,
+
+        bodySearchOpen,
+        setBodySearchOpen,
+
+        bodySearchIndex,
+        setBodySearchIndex,
+        bodySearchMatches,
+        scrollToBodySearchMatch,
+    };
 }
