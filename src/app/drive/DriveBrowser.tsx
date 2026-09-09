@@ -6,15 +6,9 @@ import {
   type HighlightItem,
 } from "./hooks/useHighlights";
 import { useBookmark } from "./hooks/useBookmark";
-import {
-  initializeReadingState,
-  saveReadingProgress,
-  type ReadingState,
-} from "./utils/readingProgress";
 
 import {
 	parseNovel,
-	type EpisodeRule,
 	type ParsedNovel,
 } from "@/lib/parser";
 import { getLines } from "@/lib/parser/normalize";
@@ -23,8 +17,11 @@ import {
 	useRef,
 	useState,
 } from "react";
-
 import { useSearchParams } from "next/navigation";
+import { useReadingProgress } from "./hooks/useReadingProgress";
+import { useEpisodeRules } from "./hooks/useEpisodeRules";
+import { useBodySearch } from "./hooks/useBodySearch";
+
 
 import type { ReactNode } from "react";
 import {
@@ -164,21 +161,6 @@ export default function DriveBrowser() {
 	const [selectedEpisodeIndex, setSelectedEpisodeIndex] =
 		useState(0);
 
-	const [progressSaving, setProgressSaving] =
-		useState(false);
-
-	const [bookId, setBookId] =
-		useState<string | null>(null);
-
-	const [roundId, setRoundId] =
-		useState<string | null>(null);
-
-	const [roundStatus, setRoundStatus] =
-		useState<"reading" | "completed">(
-			"reading"
-		);
-
-
 	const [themeKey, setThemeKey] =
 		useState<ThemeKey>("ivory");
 
@@ -197,21 +179,6 @@ export default function DriveBrowser() {
 	const [episodeListOpen, setEpisodeListOpen] =
 		useState(false);
 
-	const [episodeRules, setEpisodeRules] =
-		useState<EpisodeRule[]>([]);
-
-	const [episodeRuleInput, setEpisodeRuleInput] =
-		useState("");
-
-	const [episodeRulesLoading, setEpisodeRulesLoading] =
-		useState(false);
-
-	const [episodeRuleSaving, setEpisodeRuleSaving] =
-		useState(false);
-
-	const [episodeRuleError, setEpisodeRuleError] =
-		useState("");
-
 	// 등록된 회차 규칙 관리 화면
 	const [episodeRuleManagerOpen, setEpisodeRuleManagerOpen] =
 		useState(false);
@@ -219,15 +186,6 @@ export default function DriveBrowser() {
 	// 회차 수정 패널 (설정 팝업에서 분리된 별도 패널)
 	const [episodeEditPanelOpen, setEpisodeEditPanelOpen] =
 		useState(false);
-
-	const [episodeRuleSearch, setEpisodeRuleSearch] =
-		useState("");
-
-	const [bodySearch, setBodySearch] =
-		useState("");
-
-	const [bodySearchIndex, setBodySearchIndex] =
-		useState(0);
 
 	const [bodySearchOpen, setBodySearchOpen] =
 		useState(false);
@@ -257,20 +215,6 @@ export default function DriveBrowser() {
 	const [editError, setEditError] =
 		useState("");
 
-	const scrollPositionRef =
-		useRef(0);
-
-	const scrollSaveTimerRef =
-		useRef<ReturnType<typeof setTimeout> | null>(
-			null
-		);
-
-	const restoreScrollPositionRef =
-		useRef(0);
-
-	const skipScrollRestoreRef =
-		useRef(false);
-
 	const contentRef =
 		useRef<HTMLDivElement | null>(null);
 
@@ -283,6 +227,43 @@ export default function DriveBrowser() {
 		parsedNovel?.episodes[
 			selectedEpisodeIndex
 		];
+	const {
+	episodeRules,
+	setEpisodeRules,
+	episodeRuleInput,
+	setEpisodeRuleInput,
+	episodeRulesLoading,
+	episodeRuleSaving,
+	episodeRuleError,
+	episodeRuleSearch,
+	setEpisodeRuleSearch,
+	filteredEpisodeRules,
+	loadEpisodeRules,
+	addEpisodeRule,
+	deleteEpisodeRule,
+	reparseWithRules,
+	} = useEpisodeRules({
+	fileContent,
+	selectedEpisodeStartLine:
+		selectedEpisode?.startLine,
+	selectedEpisodeIndex,
+	setParsedNovel,
+	setSelectedEpisodeIndex,
+	});
+
+	const {
+		bodySearch,
+		setBodySearch,
+		bodySearchIndex,
+		setBodySearchIndex,
+		bodySearchMatches,
+		scrollToBodySearchMatch,
+	} = useBodySearch({
+		contentRef,
+		selectedEpisodeContent:
+			selectedEpisode?.content,
+		selectedEpisodeIndex,
+	});
 
 	const {
 		bookmarked,
@@ -296,6 +277,8 @@ export default function DriveBrowser() {
 		episode:
 			selectedEpisode?.episode ?? null,
 	});
+
+
 	const {
 		highlights,
 		highlightLoading,
@@ -327,20 +310,6 @@ export default function DriveBrowser() {
 				);
 			}
 		) || [];
-
-	const filteredEpisodeRules =
-		episodeRules.filter((rule) => {
-			const keyword =
-				episodeRuleSearch.trim().toLowerCase();
-
-			if (!keyword) {
-				return true;
-			}
-
-			return rule.rule
-				.toLowerCase()
-				.includes(keyword);
-		});
 
 	useEffect(() => {
 		try {
@@ -404,19 +373,12 @@ export default function DriveBrowser() {
 	]);
 
 	useEffect(() => {
-		setBodySearchIndex(0);
-	}, [
-		bodySearch,
-		selectedEpisodeIndex,
-	]);
-
-	useEffect(() => {
 		if (!settingsOpen) {
 			return;
 		}
 
 		void loadEpisodeRules();
-	}, [settingsOpen]);
+	}, [settingsOpen, loadEpisodeRules]);
 
 	useEffect(() => {
 		setShowHighlightButton(false);
@@ -520,62 +482,7 @@ export default function DriveBrowser() {
 
 	// 규칙을 적용하여 다시 파싱하면서
 	// 현재 보고 있던 회차를 최대한 유지한다.
-	function reparseWithRules(
-		rules: EpisodeRule[]
-	) {
-		if (!fileContent) {
-			return;
-		}
-
-		const currentStartLine =
-			selectedEpisode?.startLine;
-
-		const nextParsed =
-			parseNovel(
-				fileContent,
-				rules
-			);
-
-		setParsedNovel(
-			nextParsed
-		);
-
-		if (
-			typeof currentStartLine ===
-			"number"
-		) {
-			const nextIndex =
-				nextParsed.episodes.findIndex(
-					(episode) =>
-						episode.startLine ===
-						currentStartLine
-				);
-
-			if (nextIndex >= 0) {
-				setSelectedEpisodeIndex(
-					nextIndex
-				);
-
-				return;
-			}
-		}
-
-		// 현재 회차를 찾지 못한 경우
-		// 가능한 범위 안에서 기존 index 유지
-		const safeIndex =
-			Math.min(
-				selectedEpisodeIndex,
-				Math.max(
-					0,
-					nextParsed.episodes.length - 1
-				)
-			);
-
-		setSelectedEpisodeIndex(
-			safeIndex
-		);
-	}
-
+	
 	function extractErrorMessage(
 		data: any,
 		fallback: string
@@ -604,288 +511,6 @@ export default function DriveBrowser() {
 		}
 
 		return fallback;
-	}
-
-	async function loadEpisodeRules() {
-		setEpisodeRulesLoading(true);
-		setEpisodeRuleError("");
-
-		try {
-			const response = await fetch(
-				"/api/episode-rules"
-			);
-
-			const data =
-				await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					extractErrorMessage(
-						data,
-						"회차 규칙을 불러오지 못했습니다."
-					)
-				);
-			}
-
-			setEpisodeRules(
-				Array.isArray(data?.data)
-					? data.data
-					: []
-			);
-		} catch (error) {
-			console.error(
-				"회차 규칙 불러오기 실패:",
-				error
-			);
-
-			setEpisodeRuleError(
-				error instanceof Error
-					? error.message
-					: "회차 규칙을 불러오지 못했습니다."
-			);
-		} finally {
-			setEpisodeRulesLoading(false);
-		}
-	}
-
-	async function addEpisodeRule() {
-		const rule =
-			episodeRuleInput.trim();
-
-		if (!rule) {
-			return;
-		}
-
-		if (!rule.includes("xxx")) {
-			setEpisodeRuleError(
-				"규칙에는 xxx가 포함되어야 합니다."
-			);
-			return;
-		}
-
-		setEpisodeRuleSaving(true);
-		setEpisodeRuleError("");
-
-		try {
-			const response = await fetch(
-				"/api/episode-rules",
-				{
-					method: "POST",
-					headers: {
-						"Content-Type":
-							"application/json",
-					},
-					body: JSON.stringify({
-						rule,
-					}),
-				}
-			);
-
-			const data =
-				await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					extractErrorMessage(
-						data,
-						"회차 규칙을 추가하지 못했습니다."
-					)
-				);
-			}
-
-			if (data?.data) {
-				const addedRule =
-					data.data as EpisodeRule;
-
-				const nextRules =
-					episodeRules.some(
-						(item) =>
-							item.id ===
-							addedRule.id
-					)
-						? episodeRules
-						: [
-								...episodeRules,
-								addedRule,
-							];
-
-				setEpisodeRules(
-					nextRules
-				);
-
-				// 현재 열려 있는 작품에도
-				// 방금 추가한 규칙을 즉시 적용
-				reparseWithRules(
-					nextRules
-				);
-			}
-
-			setEpisodeRuleInput("");
-		} catch (error) {
-			console.error(
-				"회차 규칙 추가 실패:",
-				error
-			);
-
-			setEpisodeRuleError(
-				error instanceof Error
-					? error.message
-					: "회차 규칙을 추가하지 못했습니다."
-			);
-		} finally {
-			setEpisodeRuleSaving(false);
-		}
-	}
-
-	async function deleteEpisodeRule(
-		id: string
-	) {
-		setEpisodeRuleError("");
-
-		try {
-			const response = await fetch(
-				"/api/episode-rules",
-				{
-					method: "DELETE",
-					headers: {
-						"Content-Type":
-							"application/json",
-					},
-					body: JSON.stringify({
-						id,
-					}),
-				}
-			);
-
-			const data =
-				await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					extractErrorMessage(
-						data,
-						"회차 규칙을 삭제하지 못했습니다."
-					)
-				);
-			}
-
-			const nextRules =
-				episodeRules.filter(
-					(item) =>
-						item.id !== id
-				);
-
-			setEpisodeRules(
-				nextRules
-			);
-
-			// 현재 열려 있는 작품에도
-			// 삭제된 규칙을 즉시 반영
-			reparseWithRules(
-				nextRules
-			);
-		} catch (error) {
-			console.error(
-				"회차 규칙 삭제 실패:",
-				error
-			);
-
-			setEpisodeRuleError(
-				error instanceof Error
-					? error.message
-					: "회차 규칙을 삭제하지 못했습니다."
-			);
-		}
-	}
-
-	async function initializeReadingState(
-		fileId: string,
-		title: string,
-		totalEpisodes: number
-	): Promise<ReadingState | null> {
-		try {
-			const response =
-				await fetch(
-					"/api/books",
-					{
-						method: "POST",
-						headers: {
-							"Content-Type":
-								"application/json",
-						},
-						body: JSON.stringify({
-							drive_file_id:
-								fileId,
-							title,
-							total_episodes:
-								totalEpisodes,
-						}),
-					}
-				);
-
-			const data =
-				await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					extractErrorMessage(
-						data,
-						"읽기 정보를 초기화하지 못했습니다."
-					)
-				);
-			}
-
-			const stateData =
-				data?.data;
-
-			const round =
-				stateData?.round ??
-				stateData?.current_round;
-
-			const state: ReadingState = {
-				book:
-					stateData?.book,
-				round,
-				progress:
-					stateData?.progress,
-			};
-
-			if (
-				!state.book ||
-				!state.round ||
-				!state.progress
-			) {
-				console.error(
-					"읽기 상태 응답:",
-					data
-				);
-
-				throw new Error(
-					"읽기 정보 응답 형식이 올바르지 않습니다."
-				);
-			}
-
-			setBookId(
-				state.book.id
-			);
-
-			setRoundId(
-				state.round.id
-			);
-
-			setRoundStatus(
-				state.round.status
-			);
-
-			return state;
-		} catch (error) {
-			console.error(
-				"읽기 정보 초기화 실패:",
-				error
-			);
-
-			throw error;
-		}
 	}
 
 	// 본문 수정 시작
@@ -1096,272 +721,6 @@ export default function DriveBrowser() {
 		highlights,
 	]);
 
-	useEffect(() => {
-		if (
-			!parsedNovel ||
-			!selectedEpisode
-		) {
-			return;
-		}
-
-		if (
-			skipScrollRestoreRef.current
-		) {
-			skipScrollRestoreRef.current =
-				false;
-			return;
-		}
-
-		const savedPosition =
-			restoreScrollPositionRef.current;
-
-		if (
-			!Number.isFinite(
-				savedPosition
-			) ||
-			savedPosition <= 0
-		) {
-			window.scrollTo({
-				top: 0,
-				behavior: "auto",
-			});
-
-			scrollPositionRef.current =
-				0;
-
-			return;
-		}
-
-		let cancelled = false;
-		let attempts = 0;
-
-		const restore = () => {
-			if (cancelled) {
-				return;
-			}
-
-			attempts += 1;
-
-			const maxScroll =
-				document.documentElement
-					.scrollHeight -
-				window.innerHeight;
-
-			if (
-				maxScroll <= 0 &&
-				attempts < 30
-			) {
-				window.setTimeout(
-					restore,
-					100
-				);
-
-				return;
-			}
-
-			const targetPosition =
-				Math.min(
-					savedPosition,
-					Math.max(
-						0,
-						document
-							.documentElement
-							.scrollHeight -
-							window.innerHeight
-					)
-				);
-
-			window.scrollTo({
-				top: targetPosition,
-				behavior: "auto",
-			});
-
-			scrollPositionRef.current =
-				targetPosition;
-		};
-
-		const timer =
-			window.setTimeout(
-				restore,
-				100
-			);
-
-		return () => {
-			cancelled = true;
-			window.clearTimeout(
-				timer
-			);
-		};
-	}, [
-		parsedNovel,
-		selectedEpisodeIndex,
-	]);
-
-	async function saveScrollPosition(
-		position?: number
-	) {
-		if (
-			!selectedFile ||
-			!parsedNovel ||
-			!selectedEpisode ||
-			!roundId
-		) {
-			return;
-		}
-
-		const activeRoundId =
-			roundId;
-
-		if (
-			roundStatus === "completed"
-		) {
-			return;
-		}
-
-		const currentPosition =
-			Math.max(
-				0,
-				Math.round(
-					position ??
-						window.scrollY
-				)
-			);
-
-		scrollPositionRef.current =
-			currentPosition;
-
-		const totalEpisodes =
-			parsedNovel.episodes.length;
-
-		const progress =
-			Math.min(
-				100,
-				Math.round(
-					((selectedEpisodeIndex +
-						1) /
-						totalEpisodes) *
-						100
-				)
-			);
-
-		const isCompleted =
-			selectedEpisodeIndex ===
-			totalEpisodes - 1;
-
-		try {
-			const response =
-				await fetch(
-					"/api/books",
-					{
-						method: "PATCH",
-						headers: {
-							"Content-Type":
-								"application/json",
-						},
-						body: JSON.stringify({
-							drive_file_id:
-								selectedFile.id,
-							round_id:
-								activeRoundId,
-							episode:
-								selectedEpisode.episode,
-							progress,
-							scroll_position:
-								currentPosition,
-							status:
-								isCompleted
-									? "completed"
-									: "reading",
-						}),
-					}
-				);
-
-			const data =
-				await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					extractErrorMessage(
-						data,
-						"읽기 위치를 저장하지 못했습니다."
-					)
-				);
-			}
-
-			setRoundStatus(
-				isCompleted
-					? "completed"
-					: "reading"
-			);
-		} catch (error) {
-			console.error(
-				"스크롤 위치 저장 실패:",
-				error
-			);
-		}
-	}
-
-	useEffect(() => {
-		if (
-			!selectedFile ||
-			!parsedNovel ||
-			!selectedEpisode ||
-			!roundId
-		) {
-			return;
-		}
-
-		function handleScroll() {
-			const position =
-				window.scrollY;
-
-			scrollPositionRef.current =
-				position;
-
-			if (
-				scrollSaveTimerRef.current
-			) {
-				clearTimeout(
-					scrollSaveTimerRef.current
-				);
-			}
-
-			scrollSaveTimerRef.current =
-				setTimeout(() => {
-					void saveScrollPosition(
-						position
-					);
-				}, 1000);
-		}
-
-		window.addEventListener(
-			"scroll",
-			handleScroll,
-			{ passive: true }
-		);
-
-		return () => {
-			window.removeEventListener(
-				"scroll",
-				handleScroll
-			);
-
-			if (
-				scrollSaveTimerRef.current
-			) {
-				clearTimeout(
-					scrollSaveTimerRef.current
-				);
-			}
-		};
-	}, [
-		selectedFile,
-		parsedNovel,
-		selectedEpisode,
-		selectedEpisodeIndex,
-		roundId,
-		roundStatus,
-	]);
 
 	useEffect(() => {
 		function handleBeforeUnload() {
@@ -1459,163 +818,6 @@ export default function DriveBrowser() {
 		roundId,
 		roundStatus,
 	]);
-
-	function getBodySearchMatches() {
-		if (
-			!selectedEpisode ||
-			!bodySearch.trim()
-		) {
-			return [];
-		}
-
-		const content =
-			selectedEpisode.content;
-
-		const keyword =
-			bodySearch.trim().toLowerCase();
-
-		const lowerContent =
-			content.toLowerCase();
-
-		const matches: number[] = [];
-
-		let start = 0;
-
-		while (true) {
-			const index =
-				lowerContent.indexOf(
-					keyword,
-					start
-				);
-
-			if (index === -1) {
-				break;
-			}
-
-			matches.push(index);
-
-			start =
-				index + keyword.length;
-		}
-
-		return matches;
-	}
-
-	function scrollToBodySearchMatch(
-		direction: 1 | -1
-	) {
-		if (
-			!contentRef.current ||
-			!selectedEpisode ||
-			!bodySearch.trim()
-		) {
-			return;
-		}
-
-		const matches =
-			getBodySearchMatches();
-
-		if (matches.length === 0) {
-			return;
-		}
-
-		let nextIndex =
-			bodySearchIndex;
-
-		if (direction === 1) {
-			nextIndex =
-				(bodySearchIndex + 1) %
-				matches.length;
-		} else {
-			nextIndex =
-				(bodySearchIndex -
-					1 +
-					matches.length) %
-				matches.length;
-		}
-
-		setBodySearchIndex(
-			nextIndex
-		);
-
-		const targetOffset =
-			matches[nextIndex];
-
-		const keywordLength =
-			bodySearch.trim().length;
-
-		const walker =
-			document.createTreeWalker(
-				contentRef.current,
-				NodeFilter.SHOW_TEXT
-			);
-
-		let currentOffset = 0;
-
-		while (walker.nextNode()) {
-			const node =
-				walker.currentNode as Text;
-
-			const nodeText =
-				node.textContent || "";
-
-			const nodeStart =
-				currentOffset;
-
-			const nodeEnd =
-				currentOffset +
-				nodeText.length;
-
-			if (
-				targetOffset >=
-					nodeStart &&
-				targetOffset <
-					nodeEnd
-			) {
-				const range =
-					document.createRange();
-
-				range.setStart(
-					node,
-					targetOffset -
-						nodeStart
-				);
-
-				range.setEnd(
-					node,
-					Math.min(
-						targetOffset -
-							nodeStart +
-							keywordLength,
-						nodeText.length
-					)
-				);
-
-				const rect =
-					range.getBoundingClientRect();
-
-				const targetTop =
-					window.scrollY +
-					rect.top -
-					window.innerHeight /
-						2;
-
-				window.scrollTo({
-					top: Math.max(
-						0,
-						targetTop
-					),
-					behavior:
-						"smooth",
-				});
-
-				return;
-			}
-
-			currentOffset =
-				nodeEnd;
-		}
-	}
 
 	function getSelectionData() {
 		if (!contentRef.current) {
@@ -1837,143 +1039,6 @@ export default function DriveBrowser() {
 		);
 	}
 
-	async function saveProgress(
-		episodeIndex: number,
-		scrollPosition = 0,
-		targetRoundId?: string | null,
-		context?: {
-			file?: DriveItem;
-			novel?: ParsedNovel;
-		}
-	) {
-		const activeRoundId =
-			targetRoundId ?? roundId;
-
-		const activeFile =
-			context?.file ??
-			selectedFile;
-
-		const activeNovel =
-			context?.novel ??
-			parsedNovel;
-
-		if (
-			!activeFile ||
-			!activeNovel ||
-			!activeRoundId
-		) {
-			return false;
-		}
-
-		if (
-			roundStatus === "completed" &&
-			!targetRoundId
-		) {
-			return false;
-		}
-
-		if (
-			activeNovel.episodes.length ===
-			0
-		) {
-			return false;
-		}
-
-		const episode =
-			activeNovel.episodes[
-				episodeIndex
-			];
-
-		if (!episode) {
-			return false;
-		}
-
-		const totalEpisodes =
-			activeNovel.episodes.length;
-
-		const progress =
-			Math.min(
-				100,
-				Math.round(
-					((episodeIndex + 1) /
-						totalEpisodes) *
-						100
-				)
-			);
-
-		const isCompleted =
-			episodeIndex ===
-			totalEpisodes - 1;
-
-		setProgressSaving(
-			true
-		);
-
-		try {
-			const response =
-				await fetch(
-					"/api/books",
-					{
-						method: "PATCH",
-						headers: {
-							"Content-Type":
-								"application/json",
-						},
-						body: JSON.stringify({
-							drive_file_id:
-								activeFile.id,
-							round_id:
-								activeRoundId,
-							episode:
-								episode.episode,
-							progress,
-							status:
-								isCompleted
-									? "completed"
-									: "reading",
-							scroll_position:
-								Math.max(
-									0,
-									Math.round(
-										scrollPosition
-									)
-								),
-						}),
-					}
-				);
-
-			const data =
-				await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					extractErrorMessage(
-						data,
-						"읽기 진행상황을 저장하지 못했습니다."
-					)
-				);
-			}
-
-			setRoundStatus(
-				isCompleted
-					? "completed"
-					: "reading"
-			);
-
-			return true;
-		} catch (error) {
-			console.error(
-				"읽기 진행상황 저장 실패:",
-				error
-			);
-
-			return false;
-		} finally {
-			setProgressSaving(
-				false
-			);
-		}
-	}
 
 	async function changeEpisode(
 		index: number
@@ -2479,9 +1544,6 @@ export default function DriveBrowser() {
 				parsedNovel.episodes.length -
 					1
 			: true;
-
-	const bodySearchMatches =
-		getBodySearchMatches();
 
 	return (
 		<main
