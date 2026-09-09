@@ -1,29 +1,49 @@
 "use client";
+
 import { useNovelLoader } from "./hooks/useNovelLoader";
 
 import {
-  useHighlights,
-  type HighlightItem,
+	useHighlights,
 } from "./hooks/useHighlights";
+
+import { useHighlightSelection } from "./hooks/useHighlightSelection";
+
 import { useBookmark } from "./hooks/useBookmark";
 
-import {
-	parseNovel,
-	type ParsedNovel,
+import type {
+	EpisodeRule,
+	ParsedNovel,
 } from "@/lib/parser";
-import { getLines } from "@/lib/parser/normalize";
+
 import {
 	useEffect,
 	useRef,
 	useState,
 } from "react";
+
 import { useSearchParams } from "next/navigation";
+
 import { useReadingProgress } from "./hooks/useReadingProgress";
 import { useEpisodeRules } from "./hooks/useEpisodeRules";
 import { useBodySearch } from "./hooks/useBodySearch";
+import { useContentEditor } from "./hooks/useContentEditor";
+import { useEpisodeNavigation } from "./hooks/useEpisodeNavigation";
+import { useFileClose } from "./hooks/useFileClose";
+import { useReaderChrome } from "./hooks/useReaderChrome";
+import { useEpisodeList } from "./hooks/useEpisodeList";
+import { useFileOpen } from "./hooks/useFileOpen";
+
+import {
+	MAX_FONT_SIZE,
+	MIN_FONT_SIZE,
+	THEMES,
+	useReaderSettings,
+	type ThemeKey,
+} from "./hooks/useReaderSettings";
 
 
 import type { ReactNode } from "react";
+
 import {
 	ArrowLeft,
 	Bookmark,
@@ -53,95 +73,17 @@ type DriveItem = {
 const SERIF =
 	"'Noto Serif KR', 'Nanum Myeongjo', ui-serif, Georgia, serif";
 
-type ThemeKey =
-	| "ivory"
-	| "white"
-	| "sage"
-	| "gray"
-	| "dark";
-
-type ThemeConfig = {
-	label: string;
-	bg: string;
-	accent: string;
-	text: string;
-	title: string;
-	muted: string;
-	divider: string;
-	swatch: string;
-};
-
-const THEMES: Record<ThemeKey, ThemeConfig> = {
-	ivory: {
-		label: "아이보리",
-		bg: "#fafaf8",
-		accent: "#b08d5f",
-		text: "#45453f",
-		title: "#1e1e1c",
-		muted: "#b0b0a4",
-		divider: "#eeeee7",
-		swatch: "#faf6ee",
-	},
-
-	white: {
-		label: "흰색",
-		bg: "#ffffff",
-		accent: "#8a8a7e",
-		text: "#3a3a3a",
-		title: "#1a1a1a",
-		muted: "#9a9a9a",
-		divider: "#ececec",
-		swatch: "#ffffff",
-	},
-
-	sage: {
-		label: "세이지",
-		bg: "#f4f6f0",
-		accent: "#7a8f5f",
-		text: "#465239",
-		title: "#2e3a24",
-		muted: "#93a183",
-		divider: "#e2e6da",
-		swatch: "#eef2e6",
-	},
-
-	gray: {
-		label: "그레이",
-		bg: "#f5f5f3",
-		accent: "#8a8a80",
-		text: "#4a4a44",
-		title: "#2a2a26",
-		muted: "#a3a39a",
-		divider: "#e6e6e2",
-		swatch: "#ebebe7",
-	},
-
-	dark: {
-		label: "다크",
-		bg: "#1c1c1b",
-		accent: "#c7a97a",
-		text: "#d8d8d2",
-		title: "#f1f1ec",
-		muted: "#8f8f88",
-		divider: "#333330",
-		swatch: "#1c1c1b",
-	},
-};
-
-const MIN_FONT_SIZE = 14;
-const MAX_FONT_SIZE = 22;
-const DEFAULT_FONT_SIZE = 16;
-const SETTINGS_KEY = "novel-reader-settings";
 
 export default function DriveBrowser() {
-  const searchParams = useSearchParams();
+	const searchParams = useSearchParams();
 
-  const {
-    loadNovelFile,
-  } = useNovelLoader();
+	const {
+		loadNovelFile,
+	} = useNovelLoader();
 
-  const highlightId =
-    searchParams.get("highlightId");
+	const highlightId =
+		searchParams.get("highlightId");
+
 
 	const [loading, setLoading] =
 		useState(true);
@@ -161,96 +103,121 @@ export default function DriveBrowser() {
 	const [selectedEpisodeIndex, setSelectedEpisodeIndex] =
 		useState(0);
 
-	const [themeKey, setThemeKey] =
-		useState<ThemeKey>("ivory");
-
-	const [fontSize, setFontSize] =
-		useState(DEFAULT_FONT_SIZE);
-
-	const [settingsOpen, setSettingsOpen] =
-		useState(false);
-
-	const [chromeVisible, setChromeVisible] =
-		useState(true);
-
-	const [episodeSearch, setEpisodeSearch] =
-		useState("");
-
-	const [episodeListOpen, setEpisodeListOpen] =
-		useState(false);
-
-	// 등록된 회차 규칙 관리 화면
 	const [episodeRuleManagerOpen, setEpisodeRuleManagerOpen] =
 		useState(false);
 
-	// 회차 수정 패널 (설정 팝업에서 분리된 별도 패널)
 	const [episodeEditPanelOpen, setEpisodeEditPanelOpen] =
 		useState(false);
 
 	const [bodySearchOpen, setBodySearchOpen] =
 		useState(false);
 
-	const [selectedTextForHighlight, setSelectedTextForHighlight] =
-		useState("");
-
-	const [selectedHighlightRange, setSelectedHighlightRange] =
-		useState<{
-			startOffset: number;
-			endOffset: number;
-		} | null>(null);
-
-	const [showHighlightButton, setShowHighlightButton] =
-		useState(false);
-
-	// 본문 수정 관련 상태
-	const [editingContent, setEditingContent] =
-		useState(false);
-
-	const [editedText, setEditedText] =
-		useState("");
-
-	const [savingEdit, setSavingEdit] =
-		useState(false);
-
-	const [editError, setEditError] =
-		useState("");
-
 	const contentRef =
 		useRef<HTMLDivElement | null>(null);
-
-	const mobileEpisodeListRef =
-		useRef<HTMLDivElement | null>(null);
-
-	const theme = THEMES[themeKey];
 
 	const selectedEpisode =
 		parsedNovel?.episodes[
 			selectedEpisodeIndex
 		];
 	const {
-	episodeRules,
-	setEpisodeRules,
-	episodeRuleInput,
-	setEpisodeRuleInput,
-	episodeRulesLoading,
-	episodeRuleSaving,
-	episodeRuleError,
-	episodeRuleSearch,
-	setEpisodeRuleSearch,
-	filteredEpisodeRules,
-	loadEpisodeRules,
-	addEpisodeRule,
-	deleteEpisodeRule,
-	reparseWithRules,
-	} = useEpisodeRules({
-	fileContent,
-	selectedEpisodeStartLine:
-		selectedEpisode?.startLine,
-	selectedEpisodeIndex,
-	setParsedNovel,
-	setSelectedEpisodeIndex,
+		themeKey,
+		setThemeKey,
+		fontSize,
+		setFontSize,
+		settingsOpen,
+		setSettingsOpen,
+		theme,
+	} = useReaderSettings();
+
+	const {
+		chromeVisible,
+		setChromeVisible,
+		handleContentTap,
+	} = useReaderChrome();
+
+	const {
+		episodeSearch,
+		setEpisodeSearch,
+		episodeListOpen,
+		setEpisodeListOpen,
+		filteredEpisodes,
+		mobileEpisodeListRef,
+	} = useEpisodeList({
+		episodes:
+			parsedNovel?.episodes ?? [],
+		selectedEpisodeIndex,
 	});
 
+	/*
+	 * 읽기 진행도
+	 */
+	const {
+	bookId,
+	roundId,
+	roundStatus,
+	progressSaving,
+	initializeReadingState,
+	saveProgress,
+	saveScrollPosition,
+	scrollPositionRef,
+	restoreScrollPositionRef,
+	skipScrollRestoreRef,
+	} = useReadingProgress({
+	selectedFile,
+	parsedNovel,
+	selectedEpisode,
+	selectedEpisodeIndex,
+	});
+
+	/*
+	 * 회차 규칙
+	 */
+	const {
+		episodeRules,
+		setEpisodeRules,
+		episodeRuleInput,
+		setEpisodeRuleInput,
+		episodeRulesLoading,
+		episodeRuleSaving,
+		episodeRuleError,
+		episodeRuleSearch,
+		setEpisodeRuleSearch,
+		filteredEpisodeRules,
+		loadEpisodeRules,
+		addEpisodeRule,
+		deleteEpisodeRule,
+		reparseWithRules,
+	} = useEpisodeRules({
+		fileContent,
+		selectedEpisodeStartLine:
+			selectedEpisode?.startLine,
+		selectedEpisodeIndex,
+		episodeRuleManagerOpen,
+		setParsedNovel,
+		setSelectedEpisodeIndex,
+	});
+
+	const {
+		editingContent,
+		editedText,
+		savingEdit,
+		editError,
+		setEditedText,
+		startEditingContent,
+		cancelEditingContent,
+		saveEditedContent,
+	} = useContentEditor({
+		fileContent,
+		selectedFile,
+		selectedEpisode,
+		episodeRules,
+		setFileContent,
+		setParsedNovel,
+	});
+
+	/*
+	 * 본문 검색
+	 */
 	const {
 		bodySearch,
 		setBodySearch,
@@ -265,6 +232,10 @@ export default function DriveBrowser() {
 		selectedEpisodeIndex,
 	});
 
+
+	/*
+	 * 북마크
+	 */
 	const {
 		bookmarked,
 		bookmarkLoading,
@@ -278,7 +249,41 @@ export default function DriveBrowser() {
 			selectedEpisode?.episode ?? null,
 	});
 
+	const {
+		changeEpisode,
+		goToPrevEpisode,
+		goToNextEpisode,
+	} = useEpisodeNavigation({
+		parsedNovel,
+		selectedEpisodeIndex,
+		progressSaving,
+		roundStatus,
+		selectedFile,
+		setSelectedEpisodeIndex,
+		setEpisodeListOpen,
+		setChromeVisible,
+		setBodySearch,
+		setBodySearchIndex,
+		saveProgress,
+		getBookmarkStatus,
+		scrollPositionRef,
+		restoreScrollPositionRef,
+	});
 
+	const {
+		closeFile,
+	} = useFileClose({
+		selectedFile,
+		parsedNovel,
+		selectedEpisode,
+		roundId,
+		roundStatus,
+		saveScrollPosition,
+	});
+
+	/*
+	 * 하이라이트
+	 */
 	const {
 		highlights,
 		highlightLoading,
@@ -290,152 +295,36 @@ export default function DriveBrowser() {
 			selectedEpisode?.episode ?? null,
 	});
 
-	const filteredEpisodes =
-		parsedNovel?.episodes.filter(
-			(episode) => {
-				const keyword =
-					episodeSearch.trim().toLowerCase();
+	const {
+		selectedTextForHighlight,
+		selectedHighlightRange,
+		showHighlightButton,
+		handleTextSelection,
+		savePendingHighlight,
+	} = useHighlightSelection({
+		contentRef,
+		selectedEpisodeIndex,
+		selectedEpisode,
+		highlights,
+		highlightId,
+		saveHighlightApi,
+		bookId,
+		fileId:
+			selectedFile?.id ?? null,
+		scrollPositionRef,
+	});
 
-				if (!keyword) {
-					return true;
-				}
-
-				return (
-					String(episode.episode)
-						.toLowerCase()
-						.includes(keyword) ||
-					episode.title
-						.toLowerCase()
-						.includes(keyword)
-				);
-			}
-		) || [];
-
+	/*
+	 * 회차 규칙 관리 ESC
+	 */
 	useEffect(() => {
-		try {
-			const saved =
-				localStorage.getItem(
-					SETTINGS_KEY
-				);
-
-			if (!saved) {
-				return;
-			}
-
-			const parsed =
-				JSON.parse(saved);
-
-			if (
-				parsed.themeKey &&
-				THEMES[
-					parsed.themeKey as ThemeKey
-				]
-			) {
-				setThemeKey(
-					parsed.themeKey
-				);
-			}
-
-			if (
-				typeof parsed.fontSize ===
-				"number"
-			) {
-				setFontSize(
-					Math.min(
-						MAX_FONT_SIZE,
-						Math.max(
-							MIN_FONT_SIZE,
-							parsed.fontSize
-						)
-					)
-				);
-			}
-		} catch {
-			// 기본값 사용
-		}
-	}, []);
-
-	useEffect(() => {
-		try {
-			localStorage.setItem(
-				SETTINGS_KEY,
-				JSON.stringify({
-					themeKey,
-					fontSize,
-				})
-			);
-		} catch {
-			// 무시
-		}
-	}, [
-		themeKey,
-		fontSize,
-	]);
-
-	useEffect(() => {
-		if (!settingsOpen) {
+		if (!episodeRuleManagerOpen) {
 			return;
 		}
 
-		void loadEpisodeRules();
-	}, [settingsOpen, loadEpisodeRules]);
-
-	useEffect(() => {
-		setShowHighlightButton(false);
-		setSelectedTextForHighlight("");
-		setSelectedHighlightRange(null);
-	}, [
-		selectedEpisodeIndex,
-	]);
-
-	useEffect(() => {
-		if (
-			!episodeListOpen ||
-			!mobileEpisodeListRef.current ||
-			!parsedNovel
+		function handleKeyDown(
+			event: KeyboardEvent
 		) {
-			return;
-		}
-
-		const selectedButton =
-			mobileEpisodeListRef.current.querySelector(
-				`[data-episode-index="${selectedEpisodeIndex}"]`
-			) as HTMLElement | null;
-
-		if (!selectedButton) {
-			return;
-		}
-
-		window.setTimeout(() => {
-			selectedButton.scrollIntoView({
-				block: "nearest",
-				behavior: "auto",
-			});
-		}, 0);
-	}, [
-		episodeListOpen,
-		selectedEpisodeIndex,
-		episodeSearch,
-		filteredEpisodes.length,
-		parsedNovel,
-	]);
-
-	// 회차 규칙 관리 화면이 열렸을 때
-	// 검색어는 새로 시작하도록 초기화
-	useEffect(() => {
-		if (!episodeRuleManagerOpen) {
-			setEpisodeRuleSearch("");
-		}
-	}, [episodeRuleManagerOpen]);
-
-	// 회차 규칙 관리 화면이 열려 있을 때
-	// ESC로 닫을 수 있도록 처리
-	useEffect(() => {
-		if (!episodeRuleManagerOpen) {
-			return;
-		}
-
-		function handleKeyDown(event: KeyboardEvent) {
 			if (event.key === "Escape") {
 				setEpisodeRuleManagerOpen(false);
 			}
@@ -452,16 +341,22 @@ export default function DriveBrowser() {
 				handleKeyDown
 			);
 		};
-	}, [episodeRuleManagerOpen]);
+	}, [
+		episodeRuleManagerOpen,
+	]);
 
-	// 회차 수정 패널이 열려 있을 때
-	// ESC로 닫을 수 있도록 처리
+
+	/*
+	 * 회차 수정 패널 ESC
+	 */
 	useEffect(() => {
 		if (!episodeEditPanelOpen) {
 			return;
 		}
 
-		function handleKeyDown(event: KeyboardEvent) {
+		function handleKeyDown(
+			event: KeyboardEvent
+		) {
 			if (event.key === "Escape") {
 				setEpisodeEditPanelOpen(false);
 			}
@@ -478,1002 +373,47 @@ export default function DriveBrowser() {
 				handleKeyDown
 			);
 		};
-	}, [episodeEditPanelOpen]);
-
-	// 규칙을 적용하여 다시 파싱하면서
-	// 현재 보고 있던 회차를 최대한 유지한다.
-	
-	function extractErrorMessage(
-		data: any,
-		fallback: string
-	) {
-		if (
-			typeof data?.error ===
-			"string"
-		) {
-			return data.error;
-		}
-
-		if (
-			data?.error?.message
-		) {
-			return data.error.message;
-		}
-
-		if (data?.error) {
-			try {
-				return JSON.stringify(
-					data.error
-				);
-			} catch {
-				return fallback;
-			}
-		}
-
-		return fallback;
-	}
-
-	// 본문 수정 시작
-	function startEditingContent() {
-		if (!selectedEpisode) {
-			return;
-		}
-
-		setEditedText(
-			selectedEpisode.content
-		);
-		setEditError("");
-		setEditingContent(true);
-	}
-
-	// 본문 수정 취소
-	function cancelEditingContent() {
-		setEditingContent(false);
-		setEditedText("");
-		setEditError("");
-	}
-
-	// 수정한 본문을 구글 드라이브 파일에 반영
-	async function saveEditedContent() {
-		if (
-			!selectedFile ||
-			!selectedEpisode
-		) {
-			return;
-		}
-
-		setSavingEdit(true);
-		setEditError("");
-
-		try {
-			// 파서와 동일한 방식으로 정규화한 줄 단위 배열을 얻는다.
-			const lines =
-				getLines(fileContent);
-
-			// 회차 제목(헤딩) 줄은 그대로 두고,
-			// 본문에 해당하는 줄들만 수정한 내용으로 교체한다.
-			const newLines = [
-				...lines.slice(
-					0,
-					selectedEpisode.startLine +
-						1
-				),
-				...editedText.split("\n"),
-				...lines.slice(
-					selectedEpisode.endLine +
-						1
-				),
-			];
-
-			const newFullText =
-				newLines.join("\n");
-
-			const response =
-				await fetch(
-					`/api/drive/file?fileId=${encodeURIComponent(
-						selectedFile.id
-					)}`,
-					{
-						method: "PUT",
-						headers: {
-							"Content-Type":
-								"application/json",
-						},
-						body: JSON.stringify({
-							content:
-								newFullText,
-						}),
-					}
-				);
-
-			const data =
-				await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					extractErrorMessage(
-						data,
-						"구글 드라이브에 저장하지 못했습니다."
-					)
-				);
-			}
-
-			// 로컬 상태도 새 본문 기준으로 다시 계산한다.
-			setFileContent(
-				newFullText
-			);
-
-			setParsedNovel(
-				parseNovel(
-					newFullText,
-					episodeRules
-				)
-			);
-
-			setEditingContent(
-				false
-			);
-			setEditedText("");
-		} catch (error) {
-			setEditError(
-				error instanceof Error
-					? error.message
-					: "저장 중 오류가 발생했습니다."
-			);
-		} finally {
-			setSavingEdit(false);
-		}
-	}
-
-	
-
-	
-
-	useEffect(() => {
-		if (!highlightId) {
-			return;
-		}
-
-		if (!selectedEpisode) {
-			return;
-		}
-
-		if (highlights.length === 0) {
-			return;
-		}
-
-		let cancelled = false;
-		let attempts = 0;
-
-		const findAndScroll = () => {
-			if (cancelled) {
-				return;
-			}
-
-			attempts += 1;
-
-			const target =
-				document.querySelector(
-					`[data-highlight-id="${highlightId}"]`
-				);
-
-			if (!target) {
-				if (attempts < 30) {
-					window.setTimeout(
-						findAndScroll,
-						100
-					);
-				}
-
-				return;
-			}
-
-			window.requestAnimationFrame(
-				() => {
-					if (cancelled) {
-						return;
-					}
-
-					const rect =
-						target.getBoundingClientRect();
-
-					const targetTop =
-						window.scrollY +
-						rect.top -
-						window.innerHeight /
-							2 +
-						rect.height /
-							2;
-
-					scrollPositionRef.current =
-						Math.max(
-							0,
-							targetTop
-						);
-
-					window.scrollTo({
-						top: Math.max(
-							0,
-							targetTop
-						),
-						behavior:
-							"smooth",
-					});
-				}
-			);
-		};
-
-		const timer =
-			window.setTimeout(
-				findAndScroll,
-				200
-			);
-
-		return () => {
-			cancelled = true;
-			window.clearTimeout(
-				timer
-			);
-		};
 	}, [
+		episodeEditPanelOpen,
+	]);
+
+	useFileOpen({
+		fileId:
+			searchParams.get("fileId"),
+
+		targetEpisode:
+			searchParams.get("episode")
+				? Number(
+						searchParams.get(
+							"episode"
+						)
+					)
+				: null,
+
 		highlightId,
-		selectedEpisodeIndex,
-		highlights,
-	]);
 
+		loadNovelFile,
 
-	useEffect(() => {
-		function handleBeforeUnload() {
-			if (
-				!selectedFile ||
-				!parsedNovel ||
-				!selectedEpisode ||
-				!roundId
-			) {
-				return;
-			}
+		setLoading,
+		setError,
+		setSelectedFile,
+		setFileContent,
+		setParsedNovel,
+		setSelectedEpisodeIndex,
+		setEpisodeRules,
 
-			if (
-				roundStatus ===
-				"completed"
-			) {
-				return;
-			}
+		initializeReadingState,
+		getBookmarkStatus,
+		saveProgress,
 
-			const position =
-				Math.max(
-					0,
-					Math.round(
-						window.scrollY
-					)
-				);
+		restoreScrollPositionRef,
+		skipScrollRestoreRef,
+	});
 
-			const totalEpisodes =
-				parsedNovel.episodes.length;
 
-			const progress =
-				Math.min(
-					100,
-					Math.round(
-						((selectedEpisodeIndex +
-							1) /
-							totalEpisodes) *
-							100
-					)
-				);
-
-			const isCompleted =
-				selectedEpisodeIndex ===
-				totalEpisodes - 1;
-
-			const payload =
-				JSON.stringify({
-					drive_file_id:
-						selectedFile.id,
-					round_id:
-						roundId,
-					episode:
-						selectedEpisode.episode,
-					progress,
-					status:
-						isCompleted
-							? "completed"
-							: "reading",
-					scroll_position:
-						position,
-				});
-
-			fetch(
-				"/api/books",
-				{
-					method: "PATCH",
-					headers: {
-						"Content-Type":
-							"application/json",
-					},
-					body: payload,
-					keepalive: true,
-				}
-			).catch(() => {
-				// 종료 중 오류는 무시
-			});
-		}
-
-		window.addEventListener(
-			"beforeunload",
-			handleBeforeUnload
-		);
-
-		return () => {
-			window.removeEventListener(
-				"beforeunload",
-				handleBeforeUnload
-			);
-		};
-	}, [
-		selectedFile,
-		parsedNovel,
-		selectedEpisode,
-		selectedEpisodeIndex,
-		roundId,
-		roundStatus,
-	]);
-
-	function getSelectionData() {
-		if (!contentRef.current) {
-			return null;
-		}
-
-		const selection =
-			window.getSelection();
-
-		if (
-			!selection ||
-			selection.rangeCount === 0 ||
-			selection.isCollapsed
-		) {
-			return null;
-		}
-
-		const selectedText =
-			selection.toString().trim();
-
-		if (!selectedText) {
-			return null;
-		}
-
-		const range =
-			selection.getRangeAt(0);
-
-		if (
-			!contentRef.current.contains(
-				range.commonAncestorContainer
-			)
-		) {
-			return null;
-		}
-
-		const startRange =
-			document.createRange();
-
-		startRange.selectNodeContents(
-			contentRef.current
-		);
-
-		startRange.setEnd(
-			range.startContainer,
-			range.startOffset
-		);
-
-		const startOffset =
-			startRange
-				.toString()
-				.length;
-
-		const endRange =
-			document.createRange();
-
-		endRange.selectNodeContents(
-			contentRef.current
-		);
-
-		endRange.setEnd(
-			range.endContainer,
-			range.endOffset
-		);
-
-		const endOffset =
-			endRange
-				.toString()
-				.length;
-
-		if (
-			endOffset <=
-			startOffset
-		) {
-			return null;
-		}
-
-		return {
-			text: selectedText,
-			startOffset,
-			endOffset,
-		};
-	}
-
-	async function saveHighlight(
-	text: string,
-	startOffset: number,
-	endOffset: number
-	) {
-	if (
-		!selectedFile ||
-		!parsedNovel ||
-		!bookId ||
-		!selectedEpisode
-	) {
-		return;
-	}
-
-	const success =
-		await saveHighlightApi(
-		bookId,
-		selectedFile.id,
-		selectedEpisode.episode,
-		text,
-		startOffset,
-		endOffset
-		);
-
-	if (!success) {
-		return;
-	}
-
-	window
-		.getSelection()
-		?.removeAllRanges();
-
-	setShowHighlightButton(false);
-
-	setSelectedTextForHighlight("");
-
-	setSelectedHighlightRange(null);
-	}
-
-	function handleTextSelection() {
-		window.setTimeout(() => {
-			const selectionData =
-				getSelectionData();
-
-			if (!selectionData) {
-				if (
-					window.innerWidth <
-					768
-				) {
-					setShowHighlightButton(
-						false
-					);
-					setSelectedTextForHighlight(
-						""
-					);
-					setSelectedHighlightRange(
-						null
-					);
-				}
-
-				return;
-			}
-
-			if (
-				window.innerWidth <
-				768
-			) {
-				setSelectedTextForHighlight(
-					selectionData.text
-				);
-
-				setSelectedHighlightRange({
-					startOffset:
-						selectionData.startOffset,
-					endOffset:
-						selectionData.endOffset,
-				});
-
-				setShowHighlightButton(
-					true
-				);
-
-				return;
-			}
-
-			void saveHighlight(
-				selectionData.text,
-				selectionData.startOffset,
-				selectionData.endOffset
-			);
-		}, 50);
-	}
-
-	function handleContentTap(
-		event: React.MouseEvent<HTMLDivElement>
-	) {
-		const target =
-			event.target as HTMLElement;
-
-		if (
-			target.closest(
-				"button, a, input, textarea"
-			)
-		) {
-			return;
-		}
-
-		const selection =
-			window.getSelection?.();
-
-		if (
-			selection &&
-			selection.toString().length >
-				0
-		) {
-			return;
-		}
-
-		setChromeVisible(
-			(visible) => !visible
-		);
-	}
-
-	async function savePendingHighlight() {
-		if (
-			!selectedTextForHighlight ||
-			!selectedHighlightRange
-		) {
-			return;
-		}
-
-		await saveHighlight(
-			selectedTextForHighlight,
-			selectedHighlightRange.startOffset,
-			selectedHighlightRange.endOffset
-		);
-	}
-
-
-	async function changeEpisode(
-		index: number
-	) {
-		if (!parsedNovel) {
-			return;
-		}
-
-		if (progressSaving) {
-			return;
-		}
-
-		if (
-			index < 0 ||
-			index >=
-				parsedNovel.episodes.length
-		) {
-			return;
-		}
-
-		if (
-			index ===
-			selectedEpisodeIndex
-		) {
-			setEpisodeListOpen(
-				false
-			);
-			return;
-		}
-
-		setChromeVisible(
-			true
-		);
-
-		const currentScrollPosition =
-			Math.max(
-				0,
-				Math.round(
-					window.scrollY
-				)
-			);
-
-		if (
-			roundStatus !==
-			"completed"
-		) {
-			await saveProgress(
-				selectedEpisodeIndex,
-				currentScrollPosition
-			);
-		}
-
-		setSelectedEpisodeIndex(
-			index
-		);
-
-		setEpisodeListOpen(
-			false
-		);
-
-		restoreScrollPositionRef.current =
-			0;
-
-		scrollPositionRef.current =
-			0;
-
-		setBodySearch("");
-		setBodySearchIndex(0);
-
-		window.scrollTo({
-			top: 0,
-			behavior: "auto",
-		});
-
-		if (
-			roundStatus !==
-			"completed"
-		) {
-			await saveProgress(
-				index,
-				0
-			);
-		}
-
-		const episode =
-			parsedNovel.episodes[
-				index
-			];
-
-		if (
-			episode &&
-			selectedFile
-		) {
-			await getBookmarkStatus(
-				selectedFile.id,
-				episode.episode
-			);
-		}
-	}
-
-	useEffect(() => {
-		const params =
-			new URLSearchParams(
-				window.location.search
-			);
-
-		/*
-		 * URLSearchParams.get()은
-		 * string | null을 반환한다.
-		 *
-		 * 먼저 별도의 변수로 받아서
-		 * 존재 여부를 확인한 후,
-		 * 이후에는 명확한 string 타입으로 사용한다.
-		 */
-		const fileIdParam =
-			params.get("fileId");
-
-		const episodeParam =
-			params.get("episode");
-
-		const targetEpisode =
-			episodeParam
-				? Number(episodeParam)
-				: null;
-
-		if (!fileIdParam) {
-			setLoading(false);
-			setError(
-				"파일을 찾을 수 없습니다."
-			);
-			return;
-		}
-
-		/*
-		 * 위의 if문을 통과했으므로
-		 * 여기부터 fileId는 string이다.
-		 */
-		const fileId: string =
-			fileIdParam;
-
-		let cancelled = false;
-
-		async function openFile() {
-			setLoading(true);
-			setError("");
-
-			try {
-				const result =
-					await loadNovelFile(fileId);
-
-				if (cancelled) {
-				return;
-				}
-
-				const {
-				file: item,
-				content,
-				parsedNovel: parsed,
-				episodeRules:
-					loadedEpisodeRules,
-				} = result;
-
-				setEpisodeRules(
-				loadedEpisodeRules
-				);
-
-				console.log(
-				"PARSED NOVEL:",
-				parsed
-				);
-
-				setSelectedFile(
-				item
-				);
-
-				setFileContent(
-				content
-				);
-
-				setParsedNovel(
-				parsed
-				);
-
-				const readingState =
-					await initializeReadingState(
-						fileId,
-						item.name,
-						parsed.episodes.length
-					);
-
-				if (!readingState) {
-					throw new Error(
-						"읽기 정보를 불러오지 못했습니다."
-					);
-				}
-
-				if (cancelled) {
-					return;
-				}
-
-				const savedProgress =
-					readingState.progress;
-
-				let initialEpisodeIndex =
-					0;
-
-				restoreScrollPositionRef.current =
-					0;
-
-				if (highlightId) {
-					skipScrollRestoreRef.current =
-						true;
-				}
-
-				if (
-					targetEpisode !==
-						null &&
-					Number.isFinite(
-						targetEpisode
-					)
-				) {
-					const targetIndex =
-						parsed.episodes.findIndex(
-							(episode) =>
-								episode.episode ===
-								targetEpisode
-						);
-
-					if (
-						targetIndex >=
-						0
-					) {
-						initialEpisodeIndex =
-							targetIndex;
-
-						if (
-							savedProgress.episode ===
-								targetEpisode &&
-							!highlightId &&
-							typeof savedProgress.scroll_position ===
-								"number"
-						) {
-							restoreScrollPositionRef.current =
-								Math.max(
-									0,
-									savedProgress.scroll_position
-								);
-						}
-					}
-				} else {
-					const savedIndex =
-						parsed.episodes.findIndex(
-							(episode) =>
-								episode.episode ===
-								savedProgress.episode
-						);
-
-					if (
-						savedIndex >=
-						0
-					) {
-						initialEpisodeIndex =
-							savedIndex;
-					} else if (
-						savedProgress.episode >
-						0
-					) {
-						initialEpisodeIndex =
-							Math.max(
-								0,
-								Math.min(
-									savedProgress.episode -
-										1,
-									parsed
-										.episodes
-										.length -
-										1
-								)
-							);
-					}
-
-					if (
-						!highlightId &&
-						typeof savedProgress.scroll_position ===
-							"number"
-					) {
-						restoreScrollPositionRef.current =
-							Math.max(
-								0,
-								savedProgress.scroll_position
-							);
-					}
-				}
-
-				setSelectedEpisodeIndex(
-					initialEpisodeIndex
-				);
-
-				const initialEpisode =
-					parsed.episodes[
-						initialEpisodeIndex
-					];
-
-				if (initialEpisode) {
-					void getBookmarkStatus(
-						fileId,
-						initialEpisode.episode
-					);
-				}
-
-				if (
-					readingState.round.status ===
-						"reading" &&
-					savedProgress.episode ===
-						0 &&
-					parsed.episodes.length >
-						0 &&
-					targetEpisode ===
-						null
-				) {
-					restoreScrollPositionRef.current =
-						0;
-
-					void saveProgress(
-						initialEpisodeIndex,
-						0,
-						readingState
-							.round.id,
-						{
-							file: item,
-							novel: parsed,
-						}
-					);
-				}
-
-				setLoading(false);
-			} catch (error) {
-				if (cancelled) {
-					return;
-				}
-
-				console.error(
-					"소설 열기 실패:",
-					error
-				);
-
-				setError(
-					error instanceof Error
-						? error.message
-						: "소설을 가져오지 못했습니다."
-				);
-
-				setLoading(false);
-			}
-		}
-
-		void openFile();
-
-		return () => {
-			cancelled = true;
-		};
-	}, []);
-
-	async function closeFile() {
-		if (
-			selectedFile &&
-			parsedNovel &&
-			selectedEpisode &&
-			roundId &&
-			roundStatus !==
-				"completed"
-		) {
-			await saveScrollPosition(
-				window.scrollY
-			);
-		}
-
-		window.history.back();
-	}
-
-	async function goToPrevEpisode() {
-		if (
-			!parsedNovel ||
-			progressSaving
-		) {
-			return;
-		}
-
-		const nextIndex =
-			Math.max(
-				0,
-				selectedEpisodeIndex -
-					1
-			);
-
-		if (
-			nextIndex ===
-			selectedEpisodeIndex
-		) {
-			return;
-		}
-
-		await changeEpisode(
-			nextIndex
-		);
-	}
-
-	async function goToNextEpisode() {
-		if (
-			!parsedNovel ||
-			progressSaving
-		) {
-			return;
-		}
-
-		const nextIndex =
-			Math.min(
-				parsedNovel.episodes
-					.length - 1,
-				selectedEpisodeIndex +
-					1
-			);
-
-		if (
-			nextIndex ===
-			selectedEpisodeIndex
-		) {
-			return;
-		}
-
-		await changeEpisode(
-			nextIndex
-		);
-	}
-
+	/*
+	 * 로딩
+	 */
 	if (loading) {
 		return (
 			<main
@@ -1493,6 +433,10 @@ export default function DriveBrowser() {
 		);
 	}
 
+
+	/*
+	 * 에러
+	 */
 	if (
 		error ||
 		!selectedFile
@@ -1534,6 +478,7 @@ export default function DriveBrowser() {
 		);
 	}
 
+
 	const isFirstEpisode =
 		selectedEpisodeIndex ===
 		0;
@@ -1544,6 +489,7 @@ export default function DriveBrowser() {
 				parsedNovel.episodes.length -
 					1
 			: true;
+
 
 	return (
 		<main
@@ -1621,6 +567,7 @@ export default function DriveBrowser() {
 					)}
 				</div>
 			</header>
+
 
 			<section className="mx-auto max-w-5xl px-5 pb-24 md:px-8">
 				{!parsedNovel ? (
@@ -1917,6 +864,7 @@ export default function DriveBrowser() {
 							)}
 						</div>
 
+
 						<div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
 							<aside className="hidden md:block">
 								<div className="sticky top-8">
@@ -2084,6 +1032,7 @@ export default function DriveBrowser() {
 								</div>
 							</aside>
 
+
 							<article>
 								{selectedEpisode ? (
 									<>
@@ -2118,6 +1067,7 @@ export default function DriveBrowser() {
 														selectedEpisode.title
 													}
 												</h2>
+
 
 												<div className="mt-4 flex items-center gap-2">
 													<button
@@ -2156,10 +1106,12 @@ export default function DriveBrowser() {
 																	: "none"
 															}
 														/>
+
 														{bookmarked
 															? "북마크됨"
 															: "북마크"}
 													</button>
+
 
 													{!bodySearchOpen ? (
 														<button
@@ -2167,6 +1119,7 @@ export default function DriveBrowser() {
 																setBodySearchOpen(
 																	true
 																);
+
 																setBodySearchIndex(
 																	0
 																);
@@ -2231,6 +1184,7 @@ export default function DriveBrowser() {
 																		setBodySearch(
 																			""
 																		);
+
 																		setBodySearchOpen(
 																			false
 																		);
@@ -2304,6 +1258,7 @@ export default function DriveBrowser() {
 																	setBodySearch(
 																		""
 																	);
+
 																	setBodySearchOpen(
 																		false
 																	);
@@ -2321,6 +1276,7 @@ export default function DriveBrowser() {
 													)}
 												</div>
 
+
 												{editError && (
 													<p className="mt-2 text-xs text-red-500">
 														{
@@ -2328,6 +1284,7 @@ export default function DriveBrowser() {
 														}
 													</p>
 												)}
+
 
 												{editingContent ? (
 													<div className="mx-auto mt-8 max-w-2xl">
@@ -2397,6 +1354,7 @@ export default function DriveBrowser() {
 																) : (
 																	<Check className="h-4 w-4" />
 																)}
+
 																{savingEdit
 																	? "저장 중..."
 																	: "확인"}
@@ -2566,7 +1524,9 @@ export default function DriveBrowser() {
 																	content.length
 																) {
 																	parts.push(
-																		<span key="text-last">
+																		<span
+																			key="text-last"
+																		>
 																			{content.slice(
 																				currentPosition
 																			)}
@@ -2579,6 +1539,7 @@ export default function DriveBrowser() {
 														</div>
 													</div>
 												)}
+
 
 												<div className="mx-auto mt-10 hidden max-w-2xl items-center justify-between md:flex">
 													<button
@@ -2621,6 +1582,7 @@ export default function DriveBrowser() {
 												</div>
 											</div>
 										</div>
+
 
 										<div className="mt-4 flex items-center justify-between gap-3 md:hidden">
 											<button
@@ -2681,6 +1643,7 @@ export default function DriveBrowser() {
 				)}
 			</section>
 
+
 			{showHighlightButton &&
 				selectedTextForHighlight && (
 					<div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 md:hidden">
@@ -2711,6 +1674,7 @@ export default function DriveBrowser() {
 						</button>
 					</div>
 				)}
+
 
 			<div
 				className={`fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 transition-opacity duration-300 ${
@@ -2761,6 +1725,7 @@ export default function DriveBrowser() {
 							</button>
 						</div>
 
+
 						{!editingContent && (
 							<div className="mb-4 grid grid-cols-2 gap-2">
 								<button
@@ -2802,6 +1767,7 @@ export default function DriveBrowser() {
 								</button>
 							</div>
 						)}
+
 
 						<p
 							className="mb-2 text-xs font-semibold"
@@ -2892,6 +1858,7 @@ export default function DriveBrowser() {
 							</button>
 						</div>
 
+
 						<p
 							className="mb-2 text-xs font-semibold"
 							style={{
@@ -2964,9 +1931,8 @@ export default function DriveBrowser() {
 					</div>
 				)}
 
-				{/* =====================================================
-				    회차 수정 패널 (설정 팝업에서 분리)
-				    ===================================================== */}
+
+				{/* 회차 수정 패널 */}
 				{episodeEditPanelOpen && (
 					<div
 						className="fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-6"
@@ -3029,6 +1995,7 @@ export default function DriveBrowser() {
 								</button>
 							</div>
 
+
 							<p
 								className="mb-2 text-xs font-semibold"
 								style={{
@@ -3052,6 +2019,7 @@ export default function DriveBrowser() {
 								숫자 부분은{" "}
 								<b>xxx</b>로 입력하세요.
 							</p>
+
 
 							<div className="mb-3 flex gap-2">
 								<input
@@ -3116,6 +2084,7 @@ export default function DriveBrowser() {
 								</button>
 							</div>
 
+
 							{episodeRuleError && (
 								<p className="mb-4 text-[11px] text-red-500">
 									{
@@ -3124,12 +2093,10 @@ export default function DriveBrowser() {
 								</p>
 							)}
 
+
 							<button
 								type="button"
 								onClick={() => {
-									setEpisodeRuleError(
-										""
-									);
 									setEpisodeRuleManagerOpen(
 										true
 									);
@@ -3177,6 +2144,7 @@ export default function DriveBrowser() {
 					</div>
 				)}
 
+
 				<div className="flex flex-col items-end gap-1">
 					<button
 						type="button"
@@ -3200,6 +2168,7 @@ export default function DriveBrowser() {
 					>
 						<ChevronUp className="h-4 w-4" />
 					</button>
+
 
 					<button
 						type="button"
@@ -3228,6 +2197,7 @@ export default function DriveBrowser() {
 					</button>
 				</div>
 
+
 				<button
 					onClick={() =>
 						setSettingsOpen(
@@ -3249,9 +2219,8 @@ export default function DriveBrowser() {
 				</button>
 			</div>
 
-			{/* =====================================================
-			    등록된 회차 규칙 관리
-			    ===================================================== */}
+
+			{/* 등록된 회차 규칙 관리 */}
 			{episodeRuleManagerOpen && (
 				<div
 					className="fixed inset-0 z-[100] flex items-end justify-center p-0 sm:items-center sm:p-6"
@@ -3273,6 +2242,7 @@ export default function DriveBrowser() {
 								"rgba(0,0,0,0.35)",
 						}}
 					/>
+
 
 					<div
 						className="relative flex w-full max-w-md flex-col overflow-hidden rounded-t-2xl sm:rounded-2xl"
@@ -3334,6 +2304,7 @@ export default function DriveBrowser() {
 								</div>
 							</div>
 
+
 							<button
 								type="button"
 								onClick={() =>
@@ -3351,6 +2322,7 @@ export default function DriveBrowser() {
 								<X className="h-4 w-4" />
 							</button>
 						</div>
+
 
 						<div className="shrink-0 px-5 py-4">
 							<div
@@ -3410,6 +2382,7 @@ export default function DriveBrowser() {
 								)}
 							</div>
 
+
 							{episodeRuleSearch && (
 								<p
 									className="mt-2 px-1 text-[10px]"
@@ -3425,6 +2398,7 @@ export default function DriveBrowser() {
 								</p>
 							)}
 						</div>
+
 
 						<div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
 							{episodeRulesLoading ? (
@@ -3572,6 +2546,7 @@ export default function DriveBrowser() {
 								</div>
 							)}
 						</div>
+
 
 						<div
 							className="shrink-0 px-5 py-4"
