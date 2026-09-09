@@ -23,23 +23,19 @@ import LogoutButton from "./LogoutButton";
 
 type Book = {
 	id: string;
-	user_id: string;
 	drive_file_id: string;
 	title: string;
 	total_episodes: number;
 	last_episode: number;
 	progress: number;
 	status: "읽는 중" | "완독" | "안 읽음";
-	created_at: string;
 	updated_at: string;
 	series_status: "ongoing" | "completed";
 	round_count?: number;
 	completed_round_count?: number;
 	current_round?: number | null;
-	current_round_id?: string | null;
 	current_episode?: number | null;
 	current_progress?: number | null;
-	current_scroll_position?: number | null;
 
 	// 작품 관리
 	is_reread_wanted?: boolean;

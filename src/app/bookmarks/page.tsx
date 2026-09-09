@@ -44,7 +44,7 @@ export default function BookmarksPage() {
       const [bookmarkResponse, booksResponse] =
         await Promise.all([
           fetch("/api/bookmarks"),
-          fetch("/api/books"),
+          fetch("/api/books?fields=titles"),
         ]);
 
       const bookmarkData =

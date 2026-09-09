@@ -2,6 +2,7 @@
 
 import {
 	useEffect,
+	useRef,
 } from "react";
 
 import type {
@@ -116,7 +117,56 @@ export function useFileOpen({
 	restoreScrollPositionRef,
 	skipScrollRestoreRef,
 }: UseFileOpenParams) {
+	/*
+	 * 콜백은 항상 최신 것을 쓰되,
+	 * 아래 openFile effect의 재실행 트리거가 되면 안 된다.
+	 * (saveProgress 는 매 렌더 새 참조 -> 무한 재로딩)
+	 */
+	const latestRef = useRef({
+		loadNovelFile,
+		setLoading,
+		setError,
+		setSelectedFile,
+		setFileContent,
+		setParsedNovel,
+		setSelectedEpisodeIndex,
+		setEpisodeRules,
+		initializeReadingState,
+		getBookmarkStatus,
+		saveProgress,
+	});
+
 	useEffect(() => {
+		latestRef.current = {
+			loadNovelFile,
+			setLoading,
+			setError,
+			setSelectedFile,
+			setFileContent,
+			setParsedNovel,
+			setSelectedEpisodeIndex,
+			setEpisodeRules,
+			initializeReadingState,
+			getBookmarkStatus,
+			saveProgress,
+		};
+	});
+
+	useEffect(() => {
+		const {
+			loadNovelFile,
+			setLoading,
+			setError,
+			setSelectedFile,
+			setFileContent,
+			setParsedNovel,
+			setSelectedEpisodeIndex,
+			setEpisodeRules,
+			initializeReadingState,
+			getBookmarkStatus,
+			saveProgress,
+		} = latestRef.current;
+
 		if (!fileId) {
 			setLoading(false);
 
@@ -179,14 +229,14 @@ export function useFileOpen({
 						parsed.episodes.length
 					);
 
+				if (cancelled) {
+					return;
+				}
+
 				if (!readingState) {
 					throw new Error(
 						"읽기 정보를 불러오지 못했습니다."
 					);
-				}
-
-				if (cancelled) {
-					return;
 				}
 
 				const savedProgress =
@@ -349,17 +399,6 @@ export function useFileOpen({
 		fileId,
 		targetEpisode,
 		highlightId,
-		loadNovelFile,
-		setLoading,
-		setError,
-		setSelectedFile,
-		setFileContent,
-		setParsedNovel,
-		setSelectedEpisodeIndex,
-		setEpisodeRules,
-		initializeReadingState,
-		getBookmarkStatus,
-		saveProgress,
 		restoreScrollPositionRef,
 		skipScrollRestoreRef,
 	]);

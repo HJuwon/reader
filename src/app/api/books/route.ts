@@ -3,8 +3,34 @@ import { authOptions } from "@/auth";
 import { supabase } from "@/lib/supabase";
 
 // ======================================================
-// Supabase 전체 행 조회
-// 기본 1,000개 제한을 피하기 위해 1,000개씩 반복 조회
+// 조회 설정
+//
+// PostgREST 는 한 요청에 최대 1,000 행만 돌려준다.
+// 그보다 많은 행은 페이지를 나눠 받아야 한다.
+// ======================================================
+
+const PAGE_SIZE = 1000;
+
+// 서재 / 이력 화면이 실제로 사용하는 컬럼만 받는다.
+const BOOK_COLUMNS =
+  "id,drive_file_id,title,total_episodes,last_episode,progress,status,series_status,updated_at,is_reread_wanted,is_excluded";
+
+// 제목만 필요한 화면(북마크, 하이라이트)용
+const BOOK_TITLE_COLUMNS =
+  "id,drive_file_id,title";
+
+const ROUND_COLUMNS =
+  "id,book_id,round,status,started_at,completed_at,created_at";
+
+const PROGRESS_COLUMNS =
+  "round_id,episode,progress,scroll_position,updated_at";
+
+// ======================================================
+// Supabase 전체 행 조회 (순차)
+//
+// 1,000 행을 넘지 않는 작은 테이블에 사용한다.
+// range 페이징은 정렬이 유일해야 중복/누락이 없으므로
+// 호출부에서 반드시 id 까지 정렬해 넘긴다.
 // ======================================================
 
 async function fetchAllRows(
@@ -13,7 +39,6 @@ async function fetchAllRows(
   data: any[];
   error: any;
 }> {
-  const pageSize = 1000;
   let from = 0;
   const allData: any[] = [];
 
@@ -23,7 +48,7 @@ async function fetchAllRows(
       error,
     } = await query.range(
       from,
-      from + pageSize - 1
+      from + PAGE_SIZE - 1
     );
 
     if (error) {
@@ -39,11 +64,11 @@ async function fetchAllRows(
 
     allData.push(...data);
 
-    if (data.length < pageSize) {
+    if (data.length < PAGE_SIZE) {
       break;
     }
 
-    from += pageSize;
+    from += PAGE_SIZE;
   }
 
   return {
@@ -53,11 +78,104 @@ async function fetchAllRows(
 }
 
 // ======================================================
-// GET
-// 소설 목록 조회
+// 책 전체 조회 (병렬)
+//
+// 책은 수천 권이 될 수 있어 순차 페이징이 그대로 지연이 된다.
+// 먼저 개수를 세고, 필요한 페이지를 한 번에 병렬로 받는다.
 // ======================================================
 
-export async function GET() {
+async function fetchAllBooks(
+  userId: string,
+  columns: string
+): Promise<{
+  data: any[];
+  error: any;
+}> {
+  const {
+    count,
+    error: countError,
+  } = await supabase
+    .from("books")
+    .select("id", {
+      count: "exact",
+      head: true,
+    })
+    .eq("user_id", userId);
+
+  if (countError) {
+    return {
+      data: [],
+      error: countError,
+    };
+  }
+
+  const total = count ?? 0;
+
+  if (total === 0) {
+    return {
+      data: [],
+      error: null,
+    };
+  }
+
+  const pageCount =
+    Math.ceil(total / PAGE_SIZE);
+
+  const pages = await Promise.all(
+    Array.from(
+      { length: pageCount },
+      (_, index) =>
+        supabase
+          .from("books")
+          .select(columns)
+          .eq("user_id", userId)
+          // updated_at 만으로는 동일 시각 행의 순서가 보장되지 않아
+          // 페이지 경계에서 중복/누락이 생길 수 있다.
+          .order("updated_at", {
+            ascending: false,
+          })
+          .order("id", {
+            ascending: true,
+          })
+          .range(
+            index * PAGE_SIZE,
+            index * PAGE_SIZE +
+              PAGE_SIZE -
+              1
+          )
+    )
+  );
+
+  const failed = pages.find(
+    (page) => page.error
+  );
+
+  if (failed?.error) {
+    return {
+      data: [],
+      error: failed.error,
+    };
+  }
+
+  return {
+    data: pages.flatMap(
+      (page) => page.data ?? []
+    ),
+    error: null,
+  };
+}
+
+// ======================================================
+// GET
+// 소설 목록 조회
+//
+// ?fields=titles   제목만 (북마크 / 하이라이트 화면)
+// ?include=rounds  회독 목록 포함 (읽기 이력 화면)
+// ======================================================
+
+export async function GET(
+  request: Request
+) {
   const session: any =
     await getServerSession(authOptions);
 
@@ -70,35 +188,98 @@ export async function GET() {
 
   const userId = session.user.email;
 
+  const params = new URL(
+    request.url
+  ).searchParams;
+
+  const titlesOnly =
+    params.get("fields") === "titles";
+
+  const includeRounds =
+    params.get("include") === "rounds";
+
   try {
     // --------------------------------------------------
-    // 1. 책 + 회차 병렬 조회
+    // 제목만 필요한 화면은 책만 조회하고 끝낸다.
+    // --------------------------------------------------
+
+    if (titlesOnly) {
+      const {
+        data: titleBooks,
+        error: titleBooksError,
+      } = await fetchAllBooks(
+        userId,
+        BOOK_TITLE_COLUMNS
+      );
+
+      if (titleBooksError) {
+        console.error(
+          "BOOKS GET ERROR:",
+          titleBooksError
+        );
+
+        return Response.json(
+          {
+            error:
+              titleBooksError.message,
+          },
+          { status: 500 }
+        );
+      }
+
+      return Response.json({
+        success: true,
+        data: titleBooks,
+      });
+    }
+
+    // --------------------------------------------------
+    // 1. 책 + 회차 + 진행상황 병렬 조회
+    //
+    // 진행상황은 round_id 목록에 의존하지 않도록
+    // reading_rounds 조인으로 직접 필터한다.
+    // (기존에는 회차 조회가 끝난 뒤 순차로 한 번 더 기다렸다)
     // --------------------------------------------------
 
     const [
       booksResult,
       roundsResult,
+      progressResult,
     ] = await Promise.all([
-      fetchAllRows(
-        supabase
-          .from("books")
-          .select(
-            "id,user_id,drive_file_id,title,total_episodes,last_episode,progress,status,series_status,created_at,updated_at,scroll_position,is_reread_wanted,is_excluded"
-          )
-          .eq("user_id", userId)
-          .order("updated_at", {
-            ascending: false,
-          })
+      fetchAllBooks(
+        userId,
+        BOOK_COLUMNS
       ),
 
       fetchAllRows(
         supabase
           .from("reading_rounds")
-          .select(
-            "id,user_id,book_id,round,status,started_at,completed_at,created_at"
-          )
+          .select(ROUND_COLUMNS)
           .eq("user_id", userId)
           .order("round", {
+            ascending: true,
+          })
+          .order("id", {
+            ascending: true,
+          })
+      ),
+
+      fetchAllRows(
+        supabase
+          .from("reading_progress")
+          .select(
+            PROGRESS_COLUMNS +
+              ",reading_rounds!inner(user_id)"
+          )
+          .eq(
+            "reading_rounds.user_id",
+            userId
+          )
+          // 한 회차에 여러 행이 있어도 최신 행이 마지막에 남도록
+          .order("updated_at", {
+            ascending: true,
+          })
+          .order("round_id", {
             ascending: true,
           })
       ),
@@ -138,18 +319,26 @@ export async function GET() {
       );
     }
 
+    const {
+      data: progress,
+      error: progressError,
+    } = progressResult;
+
+    if (progressError) {
+      console.error(
+        "READING PROGRESS GET ERROR:",
+        progressError
+      );
+
+      return Response.json(
+        { error: progressError.message },
+        { status: 500 }
+      );
+    }
+
     const bookList = books ?? [];
     const roundList = rounds ?? [];
-
-    console.log(
-      "BOOKS GET COUNT:",
-      bookList.length
-    );
-
-    console.log(
-      "READING ROUNDS GET COUNT:",
-      roundList.length
-    );
+    const progressList = progress ?? [];
 
     if (bookList.length === 0) {
       return Response.json({
@@ -159,53 +348,7 @@ export async function GET() {
     }
 
     // --------------------------------------------------
-    // 2. 회차별 진행상황 조회
-    // --------------------------------------------------
-
-    const roundIds = roundList.map(
-      (round) => round.id
-    );
-
-    let progressList: any[] = [];
-
-    if (roundIds.length > 0) {
-      const {
-        data: progress,
-        error: progressError,
-      } = await fetchAllRows(
-        supabase
-          .from("reading_progress")
-          .select(
-            "id,round_id,episode,progress,scroll_position,updated_at"
-          )
-          .in("round_id", roundIds)
-      );
-
-      if (progressError) {
-        console.error(
-          "READING PROGRESS GET ERROR:",
-          progressError
-        );
-
-        return Response.json(
-          {
-            error:
-              progressError.message,
-          },
-          { status: 500 }
-        );
-      }
-
-      progressList = progress ?? [];
-    }
-
-    console.log(
-      "READING PROGRESS GET COUNT:",
-      progressList.length
-    );
-
-    // --------------------------------------------------
-    // 3. Map 생성
+    // 2. Map 생성
     // --------------------------------------------------
 
     const roundsByBook = new Map<
@@ -232,37 +375,20 @@ export async function GET() {
       any
     >();
 
-    for (const progress of progressList) {
+    for (const item of progressList) {
       progressByRound.set(
-        progress.round_id,
-        progress
+        item.round_id,
+        item
       );
     }
 
     // --------------------------------------------------
-    // 4. 책별 데이터 조합
+    // 3. 책별 데이터 조합
     // --------------------------------------------------
 
     const result = bookList.map((book) => {
-      const rawBookRounds =
+      const bookRounds =
         roundsByBook.get(book.id) ?? [];
-
-      // 각 회독(round)에 해당 회독의 진행상황(episode/progress)을 붙여준다.
-      const bookRounds = rawBookRounds.map(
-        (round) => {
-          const roundProgress =
-            progressByRound.get(round.id) ??
-            null;
-
-          return {
-            ...round,
-            episode:
-              roundProgress?.episode ?? 0,
-            progress:
-              roundProgress?.progress ?? 0,
-          };
-        }
-      );
 
       const currentRound =
         [...bookRounds]
@@ -284,10 +410,8 @@ export async function GET() {
             ) ?? null
           : null;
 
-      return {
+      const summary = {
         ...book,
-
-        rounds: bookRounds,
 
         round_count:
           bookRounds.length,
@@ -303,10 +427,6 @@ export async function GET() {
           currentRound?.round ??
           null,
 
-        current_round_id:
-          currentRound?.id ??
-          null,
-
         current_episode:
           currentProgress?.episode ??
           0,
@@ -314,17 +434,36 @@ export async function GET() {
         current_progress:
           currentProgress?.progress ??
           0,
+      };
 
-        current_scroll_position:
-          currentProgress?.scroll_position ??
-          0,
+      if (!includeRounds) {
+        return summary;
+      }
+
+      // 읽기 이력 화면만 회독 목록이 필요하다.
+      return {
+        ...summary,
+
+        rounds: bookRounds.map(
+          (round) => {
+            const roundProgress =
+              progressByRound.get(
+                round.id
+              ) ?? null;
+
+            return {
+              ...round,
+              episode:
+                roundProgress?.episode ??
+                0,
+              progress:
+                roundProgress?.progress ??
+                0,
+            };
+          }
+        ),
       };
     });
-
-    console.log(
-      "BOOKS FINAL RESULT COUNT:",
-      result.length
-    );
 
     return Response.json({
       success: true,

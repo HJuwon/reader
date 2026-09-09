@@ -137,6 +137,32 @@ export function useReadingProgress({
   const skipScrollRestoreRef =
     useRef(false);
 
+  /*
+   * saveProgress / saveScrollPosition 이
+   * 매 렌더마다 새 참조가 되면
+   * 이들을 deps 에 넣은 effect 가 무한 재실행된다.
+   * 최신 값은 ref 로만 읽고, 콜백 자체는 참조를 고정한다.
+   */
+  const stateRef = useRef({
+    selectedFile,
+    parsedNovel,
+    selectedEpisode,
+    selectedEpisodeIndex,
+    roundId,
+    roundStatus,
+  });
+
+  useEffect(() => {
+    stateRef.current = {
+      selectedFile,
+      parsedNovel,
+      selectedEpisode,
+      selectedEpisodeIndex,
+      roundId,
+      roundStatus,
+    };
+  });
+
   const initializeReadingState =
     useCallback(
       async (
@@ -237,6 +263,13 @@ export function useReadingProgress({
           novel?: ParsedNovel;
         }
       ) => {
+        const {
+          selectedFile,
+          parsedNovel,
+          roundId,
+          roundStatus,
+        } = stateRef.current;
+
         const activeRoundId =
           targetRoundId ?? roundId;
 
@@ -361,12 +394,7 @@ export function useReadingProgress({
           setProgressSaving(false);
         }
       },
-      [
-        roundId,
-        selectedFile,
-        parsedNovel,
-        roundStatus,
-      ]
+      []
     );
 
   const saveScrollPosition =
@@ -374,6 +402,15 @@ export function useReadingProgress({
       async (
         position?: number
       ) => {
+        const {
+          selectedFile,
+          parsedNovel,
+          selectedEpisode,
+          selectedEpisodeIndex,
+          roundId,
+          roundStatus,
+        } = stateRef.current;
+
         if (
           !selectedFile ||
           !parsedNovel ||
@@ -471,14 +508,7 @@ export function useReadingProgress({
           );
         }
       },
-      [
-        selectedFile,
-        parsedNovel,
-        selectedEpisode,
-        selectedEpisodeIndex,
-        roundId,
-        roundStatus,
-      ]
+      []
     );
 
   useEffect(() => {
@@ -647,6 +677,7 @@ export function useReadingProgress({
     selectedEpisodeIndex,
     roundId,
     roundStatus,
+    // 참조 고정됨 (deps 에 있어도 재실행 안 됨)
     saveScrollPosition,
   ]);
 

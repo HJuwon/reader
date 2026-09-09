@@ -41,7 +41,7 @@ export default function HighlightsPage() {
       const [highlightsResponse, booksResponse] =
         await Promise.all([
           fetch("/api/highlights"),
-          fetch("/api/books"),
+          fetch("/api/books?fields=titles"),
         ]);
 
       const highlightsData =

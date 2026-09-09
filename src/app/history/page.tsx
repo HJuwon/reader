@@ -56,7 +56,7 @@ export default function HistoryPage() {
       setError("");
 
       try {
-        const response = await fetch("/api/books");
+        const response = await fetch("/api/books?include=rounds");
 
         const data = await response.json();
 
