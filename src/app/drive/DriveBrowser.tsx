@@ -1,4 +1,16 @@
 "use client";
+import { useNovelLoader } from "./hooks/useNovelLoader";
+
+import {
+  useHighlights,
+  type HighlightItem,
+} from "./hooks/useHighlights";
+import { useBookmark } from "./hooks/useBookmark";
+import {
+  initializeReadingState,
+  saveReadingProgress,
+  type ReadingState,
+} from "./utils/readingProgress";
 
 import {
 	parseNovel,
@@ -31,6 +43,7 @@ import {
 	X,
 } from "lucide-react";
 
+
 type DriveItem = {
 	id: string;
 	name: string;
@@ -39,53 +52,6 @@ type DriveItem = {
 	size?: string;
 };
 
-type HighlightItem = {
-	id: string;
-	book_id: string;
-	drive_file_id: string;
-	episode: number;
-	text: string;
-	start_offset: number | null;
-	end_offset: number | null;
-	created_at: string;
-};
-
-type BookInfo = {
-	id: string;
-	drive_file_id: string;
-	title: string;
-	total_episodes: number;
-	last_episode?: number;
-	progress?: number;
-	status?: string;
-	scroll_position?: number;
-};
-
-type ReadingRound = {
-	id: string;
-	user_id: string;
-	book_id: string;
-	round: number;
-	status: "reading" | "completed";
-	started_at: string;
-	completed_at: string | null;
-	created_at: string;
-};
-
-type ReadingProgress = {
-	id: string;
-	round_id: string;
-	episode: number;
-	progress: number;
-	scroll_position: number;
-	updated_at: string;
-};
-
-type ReadingState = {
-	book: BookInfo;
-	round: ReadingRound;
-	progress: ReadingProgress;
-};
 
 const SERIF =
 	"'Noto Serif KR', 'Nanum Myeongjo', ui-serif, Georgia, serif";
@@ -171,10 +137,14 @@ const DEFAULT_FONT_SIZE = 16;
 const SETTINGS_KEY = "novel-reader-settings";
 
 export default function DriveBrowser() {
-	const searchParams = useSearchParams();
+  const searchParams = useSearchParams();
 
-	const highlightId =
-		searchParams.get("highlightId");
+  const {
+    loadNovelFile,
+  } = useNovelLoader();
+
+  const highlightId =
+    searchParams.get("highlightId");
 
 	const [loading, setLoading] =
 		useState(true);
@@ -197,12 +167,6 @@ export default function DriveBrowser() {
 	const [progressSaving, setProgressSaving] =
 		useState(false);
 
-	const [bookmarked, setBookmarked] =
-		useState(false);
-
-	const [bookmarkLoading, setBookmarkLoading] =
-		useState(false);
-
 	const [bookId, setBookId] =
 		useState<string | null>(null);
 
@@ -213,6 +177,7 @@ export default function DriveBrowser() {
 		useState<"reading" | "completed">(
 			"reading"
 		);
+
 
 	const [themeKey, setThemeKey] =
 		useState<ThemeKey>("ivory");
@@ -225,12 +190,6 @@ export default function DriveBrowser() {
 
 	const [chromeVisible, setChromeVisible] =
 		useState(true);
-
-	const [highlightLoading, setHighlightLoading] =
-		useState(false);
-
-	const [highlights, setHighlights] =
-		useState<HighlightItem[]>([]);
 
 	const [episodeSearch, setEpisodeSearch] =
 		useState("");
@@ -324,6 +283,29 @@ export default function DriveBrowser() {
 		parsedNovel?.episodes[
 			selectedEpisodeIndex
 		];
+
+	const {
+		bookmarked,
+		bookmarkLoading,
+		getBookmarkStatus,
+		toggleBookmark,
+	} = useBookmark({
+		bookId,
+		fileId:
+			selectedFile?.id ?? null,
+		episode:
+			selectedEpisode?.episode ?? null,
+	});
+	const {
+		highlights,
+		highlightLoading,
+		saveHighlight: saveHighlightApi,
+	} = useHighlights({
+		fileId:
+			selectedFile?.id ?? null,
+		episode:
+			selectedEpisode?.episode ?? null,
+	});
 
 	const filteredEpisodes =
 		parsedNovel?.episodes.filter(
@@ -906,146 +888,6 @@ export default function DriveBrowser() {
 		}
 	}
 
-	async function getBookmarkStatus(
-		fileId: string,
-		episode: number
-	) {
-		try {
-			const response =
-				await fetch(
-					`/api/bookmarks?driveFileId=${encodeURIComponent(
-						fileId
-					)}&episode=${episode}`
-				);
-
-			const data =
-				await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					extractErrorMessage(
-						data,
-						"북마크 상태를 불러오지 못했습니다."
-					)
-				);
-			}
-
-			setBookmarked(
-				!!data.bookmarked
-			);
-		} catch (error) {
-			console.error(
-				"북마크 상태 불러오기 실패:",
-				error
-			);
-
-			setBookmarked(false);
-		}
-	}
-
-	async function toggleBookmark() {
-		if (
-			!selectedFile ||
-			!parsedNovel ||
-			!bookId
-		) {
-			return;
-		}
-
-		const currentBookId =
-			bookId;
-
-		const episode =
-			parsedNovel.episodes[
-				selectedEpisodeIndex
-			];
-
-		if (!episode) {
-			return;
-		}
-
-		setBookmarkLoading(
-			true
-		);
-
-		try {
-			if (bookmarked) {
-				const response =
-					await fetch(
-						`/api/bookmarks?driveFileId=${encodeURIComponent(
-							selectedFile.id
-						)}&episode=${episode.episode}`,
-						{
-							method:
-								"DELETE",
-						}
-					);
-
-				const data =
-					await response.json();
-
-				if (!response.ok) {
-					throw new Error(
-						extractErrorMessage(
-							data,
-							"북마크를 삭제하지 못했습니다."
-						)
-					);
-				}
-
-				setBookmarked(
-					false
-				);
-			} else {
-				const response =
-					await fetch(
-						"/api/bookmarks",
-						{
-							method:
-								"POST",
-							headers: {
-								"Content-Type":
-									"application/json",
-							},
-							body: JSON.stringify({
-								book_id:
-									currentBookId,
-								drive_file_id:
-									selectedFile.id,
-								episode:
-									episode.episode,
-							}),
-						}
-					);
-
-				const data =
-					await response.json();
-
-				if (!response.ok) {
-					throw new Error(
-						extractErrorMessage(
-							data,
-							"북마크를 저장하지 못했습니다."
-						)
-					);
-				}
-
-				setBookmarked(
-					true
-				);
-			}
-		} catch (error) {
-			console.error(
-				"북마크 처리 실패:",
-				error
-			);
-		} finally {
-			setBookmarkLoading(
-				false
-			);
-		}
-	}
-
 	// 본문 수정 시작
 	function startEditingContent() {
 		if (!selectedEpisode) {
@@ -1158,60 +1000,9 @@ export default function DriveBrowser() {
 		}
 	}
 
-	async function loadHighlights(
-		fileId: string,
-		episode: number
-	) {
-		try {
-			const response =
-				await fetch(
-					`/api/highlights?driveFileId=${encodeURIComponent(
-						fileId
-					)}&episode=${episode}`
-				);
+	
 
-			const data =
-				await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					extractErrorMessage(
-						data,
-						"하이라이트를 불러오지 못했습니다."
-					)
-				);
-			}
-
-			setHighlights(
-				data.data || []
-			);
-		} catch (error) {
-			console.error(
-				"하이라이트 불러오기 실패:",
-				error
-			);
-
-			setHighlights([]);
-		}
-	}
-
-	useEffect(() => {
-		if (
-			!selectedFile ||
-			!selectedEpisode
-		) {
-			setHighlights([]);
-			return;
-		}
-
-		void loadHighlights(
-			selectedFile.id,
-			selectedEpisode.episode
-		);
-	}, [
-		selectedFile,
-		selectedEpisodeIndex,
-	]);
+	
 
 	useEffect(() => {
 		if (!highlightId) {
@@ -1909,90 +1700,42 @@ export default function DriveBrowser() {
 	}
 
 	async function saveHighlight(
-		text: string,
-		startOffset: number,
-		endOffset: number
+	text: string,
+	startOffset: number,
+	endOffset: number
 	) {
-		if (
-			!selectedFile ||
-			!parsedNovel ||
-			!bookId ||
-			!selectedEpisode
-		) {
-			return;
-		}
+	if (
+		!selectedFile ||
+		!parsedNovel ||
+		!bookId ||
+		!selectedEpisode
+	) {
+		return;
+	}
 
-		const activeBookId =
-			bookId;
-
-		setHighlightLoading(
-			true
+	const success =
+		await saveHighlightApi(
+		bookId,
+		selectedFile.id,
+		selectedEpisode.episode,
+		text,
+		startOffset,
+		endOffset
 		);
 
-		try {
-			const response =
-				await fetch(
-					"/api/highlights",
-					{
-						method: "POST",
-						headers: {
-							"Content-Type":
-								"application/json",
-						},
-						body: JSON.stringify({
-							book_id:
-								activeBookId,
-							drive_file_id:
-								selectedFile.id,
-							episode:
-								selectedEpisode.episode,
-							text,
-							start_offset:
-								startOffset,
-							end_offset:
-								endOffset,
-						}),
-					}
-				);
+	if (!success) {
+		return;
+	}
 
-			const data =
-				await response.json();
+	window
+		.getSelection()
+		?.removeAllRanges();
 
-			if (!response.ok) {
-				throw new Error(
-					extractErrorMessage(
-						data,
-						"하이라이트를 저장하지 못했습니다."
-					)
-				);
-			}
+	setShowHighlightButton(false);
 
-			await loadHighlights(
-				selectedFile.id,
-				selectedEpisode.episode
-			);
+	setSelectedTextForHighlight("");
 
-			window.getSelection()?.removeAllRanges();
-
-			setShowHighlightButton(
-				false
-			);
-			setSelectedTextForHighlight(
-				""
-			);
-			setSelectedHighlightRange(
-				null
-			);
-		} catch (error) {
-			console.error(
-				"하이라이트 저장 실패:",
-				error
-			);
-		} finally {
-			setHighlightLoading(
-				false
-			);
-		}
+	setSelectedHighlightRange(null);
 	}
 
 	function handleTextSelection() {
@@ -2378,110 +2121,46 @@ export default function DriveBrowser() {
 			setError("");
 
 			try {
-				const [
-					infoResponse,
-					fileResponse,
-					rulesResponse,
-				] = await Promise.all([
-					fetch(
-						`/api/drive/file-info?fileId=${encodeURIComponent(
-							fileId
-						)}`
-					),
-
-					fetch(
-						`/api/drive/file?fileId=${encodeURIComponent(
-							fileId
-						)}`
-					),
-
-					fetch(
-						"/api/episode-rules"
-					),
-				]);
-
-				const [
-					infoData,
-					fileData,
-					rulesData,
-				] = await Promise.all([
-					infoResponse.json(),
-					fileResponse.json(),
-					rulesResponse.json(),
-				]);
-
-				if (!infoResponse.ok) {
-					throw new Error(
-						extractErrorMessage(
-							infoData,
-							"파일 정보를 가져오지 못했습니다."
-						)
-					);
-				}
-
-				if (!fileResponse.ok) {
-					throw new Error(
-						extractErrorMessage(
-							fileData,
-							"파일을 가져오지 못했습니다."
-						)
-					);
-				}
+				const result =
+					await loadNovelFile(fileId);
 
 				if (cancelled) {
-					return;
+				return;
 				}
 
-				const loadedEpisodeRules: EpisodeRule[] =
-					rulesResponse.ok &&
-					Array.isArray(
-						rulesData?.data
-					)
-						? rulesData.data
-						: [];
+				const {
+				file: item,
+				content,
+				parsedNovel: parsed,
+				episodeRules:
+					loadedEpisodeRules,
+				} = result;
 
 				setEpisodeRules(
-					loadedEpisodeRules
+				loadedEpisodeRules
 				);
-
-				const parsed =
-					parseNovel(
-						fileData.content,
-						loadedEpisodeRules
-					);
 
 				console.log(
-					"PARSED NOVEL:",
-					parsed
+				"PARSED NOVEL:",
+				parsed
 				);
 
-				const item: DriveItem = {
-					id: infoData.id,
-					name: infoData.name,
-					mimeType:
-						infoData.mimeType,
-					modifiedTime:
-						infoData.modifiedTime,
-					size:
-						infoData.size,
-				};
-
 				setSelectedFile(
-					item
+				item
 				);
 
 				setFileContent(
-					fileData.content
+				content
 				);
 
 				setParsedNovel(
-					parsed
+				parsed
 				);
 
 				const readingState =
 					await initializeReadingState(
 						fileId,
-						infoData.name,
+						item.name,
 						parsed.episodes.length
 					);
 
