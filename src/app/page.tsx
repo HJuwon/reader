@@ -1741,7 +1741,7 @@ export default function Home() {
 							{/* 페이지네이션 */}
 							{totalPages >
 								1 && (
-								<div className="mt-5 mb-20 flex items-center justify-center gap-1 sm:gap-1.5">
+								<div className="mt-5 mb-12 flex items-center justify-center gap-1 sm:gap-1.5">
 									<button
 										type="button"
 										onClick={() =>
