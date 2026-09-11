@@ -4,11 +4,10 @@ import CredentialsProvider from "next-auth/providers/credentials";
 
 export const authOptions: AuthOptions = {
   providers: [
-    // 웹용 기존 Google 로그인
+    // 웹 브라우저용 Google 로그인
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-
       authorization: {
         params: {
           scope:
@@ -18,7 +17,7 @@ export const authOptions: AuthOptions = {
       },
     }),
 
-    // Android APK용 Google 로그인
+    // Android APK용 네이티브 Google 로그인
     CredentialsProvider({
       id: "mobile-google",
       name: "Mobile Google",
@@ -40,7 +39,7 @@ export const authOptions: AuthOptions = {
         }
 
         try {
-          // Google ID Token 검증
+          // Android에서 받은 Google ID Token 검증
           const response = await fetch(
             `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(
               credentials.idToken,
@@ -54,7 +53,7 @@ export const authOptions: AuthOptions = {
 
           const googleUser = await response.json();
 
-          // 우리 앱의 Google Client ID인지 확인
+          // 우리 서비스에서 사용하는 Web Client ID인지 확인
           if (
             process.env.GOOGLE_CLIENT_ID &&
             googleUser.aud !== process.env.GOOGLE_CLIENT_ID
@@ -74,7 +73,7 @@ export const authOptions: AuthOptions = {
             email: googleUser.email,
             image: googleUser.picture ?? null,
 
-            // Android Google 로그인에서 받은
+            // Android Google Sign-In에서 받은
             // Google Drive Access Token
             accessToken: credentials.accessToken ?? null,
           };
@@ -93,7 +92,9 @@ export const authOptions: AuthOptions = {
 
   callbacks: {
     async jwt({ token, account, user }: any) {
-      // 일반 웹 Google 로그인
+      // --------------------------------
+      // 1. 웹 Google 로그인
+      // --------------------------------
       if (account?.provider === "google") {
         token.accessToken = account.access_token;
 
@@ -107,15 +108,21 @@ export const authOptions: AuthOptions = {
         return token;
       }
 
-      // Android 네이티브 Google 로그인
+      // --------------------------------
+      // 2. Android 네이티브 Google 로그인
+      // --------------------------------
       if (account?.provider === "mobile-google") {
         token.accessToken = user?.accessToken ?? null;
+
+        // Google Access Token은 기본적으로 약 1시간 유효
         token.accessTokenExpires = Date.now() + 3600 * 1000;
 
         return token;
       }
 
-      // 아직 Access Token이 유효한 경우
+      // --------------------------------
+      // 3. Access Token이 아직 유효한 경우
+      // --------------------------------
       if (
         token.accessToken &&
         token.accessTokenExpires &&
@@ -124,13 +131,16 @@ export const authOptions: AuthOptions = {
         return token;
       }
 
-      // Refresh Token이 없는 경우
+      // --------------------------------
+      // 4. Refresh Token이 없는 경우
+      // --------------------------------
       if (!token.refreshToken) {
-        console.error("Google refresh token이 없습니다.");
         return token;
       }
 
-      // 웹 Google 로그인 Access Token 갱신
+      // --------------------------------
+      // 5. 웹 Google Access Token 갱신
+      // --------------------------------
       try {
         const response = await fetch(
           "https://oauth2.googleapis.com/token",

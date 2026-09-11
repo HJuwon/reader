@@ -19,7 +19,11 @@ export const metadata: Metadata = {
   description: "Web Novel Reader",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+type RootLayoutProps = {
+  children: React.ReactNode;
+};
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html
       lang="ko"
