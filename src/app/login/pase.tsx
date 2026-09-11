@@ -6,7 +6,7 @@ import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
 
 export default function LoginPage() {
   const handleGoogleLogin = async () => {
-    // 일반 웹에서는 기존 NextAuth Google 로그인을 그대로 사용
+    // 웹에서는 기존 NextAuth Google 로그인을 그대로 사용
     if (!Capacitor.isNativePlatform()) {
       await signIn("google", { callbackUrl: "/" });
       return;
@@ -14,12 +14,37 @@ export default function LoginPage() {
 
     // Android APK에서는 네이티브 Google 로그인 사용
     try {
-      const user = await GoogleAuth.signIn();
+      const result = await GoogleAuth.signIn();
 
-      console.log("Google 로그인 성공:", user);
+      console.log("Google 로그인 결과:", result);
 
-      // 현재는 Google 인증 결과 확인 단계
-      // 다음 단계에서 이 결과를 NextAuth 세션과 연결한다.
+      const idToken = result?.authentication?.idToken;
+
+      if (!idToken) {
+        throw new Error("Google ID Token을 받지 못했습니다.");
+      }
+
+      const response = await fetch("/api/mobile-auth", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          idToken,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.ok) {
+        throw new Error(
+          data.error || "모바일 Google 인증에 실패했습니다.",
+        );
+      }
+
+      console.log("모바일 Google 인증 성공:", data.user);
+
+      // 다음 단계에서 여기서 NextAuth 세션을 생성하도록 연결한다.
     } catch (error) {
       console.error("Google 로그인 실패:", error);
     }
