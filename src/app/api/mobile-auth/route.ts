@@ -1,5 +1,24 @@
 import { NextResponse } from "next/server";
 
+export async function GET() {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+
+  if (!clientId) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "GOOGLE_CLIENT_ID가 설정되어 있지 않습니다.",
+      },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    clientId,
+  });
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();

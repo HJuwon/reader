@@ -1,31 +1,72 @@
 "use client";
 
+import { useState } from "react";
 import { Capacitor } from "@capacitor/core";
 import { signIn } from "next-auth/react";
-import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
+import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
+
+let googleInitialized = false;
+
+async function initializeGoogleSignIn() {
+  if (googleInitialized) return;
+
+  const response = await fetch("/api/mobile-auth");
+
+  if (!response.ok) {
+    throw new Error("Google Client ID를 가져오지 못했습니다.");
+  }
+
+  const data = await response.json();
+
+  if (!data.clientId) {
+    throw new Error("Google Client ID가 없습니다.");
+  }
+
+  await GoogleSignIn.initialize({
+    clientId: data.clientId,
+    scopes: [
+      "openid",
+      "email",
+      "profile",
+      "https://www.googleapis.com/auth/drive",
+    ],
+  });
+
+  googleInitialized = true;
+}
 
 export default function LoginPage() {
-  const handleGoogleLogin = async () => {
-    // 일반 웹
-    if (!Capacitor.isNativePlatform()) {
-      await signIn("google", { callbackUrl: "/" });
-      return;
-    }
+  const [loading, setLoading] = useState(false);
 
-    // Android APK
+  const handleGoogleLogin = async () => {
+    if (loading) return;
+
+    setLoading(true);
+
     try {
-      const result = await GoogleAuth.signIn();
+      // 일반 웹
+      if (!Capacitor.isNativePlatform()) {
+        await signIn("google", {
+          callbackUrl: "/",
+        });
+        return;
+      }
+
+      // Android APK
+      await initializeGoogleSignIn();
+
+      const result = await GoogleSignIn.signIn();
 
       console.log("Google 로그인 결과:", result);
 
-      const idToken = result?.authentication?.idToken;
-      const accessToken = result?.authentication?.accessToken;
+      const idToken = result.idToken;
+      const accessToken = result.accessToken;
 
       if (!idToken) {
         throw new Error("Google ID Token을 받지 못했습니다.");
       }
 
-      // NextAuth의 mobile-google Credentials Provider로 로그인
+      // NextAuth mobile-google Credentials Provider로 로그인
       const loginResult = await signIn("mobile-google", {
         idToken,
         accessToken: accessToken ?? "",
@@ -36,11 +77,19 @@ export default function LoginPage() {
         throw new Error(loginResult.error);
       }
 
-      // 로그인 성공
+      // NextAuth 세션 생성 후 홈으로 이동
       window.location.href = "/";
     } catch (error) {
       console.error("Google 로그인 실패:", error);
-      alert("Google 로그인에 실패했습니다.");
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Google 로그인에 실패했습니다.";
+
+      alert(message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -57,9 +106,10 @@ export default function LoginPage() {
 
         <button
           onClick={handleGoogleLogin}
-          className="mt-8 w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white hover:bg-gray-800"
+          disabled={loading}
+          className="mt-8 w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Google로 로그인
+          {loading ? "로그인 중..." : "Google로 로그인"}
         </button>
       </div>
     </main>
