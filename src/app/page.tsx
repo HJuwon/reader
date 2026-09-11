@@ -530,37 +530,17 @@ export default function Home() {
 	]);
 
 	const pageNumbers = useMemo(() => {
-		if (totalPages <= 5) {
-			return Array.from(
-				{
-					length: totalPages,
-				},
-				(_, index) =>
-					index + 1
-			);
-		}
-
-		let start = Math.max(
-			1,
-			currentPage - 2
-		);
-
-		let end = Math.min(
+		const start =
+			Math.floor((currentPage - 1) / 5) * 5 + 1;
+	
+		const end = Math.min(
 			totalPages,
 			start + 4
 		);
-
-		if (end - start < 4) {
-			start = Math.max(
-				1,
-				end - 4
-			);
-		}
-
+	
 		return Array.from(
 			{
-				length:
-					end - start + 1,
+				length: end - start + 1,
 			},
 			(_, index) =>
 				start + index
@@ -1741,7 +1721,7 @@ export default function Home() {
 							{/* 페이지네이션 */}
 							{totalPages >
 								1 && (
-								<div className="mt-5 mb-12 flex items-center justify-center gap-1 sm:gap-1.5">
+								<div className="mt-5 mb-10 flex items-center justify-center gap-1 sm:gap-1.5">
 									<button
 										type="button"
 										onClick={() =>
