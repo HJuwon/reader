@@ -161,6 +161,7 @@ function getLengthBucket(
 }
 
 const ITEMS_PER_PAGE = 20;
+const PAGE_GROUP_SIZE = 5;
 
 type ManagementFilter =
 	| "none"
@@ -205,6 +206,10 @@ export default function Home() {
 		currentPage,
 		setCurrentPage,
 	] = useState(1);
+
+	// 페이지 직접 입력용
+	const [pageInput, setPageInput] =
+		useState("");
 
 	const [
 		openMenuId,
@@ -301,6 +306,7 @@ export default function Home() {
 
 	useEffect(() => {
 		setCurrentPage(1);
+		setPageInput("");
 	}, [
 		search,
 		filter,
@@ -531,16 +537,24 @@ export default function Home() {
 
 	const pageNumbers = useMemo(() => {
 		const start =
-			Math.floor((currentPage - 1) / 5) * 5 + 1;
-	
+			Math.floor(
+				(currentPage - 1) /
+					PAGE_GROUP_SIZE
+			) *
+				PAGE_GROUP_SIZE +
+			1;
+
 		const end = Math.min(
 			totalPages,
-			start + 4
+			start + PAGE_GROUP_SIZE - 1
 		);
-	
+
 		return Array.from(
 			{
-				length: end - start + 1,
+				length: Math.max(
+					0,
+					end - start + 1
+				),
 			},
 			(_, index) =>
 				start + index
@@ -584,6 +598,60 @@ export default function Home() {
 			top: 0,
 			behavior: "smooth",
 		});
+	}
+
+	// 현재 페이지 그룹의 첫 페이지
+	const currentPageGroupStart =
+		Math.floor(
+			(currentPage - 1) /
+				PAGE_GROUP_SIZE
+		) *
+			PAGE_GROUP_SIZE +
+		1;
+
+	// 이전 페이지 그룹으로 이동
+	function goToPreviousPageGroup() {
+		const previousGroupStart =
+			currentPageGroupStart -
+			PAGE_GROUP_SIZE;
+
+		changePage(
+			Math.max(
+				1,
+				previousGroupStart
+			)
+		);
+	}
+
+	// 다음 페이지 그룹으로 이동
+	function goToNextPageGroup() {
+		const nextGroupStart =
+			currentPageGroupStart +
+			PAGE_GROUP_SIZE;
+
+		changePage(
+			Math.min(
+				totalPages,
+				nextGroupStart
+			)
+		);
+	}
+
+	// 입력한 페이지로 이동
+	function goToInputPage() {
+		const page =
+			Number(pageInput);
+
+		if (
+			!Number.isInteger(page) ||
+			page < 1 ||
+			page > totalPages
+		) {
+			return;
+		}
+
+		changePage(page);
+		setPageInput("");
 	}
 
 	const recentBooks = useMemo(() => {
@@ -1721,20 +1789,14 @@ export default function Home() {
 							{/* 페이지네이션 */}
 							{totalPages >
 								1 && (
-								<div className="mt-5 mb-10 flex items-center justify-center gap-1 sm:gap-1.5">
+								<div className="mt-5 mb-10 flex flex-wrap items-center justify-center gap-1 sm:gap-1.5">
 									<button
 										type="button"
-										onClick={() =>
-											changePage(
-												Math.max(
-													1,
-													currentPage -
-														5
-												)
-											)
+										onClick={
+											goToPreviousPageGroup
 										}
 										disabled={
-											currentPage ===
+											currentPageGroupStart ===
 											1
 										}
 										className="rounded-lg border bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-default disabled:opacity-30 sm:px-3 sm:text-sm"
@@ -1772,23 +1834,61 @@ export default function Home() {
 
 									<button
 										type="button"
-										onClick={() =>
-											changePage(
-												Math.min(
-													totalPages,
-													currentPage +
-														5
-												)
-											)
+										onClick={
+											goToNextPageGroup
 										}
 										disabled={
-											currentPage ===
+											currentPageGroupStart +
+												PAGE_GROUP_SIZE >
 											totalPages
 										}
 										className="rounded-lg border bg-white px-2.5 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:cursor-default disabled:opacity-30 sm:px-3 sm:text-sm"
 									>
 										다음
 									</button>
+
+									{/* 페이지 직접 입력 */}
+									<div className="ml-2 flex items-center gap-1.5">
+										<input
+											type="number"
+											min={1}
+											max={
+												totalPages
+											}
+											value={
+												pageInput
+											}
+											onChange={(
+												event
+											) =>
+												setPageInput(
+													event
+														.target
+														.value
+												)
+											}
+											onKeyDown={(
+												event
+											) => {
+												if (
+													event.key ===
+													"Enter"
+												) {
+													goToInputPage();
+												}
+											}}
+											placeholder={`${currentPage}`}
+											aria-label="이동할 페이지"
+											className="h-8 w-14 rounded-lg border border-gray-200 bg-white px-2 text-center text-xs outline-none transition focus:border-gray-400 focus:ring-2 focus:ring-gray-100 sm:h-9 sm:w-16 sm:text-sm"
+										/>
+
+										<span className="whitespace-nowrap text-xs text-gray-400 sm:text-sm">
+											/{" "}
+											{
+												totalPages
+											}
+										</span>
+									</div>
 								</div>
 							)}
 						</>
@@ -1816,4 +1916,3 @@ export default function Home() {
 		</main>
 	);
 }
-
