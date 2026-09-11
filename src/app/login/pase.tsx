@@ -6,47 +6,41 @@ import { GoogleAuth } from "@codetrix-studio/capacitor-google-auth";
 
 export default function LoginPage() {
   const handleGoogleLogin = async () => {
-    // 웹에서는 기존 NextAuth Google 로그인을 그대로 사용
+    // 일반 웹
     if (!Capacitor.isNativePlatform()) {
       await signIn("google", { callbackUrl: "/" });
       return;
     }
 
-    // Android APK에서는 네이티브 Google 로그인 사용
+    // Android APK
     try {
       const result = await GoogleAuth.signIn();
 
       console.log("Google 로그인 결과:", result);
 
       const idToken = result?.authentication?.idToken;
+      const accessToken = result?.authentication?.accessToken;
 
       if (!idToken) {
         throw new Error("Google ID Token을 받지 못했습니다.");
       }
 
-      const response = await fetch("/api/mobile-auth", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          idToken,
-        }),
+      // NextAuth의 mobile-google Credentials Provider로 로그인
+      const loginResult = await signIn("mobile-google", {
+        idToken,
+        accessToken: accessToken ?? "",
+        redirect: false,
       });
 
-      const data = await response.json();
-
-      if (!response.ok || !data.ok) {
-        throw new Error(
-          data.error || "모바일 Google 인증에 실패했습니다.",
-        );
+      if (loginResult?.error) {
+        throw new Error(loginResult.error);
       }
 
-      console.log("모바일 Google 인증 성공:", data.user);
-
-      // 다음 단계에서 여기서 NextAuth 세션을 생성하도록 연결한다.
+      // 로그인 성공
+      window.location.href = "/";
     } catch (error) {
       console.error("Google 로그인 실패:", error);
+      alert("Google 로그인에 실패했습니다.");
     }
   };
 
