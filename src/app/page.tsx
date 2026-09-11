@@ -36,8 +36,6 @@ type Book = {
 	current_round?: number | null;
 	current_episode?: number | null;
 	current_progress?: number | null;
-
-	// 작품 관리
 	is_reread_wanted?: boolean;
 	is_excluded?: boolean;
 };
@@ -102,35 +100,23 @@ function ProgressRing({
 	);
 }
 
-function getTitleEpisodeCount(
-	title: string
-): number {
+function getTitleEpisodeCount(title: string): number {
 	const matches = [
-		...title.matchAll(
-			/(\d+)\s*[-~]\s*(\d+)/g
-		),
+		...title.matchAll(/(\d+)\s*[-~]\s*(\d+)/g),
 	];
 
 	if (matches.length === 0) {
 		return 0;
 	}
 
-	const last =
-		matches[matches.length - 1];
+	const last = matches[matches.length - 1];
 
-	const count = parseInt(
-		last[2],
-		10
-	);
+	const count = parseInt(last[2], 10);
 
-	return Number.isFinite(count)
-		? count
-		: 0;
+	return Number.isFinite(count) ? count : 0;
 }
 
-function getEffectiveTotalEpisodes(
-	book: Book
-): number {
+function getEffectiveTotalEpisodes(book: Book): number {
 	return Math.max(
 		book.total_episodes || 0,
 		getTitleEpisodeCount(book.title)
@@ -145,8 +131,7 @@ const TOGGLE_TAGS = [
 	"장편",
 ] as const;
 
-type ToggleTag =
-	(typeof TOGGLE_TAGS)[number];
+type ToggleTag = (typeof TOGGLE_TAGS)[number];
 
 const COMPLETION_TAGS: ToggleTag[] = [
 	"완결",
@@ -162,8 +147,7 @@ const LENGTH_TAGS: ToggleTag[] = [
 function getLengthBucket(
 	book: Book
 ): "단편" | "중편" | "장편" {
-	const total =
-		getEffectiveTotalEpisodes(book);
+	const total = getEffectiveTotalEpisodes(book);
 
 	if (total > 1000) {
 		return "장편";
@@ -217,19 +201,16 @@ export default function Home() {
 	const [syncing, setSyncing] =
 		useState(false);
 
-	// 페이지네이션
 	const [
 		currentPage,
 		setCurrentPage,
 	] = useState(1);
 
-	// 작품 관리 메뉴
 	const [
 		openMenuId,
 		setOpenMenuId,
 	] = useState<string | null>(null);
 
-	// 관리함
 	const [
 		managementFilter,
 		setManagementFilter,
@@ -242,13 +223,11 @@ export default function Home() {
 		setManagementMenuOpen,
 	] = useState(false);
 
-	// 완결/미완/단편 등 태그 필터 열림 여부
 	const [
 		tagFilterOpen,
 		setTagFilterOpen,
 	] = useState(false);
 
-	// 전체 소설 영역 위치
 	const allBooksSectionRef =
 		useRef<HTMLElement>(null);
 
@@ -320,7 +299,6 @@ export default function Home() {
 		loadBooks();
 	}, []);
 
-	// 검색 / 필터 / 태그 / 정렬 / 관리함이 변경되면 1페이지로 이동
 	useEffect(() => {
 		setCurrentPage(1);
 	}, [
@@ -331,7 +309,6 @@ export default function Home() {
 		managementFilter,
 	]);
 
-	// 페이지 전체 스크롤에 따른 맨 위로 버튼
 	useEffect(() => {
 		function handleScroll() {
 			setShowScrollTop(
@@ -352,7 +329,6 @@ export default function Home() {
 		};
 	}, []);
 
-	// 메뉴 바깥을 클릭하면 닫기
 	useEffect(() => {
 		function handleClickOutside(
 			event: MouseEvent
@@ -401,7 +377,6 @@ export default function Home() {
 				.toLowerCase();
 
 		return books.filter((book) => {
-			// 제외된 작품은 일반 목록에서 숨김
 			if (
 				managementFilter ===
 					"none" &&
@@ -410,7 +385,6 @@ export default function Home() {
 				return false;
 			}
 
-			// 관리함 - 다시 볼 작품
 			if (
 				managementFilter ===
 					"reread" &&
@@ -419,7 +393,6 @@ export default function Home() {
 				return false;
 			}
 
-			// 관리함 - 제외한 작품
 			if (
 				managementFilter ===
 					"excluded" &&
@@ -428,7 +401,6 @@ export default function Home() {
 				return false;
 			}
 
-			// 관리함을 보고 있을 때는 기존 상태 필터를 적용하지 않음
 			const matchesStatus =
 				managementFilter !==
 					"none" ||
@@ -523,13 +495,11 @@ export default function Home() {
 		sortOption,
 	]);
 
-	// 전체 페이지 수
 	const totalPages = Math.ceil(
 		sortedBooks.length /
 			ITEMS_PER_PAGE
 	);
 
-	// 현재 페이지가 필터 결과의 마지막 페이지보다 커진 경우에만 보정
 	useEffect(() => {
 		setCurrentPage((page) => {
 			const safeTotalPages =
@@ -545,7 +515,6 @@ export default function Home() {
 		});
 	}, [totalPages]);
 
-	// 현재 페이지에 표시할 소설
 	const paginatedBooks = useMemo(() => {
 		const start =
 			(currentPage - 1) *
@@ -560,7 +529,6 @@ export default function Home() {
 		currentPage,
 	]);
 
-	// 페이지 번호는 현재 페이지 주변만 표시
 	const pageNumbers = useMemo(() => {
 		if (totalPages <= 5) {
 			return Array.from(
@@ -615,8 +583,6 @@ export default function Home() {
 
 		setCurrentPage(page);
 
-		// 전체 탭에서는 최근 읽은 소설을 지나
-		// 전체 소설 영역의 시작 부분까지만 이동
 		if (
 			filter === "전체" &&
 			managementFilter === "none"
@@ -634,7 +600,6 @@ export default function Home() {
 			return;
 		}
 
-		// 그 외 상태 탭 / 관리함에서는 화면 맨 위로 이동
 		window.scrollTo({
 			top: 0,
 			behavior: "smooth",
@@ -724,7 +689,6 @@ export default function Home() {
 		}
 	}
 
-	// 작품 관리 상태 변경
 	async function updateBookManagement(
 		book: Book,
 		type:
@@ -751,8 +715,6 @@ export default function Home() {
 			nextReread =
 				!isReread;
 
-			// 다시 볼 작품으로 지정하면
-			// 제외 상태는 해제
 			if (nextReread) {
 				nextExcluded =
 					false;
@@ -763,8 +725,6 @@ export default function Home() {
 			nextExcluded =
 				!isExcluded;
 
-			// 제외하기로 지정하면
-			// 다시 볼 작품 상태는 해제
 			if (nextExcluded) {
 				nextReread =
 					false;
@@ -1104,7 +1064,6 @@ export default function Home() {
 					</div>
 				)}
 
-				{/* 상태 필터 */}
 				<div className="mt-5 flex gap-1.5 sm:mt-6 sm:gap-2">
 					{[
 						"전체",
@@ -1139,7 +1098,6 @@ export default function Home() {
 						</button>
 					))}
 
-					{/* 관리함 */}
 					<div
 						ref={
 							managementMenuRef
@@ -1244,7 +1202,6 @@ export default function Home() {
 					</div>
 				</div>
 
-				{/* 최근 읽은 소설 - 가로 스크롤 캐러셀 */}
 				{filter === "전체" &&
 					managementFilter ===
 						"none" && (
@@ -1393,7 +1350,6 @@ export default function Home() {
 						</section>
 					)}
 
-				{/* 전체 소설 / 관리함 */}
 				<section
 					ref={
 						allBooksSectionRef
@@ -1475,7 +1431,6 @@ export default function Home() {
 						</button>
 					</div>
 
-					{/* 검색 */}
 					<div className="relative mt-4 sm:mt-5">
 						<Search
 							className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
@@ -1523,7 +1478,6 @@ export default function Home() {
 						)}
 					</div>
 
-					{/* 정렬 + 태그 필터 열기 */}
 					<div className="mt-3 flex items-center gap-1.5 sm:mt-4 sm:gap-2">
 						{(
 							[
@@ -1619,7 +1573,6 @@ export default function Home() {
 						)}
 					</div>
 
-					{/* 완결 / 미완 / 단편 / 중편 / 장편 / 초기화 - 필터 버튼을 눌러야 열림 */}
 					{managementFilter ===
 						"none" &&
 						tagFilterOpen && (
@@ -1679,7 +1632,6 @@ export default function Home() {
 							</div>
 						)}
 
-					{/* 소설 목록 - 가로형 카드 리스트 */}
 					{loading ? (
 						<div className="mt-3 rounded-2xl border bg-white px-5 py-10 text-center text-sm text-gray-400 sm:mt-4 sm:px-6 sm:py-12">
 							불러오는 중...
@@ -1758,7 +1710,8 @@ export default function Home() {
 												</div>
 											</div>
 
-											<div className="flex shrink-0 items-center gap-2.5">
+											{/* 모바일에서는 진행률 원과 읽기 버튼을 세로로 배치 */}
+											<div className="flex shrink-0 flex-col items-center gap-2 sm:flex-row sm:gap-2.5">
 												<div className="relative flex items-center justify-center">
 													<ProgressRing
 														percent={getProgress(
@@ -1773,19 +1726,12 @@ export default function Home() {
 													/>
 												</div>
 
-												<div className="hidden sm:block">
+												<div>
 													{renderAction(
 														book,
 														true
 													)}
 												</div>
-											</div>
-
-											<div className="absolute bottom-3 right-4 sm:hidden">
-												{renderAction(
-													book,
-													true
-												)}
 											</div>
 										</div>
 									)
@@ -1800,8 +1746,11 @@ export default function Home() {
 										type="button"
 										onClick={() =>
 											changePage(
-												currentPage -
-													1
+												Math.max(
+													1,
+													currentPage -
+														5
+												)
 											)
 										}
 										disabled={
@@ -1845,8 +1794,11 @@ export default function Home() {
 										type="button"
 										onClick={() =>
 											changePage(
-												currentPage +
-													1
+												Math.min(
+													totalPages,
+													currentPage +
+														5
+												)
 											)
 										}
 										disabled={
@@ -1864,7 +1816,6 @@ export default function Home() {
 				</section>
 			</section>
 
-			{/* 맨 위로 */}
 			{showScrollTop && (
 				<button
 					type="button"
@@ -1885,3 +1836,4 @@ export default function Home() {
 		</main>
 	);
 }
+
