@@ -1,8 +1,7 @@
-
-import NextAuth from "next-auth";
+import NextAuth, { type AuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
-export const authOptions = {
+export const authOptions: AuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -10,11 +9,8 @@ export const authOptions = {
 
       authorization: {
         params: {
-          // Google Drive 읽기/쓰기 권한
           scope:
             "openid email profile https://www.googleapis.com/auth/drive",
-
-          // Google refresh_token을 받기 위해 사용
           access_type: "offline",
         },
       },
@@ -28,48 +24,29 @@ export const authOptions = {
 
   callbacks: {
     async jwt({ token, account }: any) {
-      // =====================================================
-      // 최초 Google 로그인
-      // =====================================================
-
       if (account) {
         token.accessToken = account.access_token;
 
-        // Google이 최초 로그인에서 refresh_token을 주는 경우 저장
-        // 이후 로그인에서 refresh_token이 없더라도 기존 값을 유지
         if (account.refresh_token) {
           token.refreshToken = account.refresh_token;
         }
 
         token.accessTokenExpires =
-          Date.now() +
-          (account.expires_in ?? 3600) * 1000;
+          Date.now() + (account.expires_in ?? 3600) * 1000;
 
         return token;
       }
-
-      // =====================================================
-      // access token이 아직 유효하면 그대로 사용
-      // =====================================================
 
       if (
         token.accessToken &&
         token.accessTokenExpires &&
-        Date.now() <
-          token.accessTokenExpires - 60 * 1000
+        Date.now() < token.accessTokenExpires - 60 * 1000
       ) {
         return token;
       }
 
-      // =====================================================
-      // access token 만료 → refresh token으로 갱신
-      // =====================================================
-
       if (!token.refreshToken) {
-        console.error(
-          "Google refresh token이 없습니다."
-        );
-
+        console.error("Google refresh token이 없습니다.");
         return token;
       }
 
@@ -79,49 +56,36 @@ export const authOptions = {
           {
             method: "POST",
             headers: {
-              "Content-Type":
-                "application/x-www-form-urlencoded",
+              "Content-Type": "application/x-www-form-urlencoded",
             },
             body: new URLSearchParams({
-              client_id:
-                process.env.GOOGLE_CLIENT_ID!,
-              client_secret:
-                process.env.GOOGLE_CLIENT_SECRET!,
+              client_id: process.env.GOOGLE_CLIENT_ID!,
+              client_secret: process.env.GOOGLE_CLIENT_SECRET!,
               grant_type: "refresh_token",
-              refresh_token:
-                token.refreshToken,
+              refresh_token: token.refreshToken,
             }),
           }
         );
 
-        const refreshedTokens =
-          await response.json();
+        const refreshedTokens = await response.json();
 
         if (!response.ok) {
           throw refreshedTokens;
         }
 
-        token.accessToken =
-          refreshedTokens.access_token;
+        token.accessToken = refreshedTokens.access_token;
 
         token.accessTokenExpires =
           Date.now() +
-          (refreshedTokens.expires_in ?? 3600) *
-            1000;
+          (refreshedTokens.expires_in ?? 3600) * 1000;
 
-        // Google이 새 refresh_token을 주는 경우에만 교체
         if (refreshedTokens.refresh_token) {
-          token.refreshToken =
-            refreshedTokens.refresh_token;
+          token.refreshToken = refreshedTokens.refresh_token;
         }
 
         return token;
       } catch (error) {
-        console.error(
-          "Google access token 갱신 실패:",
-          error
-        );
-
+        console.error("Google access token 갱신 실패:", error);
         return token;
       }
     },
@@ -135,4 +99,3 @@ export const authOptions = {
 };
 
 export default NextAuth(authOptions);
-
