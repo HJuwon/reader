@@ -1,3 +1,4 @@
+
 import NextAuth from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 
@@ -9,20 +10,21 @@ export const authOptions = {
 
       authorization: {
         params: {
-          // 본문 수정 후 구글 드라이브에 다시 저장하려면
-          // 읽기 전용(drive.readonly)이 아닌 쓰기 가능한 권한이 필요하다.
+          // Google Drive 읽기/쓰기 권한
           scope:
             "openid email profile https://www.googleapis.com/auth/drive",
 
           // Google refresh_token을 받기 위해 사용
           access_type: "offline",
-
-          // 기존에 권한을 승인했더라도 다시 refresh_token을 받을 수 있도록 함
-          prompt: "consent",
         },
       },
     }),
   ],
+
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60,
+  },
 
   callbacks: {
     async jwt({ token, account }: any) {
@@ -32,7 +34,13 @@ export const authOptions = {
 
       if (account) {
         token.accessToken = account.access_token;
-        token.refreshToken = account.refresh_token;
+
+        // Google이 최초 로그인에서 refresh_token을 주는 경우 저장
+        // 이후 로그인에서 refresh_token이 없더라도 기존 값을 유지
+        if (account.refresh_token) {
+          token.refreshToken = account.refresh_token;
+        }
+
         token.accessTokenExpires =
           Date.now() +
           (account.expires_in ?? 3600) * 1000;
@@ -127,3 +135,4 @@ export const authOptions = {
 };
 
 export default NextAuth(authOptions);
+
