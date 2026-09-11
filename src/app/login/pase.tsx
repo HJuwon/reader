@@ -1,8 +1,18 @@
 "use client";
 
+import { Capacitor } from "@capacitor/core";
 import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
+  const handleGoogleLogin = async () => {
+    if (Capacitor.isNativePlatform()) {
+      console.log("Capacitor app login");
+      return;
+    }
+
+    await signIn("google", { callbackUrl: "/" });
+  };
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50">
       <div className="w-full max-w-sm rounded-2xl border bg-white p-8 shadow-sm">
@@ -15,7 +25,7 @@ export default function LoginPage() {
         </p>
 
         <button
-          onClick={() => signIn("google", { callbackUrl: "/" })}
+          onClick={handleGoogleLogin}
           className="mt-8 w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white hover:bg-gray-800"
         >
           Google로 로그인
