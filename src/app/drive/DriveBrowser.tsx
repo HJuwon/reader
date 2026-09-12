@@ -591,7 +591,7 @@ export default function DriveBrowser() {
 					</div>
 				) : (
 					<>
-						<div className="mb-5 md:hidden">
+						<div className="mb-5">
 							<button
 								type="button"
 								onClick={() =>
@@ -826,8 +826,8 @@ export default function DriveBrowser() {
 						</div>
 
 
-						<div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
-							<aside className="hidden md:block">
+						<div className="grid grid-cols-1 gap-6">
+							<aside className="hidden">
 								<div className="sticky top-8">
 									<div
 										className="mb-4 flex items-center gap-2 rounded-[4px] px-3 py-2"
