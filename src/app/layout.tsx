@@ -1,33 +1,40 @@
-"use client";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import "./globals.css";
+import BottomNav from "./components/BottomNav";
+import SessionProvider from "./SessionProvider";
 
-import { useRouter } from "next/navigation";
-import { signOut, useSession } from "next-auth/react";
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
 
-export default function LoginButton() {
-  const { data: session, status } = useSession();
-  const router = useRouter();
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
-  if (status === "loading") {
-    return null;
-  }
+export const metadata: Metadata = {
+  title: "Reader",
+  description: "Web Novel Reader",
+};
 
-  if (session) {
-    return (
-      <button
-        onClick={() => signOut({ callbackUrl: "/" })}
-        className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white hover:bg-gray-800"
-      >
-        로그아웃
-      </button>
-    );
-  }
+type RootLayoutProps = {
+  children: React.ReactNode;
+};
 
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
-    <button
-      onClick={() => router.push("/login")}
-      className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white hover:bg-gray-800"
+    <html
+      lang="ko"
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      Google로 로그인
-    </button>
+      <body className="min-h-full flex flex-col">
+        <SessionProvider>
+          {children}
+          <BottomNav />
+        </SessionProvider>
+      </body>
+    </html>
   );
 }
