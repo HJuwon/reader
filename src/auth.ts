@@ -13,6 +13,7 @@ export const authOptions: AuthOptions = {
           scope:
             "openid email profile https://www.googleapis.com/auth/drive",
           access_type: "offline",
+          prompt: "consent",
         },
       },
     }),
@@ -29,6 +30,10 @@ export const authOptions: AuthOptions = {
         },
         accessToken: {
           label: "Google Access Token",
+          type: "text",
+        },
+        serverAuthCode: {
+          label: "Google Server Auth Code",
           type: "text",
         },
       },
@@ -67,15 +72,49 @@ export const authOptions: AuthOptions = {
             return null;
           }
 
+          let accessToken = credentials.accessToken ?? null;
+          let refreshToken: string | null = null;
+          let expiresIn = 3600;
+
+          // serverAuthCode가 있으면 진짜 access/refresh token으로 교환
+          if (credentials.serverAuthCode) {
+            const tokenRes = await fetch(
+              "https://oauth2.googleapis.com/token",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({
+                  client_id: process.env.GOOGLE_CLIENT_ID!,
+                  client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+                  code: credentials.serverAuthCode,
+                  grant_type: "authorization_code",
+                }),
+              },
+            );
+
+            if (tokenRes.ok) {
+              const tokenData = await tokenRes.json();
+              accessToken = tokenData.access_token ?? accessToken;
+              refreshToken = tokenData.refresh_token ?? null;
+              expiresIn = tokenData.expires_in ?? 3600;
+            } else {
+              console.error(
+                "서버 인증 코드 교환 실패:",
+                await tokenRes.text(),
+              );
+            }
+          }
+
           return {
             id: googleUser.sub,
             name: googleUser.name ?? null,
             email: googleUser.email,
             image: googleUser.picture ?? null,
-
-            // Android Google Sign-In에서 받은
-            // Google Drive Access Token
-            accessToken: credentials.accessToken ?? null,
+            accessToken,
+            refreshToken,
+            expiresIn,
           };
         } catch (error) {
           console.error("Mobile Google 로그인 실패:", error);
@@ -114,8 +153,12 @@ export const authOptions: AuthOptions = {
       if (account?.provider === "mobile-google") {
         token.accessToken = user?.accessToken ?? null;
 
-        // Google Access Token은 기본적으로 약 1시간 유효
-        token.accessTokenExpires = Date.now() + 3600 * 1000;
+        if (user?.refreshToken) {
+          token.refreshToken = user.refreshToken;
+        }
+
+        token.accessTokenExpires =
+          Date.now() + (user?.expiresIn ?? 3600) * 1000;
 
         return token;
       }
@@ -139,7 +182,7 @@ export const authOptions: AuthOptions = {
       }
 
       // --------------------------------
-      // 5. 웹 Google Access Token 갱신
+      // 5. Google Access Token 갱신 (웹/앱 공통)
       // --------------------------------
       try {
         const response = await fetch(
