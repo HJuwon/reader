@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { signIn } from "next-auth/react";
 import { GoogleSignIn } from "@capawesome/capacitor-google-sign-in";
@@ -37,6 +37,10 @@ async function initializeGoogleSignIn() {
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    alert(`native: ${Capacitor.isNativePlatform()}, platform: ${Capacitor.getPlatform()}`);
+  }, []);
 
   const handleGoogleLogin = async () => {
     if (loading) return;
