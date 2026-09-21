@@ -56,7 +56,7 @@ export default function LoginPage() {
         return;
       }
 
-      // Android APK// Android APK
+      // Android APK
       await initializeGoogleSignIn();
 
       const result = await GoogleSignIn.signIn();
@@ -65,7 +65,7 @@ export default function LoginPage() {
 
       const idToken = result.idToken;
       const accessToken = result.accessToken;
-      const serverAuthCode = result.serverAuthCode;   // ① 추가
+      const serverAuthCode = result.serverAuthCode;
 
       if (!idToken) {
         throw new Error("Google ID Token을 받지 못했습니다.");
@@ -75,10 +75,9 @@ export default function LoginPage() {
       const loginResult = await signIn("mobile-google", {
         idToken,
         accessToken: accessToken ?? "",
-        serverAuthCode: serverAuthCode ?? "",   // ② 추가
+        serverAuthCode: serverAuthCode ?? "",
         redirect: false,
       });
-    
 
       if (loginResult?.error) {
         throw new Error(loginResult.error);
