@@ -1,6 +1,7 @@
 import NextAuth, { type AuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { saveRefreshToken } from "@/lib/googleToken";
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -139,6 +140,7 @@ export const authOptions: AuthOptions = {
 
         if (account.refresh_token) {
           token.refreshToken = account.refresh_token;
+          await saveRefreshToken(token.email, account.refresh_token);
         }
 
         token.accessTokenExpires =
@@ -155,6 +157,7 @@ export const authOptions: AuthOptions = {
 
         if (user?.refreshToken) {
           token.refreshToken = user.refreshToken;
+          await saveRefreshToken(user.email, user.refreshToken);
         }
 
         token.accessTokenExpires =
