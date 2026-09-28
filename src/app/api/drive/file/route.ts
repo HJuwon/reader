@@ -1,10 +1,11 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
+import { getDriveAccessToken } from "@/lib/googleToken";
 
 export async function GET(request: Request) {
   const session: any = await getServerSession(authOptions);
 
-  if (!session?.accessToken) {
+  const accessToken = await getDriveAccessToken(session); if (!accessToken) {
     return Response.json(
       { error: "로그인이 필요합니다." },
       { status: 401 }
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
     `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
     {
       headers: {
-        Authorization: `Bearer ${session.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
       },
     }
   );
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   const session: any = await getServerSession(authOptions);
 
-  if (!session?.accessToken) {
+  const accessToken = await getDriveAccessToken(session); if (!accessToken) {
     return Response.json(
       { error: "로그인이 필요합니다." },
       { status: 401 }
@@ -100,7 +101,7 @@ export async function PUT(request: Request) {
     {
       method: "PATCH",
       headers: {
-        Authorization: `Bearer ${session.accessToken}`,
+        Authorization: `Bearer ${accessToken}`,
         "Content-Type": "text/plain; charset=utf-8",
       },
       body: content,
