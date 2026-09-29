@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import BottomNav from "./components/BottomNav";
 import SessionProvider from "./SessionProvider";
+import AndroidBackButton from "./AndroidBackButton";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: RootLayoutProps) {
     >
       <body className="min-h-full flex flex-col">
         <SessionProvider>
+          <AndroidBackButton />
           {children}
           <BottomNav />
         </SessionProvider>
