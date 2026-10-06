@@ -1357,90 +1357,10 @@ export default function DriveBrowser() {
 												)}
 
 
-												<div className="mx-auto mt-10 hidden max-w-2xl items-center justify-between md:flex">
-													<button
-														onClick={
-															goToPrevEpisode
-														}
-														disabled={
-															isFirstEpisode ||
-															progressSaving
-														}
-														className="rounded-[4px] px-4 py-2 text-sm font-medium transition hover:opacity-80 disabled:opacity-30"
-														style={{
-															backgroundColor:
-																theme.divider,
-															color:
-																theme.title,
-														}}
-													>
-														← 이전화
-													</button>
-
-													<button
-														onClick={
-															goToNextEpisode
-														}
-														disabled={
-															isLastEpisode ||
-															progressSaving
-														}
-														className="rounded-[4px] px-4 py-2 text-sm font-medium transition hover:opacity-80 disabled:opacity-30"
-														style={{
-															backgroundColor:
-																theme.divider,
-															color:
-																theme.title,
-														}}
-													>
-														다음화 →
-													</button>
-												</div>
 											</div>
 										</div>
 
 
-										<div className="mt-4 flex items-center justify-between gap-3 md:hidden">
-											<button
-												onClick={
-													goToPrevEpisode
-												}
-												disabled={
-													isFirstEpisode ||
-													progressSaving
-												}
-												className="flex flex-1 items-center justify-center gap-1 rounded-[4px] px-3 py-3 text-sm font-medium transition hover:opacity-80 disabled:opacity-30"
-												style={{
-													backgroundColor:
-														theme.divider,
-													color:
-														theme.title,
-												}}
-											>
-												<ChevronLeft className="h-4 w-4" />
-												이전화
-											</button>
-
-											<button
-												onClick={
-													goToNextEpisode
-												}
-												disabled={
-													isLastEpisode ||
-													progressSaving
-												}
-												className="flex flex-1 items-center justify-center gap-1 rounded-[4px] px-3 py-3 text-sm font-medium transition hover:opacity-80 disabled:opacity-30"
-												style={{
-													backgroundColor:
-														theme.divider,
-													color:
-														theme.title,
-												}}
-											>
-												다음화
-												<ChevronRight className="h-4 w-4" />
-											</button>
-										</div>
 									</>
 								) : (
 									<div
@@ -1462,7 +1382,13 @@ export default function DriveBrowser() {
 
 			{showHighlightButton &&
 				selectedTextForHighlight && (
-					<div className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 md:hidden">
+					<div
+						className="fixed left-1/2 z-[60] -translate-x-1/2 md:hidden"
+						style={{
+							bottom:
+								"calc(5.5rem + env(safe-area-inset-bottom, 0px))",
+						}}
+					>
 						<button
 							onMouseDown={(e) =>
 								e.preventDefault()
@@ -1476,7 +1402,8 @@ export default function DriveBrowser() {
 							disabled={
 								highlightLoading
 							}
-							className="rounded-full px-5 py-3 text-sm font-medium shadow-lg transition disabled:opacity-60"
+							aria-label="하이라이트"
+							className="flex h-12 w-12 items-center justify-center rounded-full shadow-lg transition disabled:opacity-60"
 							style={{
 								backgroundColor:
 									theme.title,
@@ -1484,25 +1411,36 @@ export default function DriveBrowser() {
 									theme.bg,
 							}}
 						>
-							{highlightLoading
-								? "저장 중..."
-								: "하이라이트"}
+							{highlightLoading ? (
+								<Loader2 className="h-5 w-5 animate-spin" />
+							) : (
+								<span
+									aria-hidden="true"
+									className="text-xl leading-none"
+								>
+									🖍
+								</span>
+							)}
 						</button>
 					</div>
 				)}
 
 
 			<div
-				className={`fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3 transition-opacity duration-300 ${
+				className={`fixed inset-x-0 bottom-0 z-50 mx-auto flex w-full max-w-md flex-col items-end gap-3 px-4 transition-opacity duration-300 ${
 					chromeVisible ||
 					settingsOpen
 						? "opacity-100"
 						: "pointer-events-none opacity-0"
 				}`}
+				style={{
+					paddingBottom:
+						"max(1rem, env(safe-area-inset-bottom, 0px))",
+				}}
 			>
 				{settingsOpen && (
 					<div
-						className="w-64 rounded-2xl p-5"
+						className="w-64 max-w-full rounded-2xl p-5"
 						style={{
 							backgroundColor:
 								theme.bg,
@@ -1961,78 +1899,121 @@ export default function DriveBrowser() {
 				)}
 
 
-				<div className="flex flex-col items-end gap-1">
-					<button
-						type="button"
-						onClick={() => {
-							window.scrollTo({
-								top: 0,
-								behavior:
-									"smooth",
-							});
-						}}
-						aria-label="페이지 맨 위로 이동"
-						className="flex h-9 w-9 items-center justify-center rounded-full transition hover:opacity-80"
-						style={{
-							backgroundColor:
-								theme.title,
-							color:
-								theme.bg,
-							boxShadow:
-								"0 3px 10px rgba(0,0,0,0.16)",
-						}}
-					>
-						<ChevronUp className="h-4 w-4" />
-					</button>
-
-
-					<button
-						type="button"
-						onClick={() => {
-							window.scrollTo({
-								top:
-									document
-										.documentElement
-										.scrollHeight,
-								behavior:
-									"smooth",
-							});
-						}}
-						aria-label="페이지 맨 아래로 이동"
-						className="flex h-9 w-9 items-center justify-center rounded-full transition hover:opacity-80"
-						style={{
-							backgroundColor:
-								theme.title,
-							color:
-								theme.bg,
-							boxShadow:
-								"0 3px 10px rgba(0,0,0,0.16)",
-						}}
-					>
-						<ChevronDown className="h-4 w-4" />
-					</button>
-				</div>
-
-
-				<button
-					onClick={() =>
-						setSettingsOpen(
-							(v) => !v
-						)
-					}
-					aria-label="읽기 설정 열기"
-					className="flex h-12 w-12 items-center justify-center rounded-full hover:opacity-90"
+				<nav
+					aria-label="리더 메뉴"
+					className="flex w-full items-center justify-between gap-1 rounded-full px-2 py-2"
 					style={{
 						backgroundColor:
-							theme.title,
-						color:
 							theme.bg,
+						color:
+							theme.title,
+						border: `0.5px solid ${theme.divider}`,
 						boxShadow:
-							"0 4px 14px rgba(0,0,0,0.2)",
+							"0 4px 20px rgba(0,0,0,0.18)",
 					}}
 				>
-					<Settings className="h-5 w-5" />
-				</button>
+					<button
+						type="button"
+						onClick={
+							goToPrevEpisode
+						}
+						disabled={
+							isFirstEpisode ||
+							progressSaving
+						}
+						aria-label="이전화"
+						className="flex h-10 items-center gap-0.5 rounded-full pl-2 pr-3 text-sm font-medium transition hover:opacity-80 disabled:opacity-30"
+						style={{
+							color:
+								theme.title,
+						}}
+					>
+						<ChevronLeft className="h-4 w-4" />
+						이전화
+					</button>
+
+					<div className="flex items-center">
+						<button
+							type="button"
+							onClick={() => {
+								window.scrollTo({
+									top: 0,
+									behavior:
+										"smooth",
+								});
+							}}
+							aria-label="페이지 맨 위로 이동"
+							className="flex h-10 w-10 items-center justify-center rounded-full transition hover:opacity-80"
+							style={{
+								color:
+									theme.muted,
+							}}
+						>
+							<ChevronUp className="h-5 w-5" />
+						</button>
+
+						<button
+							type="button"
+							onClick={() =>
+								setSettingsOpen(
+									(v) => !v
+								)
+							}
+							aria-label="읽기 설정 열기"
+							className="flex h-10 w-10 items-center justify-center rounded-full transition hover:opacity-90"
+							style={{
+								backgroundColor:
+									theme.title,
+								color:
+									theme.bg,
+							}}
+						>
+							<Settings className="h-4 w-4" />
+						</button>
+
+						<button
+							type="button"
+							onClick={() => {
+								window.scrollTo({
+									top:
+										document
+											.documentElement
+											.scrollHeight,
+									behavior:
+										"smooth",
+								});
+							}}
+							aria-label="페이지 맨 아래로 이동"
+							className="flex h-10 w-10 items-center justify-center rounded-full transition hover:opacity-80"
+							style={{
+								color:
+									theme.muted,
+							}}
+						>
+							<ChevronDown className="h-5 w-5" />
+						</button>
+					</div>
+
+					<button
+						type="button"
+						onClick={
+							goToNextEpisode
+						}
+						disabled={
+							isLastEpisode ||
+							progressSaving
+						}
+						aria-label="다음화"
+						className="flex h-10 items-center gap-0.5 rounded-full pl-3 pr-2 text-sm font-medium transition hover:opacity-80 disabled:opacity-30"
+						style={{
+							color:
+								theme.title,
+						}}
+					>
+						다음화
+						<ChevronRight className="h-4 w-4" />
+					</button>
+				</nav>
 			</div>
 
 
