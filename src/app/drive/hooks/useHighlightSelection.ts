@@ -268,6 +268,53 @@ export function useHighlightSelection({
     ]);
 
   /*
+   * 모바일: 선택 핸들 드래그 등 선택 범위 변경 감지
+   * (핸들은 네이티브 UI라 touchend가 본문에 오지 않음)
+   */
+  useEffect(() => {
+    let timer: number | undefined;
+
+    const handleSelectionChange = () => {
+      if (window.innerWidth >= 768) {
+        return;
+      }
+
+      window.clearTimeout(timer);
+
+      timer = window.setTimeout(() => {
+        const data = getSelectionData();
+
+        if (!data) {
+          setShowHighlightButton(false);
+          setSelectedTextForHighlight("");
+          setSelectedHighlightRange(null);
+          return;
+        }
+
+        setSelectedTextForHighlight(data.text);
+        setSelectedHighlightRange({
+          startOffset: data.startOffset,
+          endOffset: data.endOffset,
+        });
+        setShowHighlightButton(true);
+      }, 150);
+    };
+
+    document.addEventListener(
+      "selectionchange",
+      handleSelectionChange
+    );
+
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener(
+        "selectionchange",
+        handleSelectionChange
+      );
+    };
+  }, [getSelectionData]);
+
+  /*
    * 회차가 바뀌면 선택 UI 초기화
    */
   useEffect(() => {
@@ -372,4 +419,3 @@ export function useHighlightSelection({
     savePendingHighlight,
   };
 }
-
