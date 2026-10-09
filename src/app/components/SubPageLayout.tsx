@@ -14,12 +14,12 @@ export default function SubPageLayout({
   children: ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-[#faf6ef] text-stone-900">
-      <header className="sticky top-0 z-10 border-b border-stone-200/70 bg-[#faf6ef]/85 backdrop-blur-md">
+    <main className="min-h-screen bg-[#eaf6fd] text-slate-900">
+      <header className="sticky top-0 z-10 border-b border-sky-200/70 bg-[#eaf6fd]/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3 sm:px-6">
           <Link
             href="/"
-            className="flex items-center gap-1.5 text-sm font-medium text-stone-500 transition hover:text-stone-900"
+            className="flex items-center gap-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-900"
           >
             <ArrowLeft className="h-4 w-4" />
             서재
@@ -36,7 +36,7 @@ export default function SubPageLayout({
           </h1>
 
           {count !== undefined && (
-            <span className="pb-1 text-sm text-stone-400">
+            <span className="pb-1 text-sm text-slate-400">
               {count.toLocaleString("ko-KR")}
             </span>
           )}
