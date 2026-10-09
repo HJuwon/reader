@@ -11,25 +11,28 @@ export function getSearchTitle(title: string): string {
 }
 
 // 표지 색 규칙 (표지 이미지가 없을 때)
-//  - 완결   : 진한 네이비/인디고 계열
-//  - 연재중 : 밝은 스카이/시안 계열
-//  - 알 수 없음 : 중간 톤 슬레이트 블루
+//  - 완결   : 페리윙클 계열
+//  - 연재중 : 스카이블루 계열
+// 실제 색 값은 globals.css 의 --cover-* 변수에서 바꾼다.
+const v = (kind: string, n: number): [string, string] => [
+  `var(--cover-${kind}-${n}-from)`,
+  `var(--cover-${kind}-${n}-to)`,
+];
+
 const COVER_COLORS = {
-  completed: [
-    ["#1e3a8a", "#172554"],
-    ["#1e40af", "#1e3a8a"],
-    ["#312e81", "#1e1b4b"],
-  ],
-  ongoing: [
-    ["#0ea5e9", "#0369a1"],
-    ["#38a3d8", "#0b6aa2"],
-    ["#06b6d4", "#0e7490"],
-  ],
-  unknown: [
-    ["#64748b", "#475569"],
-    ["#5b7fa6", "#3f5f86"],
-  ],
-} satisfies Record<string, [string, string][]>;
+  completed: {
+    text: "var(--cover-completed-text)",
+    colors: [v("completed", 1), v("completed", 2), v("completed", 3)],
+  },
+  ongoing: {
+    text: "var(--cover-ongoing-text)",
+    colors: [v("ongoing", 1), v("ongoing", 2), v("ongoing", 3)],
+  },
+  unknown: {
+    text: "var(--cover-unknown-text)",
+    colors: [v("unknown", 1), v("unknown", 2)],
+  },
+} satisfies Record<string, { text: string; colors: [string, string][] }>;
 
 export type SeriesStatus = "ongoing" | "completed" | null | undefined;
 
@@ -55,27 +58,30 @@ export default function BookCover({
     hash = (hash * 31 + ch.codePointAt(0)!) % 1000003;
   }
 
-  const palette =
+  const theme =
     seriesStatus === "completed"
       ? COVER_COLORS.completed
       : seriesStatus === "ongoing"
         ? COVER_COLORS.ongoing
         : COVER_COLORS.unknown;
 
-  const [from, to] = palette[hash % palette.length];
+  const [from, to] = theme.colors[hash % theme.colors.length];
 
   return (
     <div
       aria-hidden
-      className={`relative flex shrink-0 flex-col items-center justify-center overflow-hidden rounded-l-sm rounded-r-md text-center font-serif font-semibold leading-snug text-white/95 shadow-[0_6px_14px_-4px_rgba(3,105,161,0.35)] ${
+      className={`relative flex shrink-0 flex-col items-center justify-center overflow-hidden rounded-l-sm rounded-r-md text-center font-serif font-semibold leading-snug shadow-[0_6px_14px_-4px_rgb(0_0_0/0.18)] ${
         compact ? "pl-2.5 pr-1" : "px-2.5 pl-3.5"
       } ${className}`}
-      style={{ background: `linear-gradient(160deg, ${from}, ${to})` }}
+      style={{
+        background: `linear-gradient(160deg, ${from}, ${to})`,
+        color: theme.text,
+      }}
     >
-      <span className="absolute inset-y-0 left-0 w-1.5 bg-black/20" />
-      <span className="absolute inset-y-0 left-1.5 w-px bg-white/20" />
+      <span className="absolute inset-y-0 left-0 w-1.5 bg-black/10" />
+      <span className="absolute inset-y-0 left-1.5 w-px bg-white/50" />
       <span className={`line-clamp-4 break-keep ${textClass}`}>{name}</span>
-      <span className="mt-1.5 h-px w-5 bg-white/40" />
+      <span className="mt-1.5 h-px w-5 bg-current opacity-30" />
     </div>
   );
 }
