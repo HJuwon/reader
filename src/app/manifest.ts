@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "reader",
     start_url: "/",
     display: "standalone",
-    background_color: "#ffffff",
-    theme_color: "#ffffff",
+    background_color: "#eaf6fd",
+    theme_color: "#eaf6fd",
     icons: [],
   };
 }
