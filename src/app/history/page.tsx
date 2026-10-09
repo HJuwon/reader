@@ -140,7 +140,7 @@ export default function HistoryPage() {
       count={!loading && !error ? historyEntries.length : undefined}
     >
       {loading ? (
-        <div className="mt-6 flex items-center justify-center rounded-2xl bg-sky-100/70 py-16 text-sm text-slate-400">
+        <div className="mt-6 flex items-center justify-center rounded-2xl bg-card py-16 text-sm text-slate-400">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           읽기 이력을 불러오는 중...
         </div>
@@ -149,14 +149,14 @@ export default function HistoryPage() {
           {error}
         </div>
       ) : historyEntries.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-sky-200 px-6 py-16 text-center">
+        <div className="mt-6 rounded-2xl border border-dashed border-line px-6 py-16 text-center">
           <BookOpen className="mx-auto h-7 w-7 text-slate-300" />
           <p className="mt-4 text-sm text-slate-400">
             아직 읽기 이력이 없습니다.
           </p>
         </div>
       ) : (
-        <div className="mt-6 divide-y divide-sky-200/70 rounded-2xl border border-sky-200/70 bg-white/60">
+        <div className="mt-6 divide-y divide-line/70 rounded-2xl border border-line/70 bg-white/60">
           {historyEntries.map((entry) => {
             const progress = Math.min(
               100,
@@ -168,7 +168,7 @@ export default function HistoryPage() {
               <Link
                 key={entry.round.id}
                 href={getReaderUrl(entry)}
-                className="flex items-center gap-3.5 px-4 py-3.5 transition hover:bg-sky-100/60"
+                className="flex items-center gap-3.5 px-4 py-3.5 transition hover:bg-card"
               >
                 <BookCover
                   compact
@@ -186,7 +186,7 @@ export default function HistoryPage() {
                   <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-slate-500">
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${
-                        completed ? "bg-[#1e40af]" : "bg-[#0284c7]"
+                        completed ? "bg-done" : "bg-accent"
                       }`}
                     />
                     {statusLabel[entry.round.status]}
@@ -197,10 +197,10 @@ export default function HistoryPage() {
                   </p>
 
                   <div className="mt-2 flex items-center gap-2.5">
-                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-sky-100">
+                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-line">
                       <div
                         className={`h-full rounded-full ${
-                          completed ? "bg-[#1e40af]" : "bg-[#0284c7]"
+                          completed ? "bg-done" : "bg-accent"
                         }`}
                         style={{ width: `${progress}%` }}
                       />
