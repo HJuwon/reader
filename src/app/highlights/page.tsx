@@ -21,6 +21,7 @@ type Book = {
   id: string;
   title: string;
   drive_file_id: string;
+  series_status?: "ongoing" | "completed";
 };
 
 export default function HighlightsPage() {
@@ -70,6 +71,10 @@ export default function HighlightsPage() {
   useEffect(() => {
     loadHighlights();
   }, []);
+
+  function getBookSeriesStatus(bookId: string) {
+    return books.find((item) => item.id === bookId)?.series_status;
+  }
 
   function getBookTitle(bookId: string) {
     const book = books.find((item) => item.id === bookId);
@@ -132,7 +137,7 @@ export default function HighlightsPage() {
       count={!loading && !error ? highlights.length : undefined}
     >
       {loading ? (
-        <div className="mt-6 flex items-center justify-center rounded-2xl bg-stone-200/50 py-16 text-sm text-stone-400">
+        <div className="mt-6 flex items-center justify-center rounded-2xl bg-sky-100/70 py-16 text-sm text-slate-400">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           하이라이트를 불러오는 중...
         </div>
@@ -141,19 +146,19 @@ export default function HighlightsPage() {
           {error}
         </div>
       ) : highlights.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-stone-300 px-6 py-16 text-center">
-          <Highlighter className="mx-auto h-7 w-7 text-stone-300" />
-          <p className="mt-4 text-sm text-stone-400">
+        <div className="mt-6 rounded-2xl border border-dashed border-sky-200 px-6 py-16 text-center">
+          <Highlighter className="mx-auto h-7 w-7 text-slate-300" />
+          <p className="mt-4 text-sm text-slate-400">
             저장한 하이라이트가 없습니다.
           </p>
-          <p className="mt-2 text-xs leading-6 text-stone-400">
+          <p className="mt-2 text-xs leading-6 text-slate-400">
             소설을 읽다가 문장을 드래그하면
             <br />
             하이라이트로 저장할 수 있습니다.
           </p>
         </div>
       ) : (
-        <div className="mt-6 divide-y divide-stone-200/70 rounded-2xl border border-stone-200/70 bg-white/60">
+        <div className="mt-6 divide-y divide-sky-200/70 rounded-2xl border border-sky-200/70 bg-white/60">
           {highlights.map((highlight) => {
             const isDeleting = deletingId === highlight.id;
             const title = getBookTitle(highlight.book_id);
@@ -166,6 +171,7 @@ export default function HighlightsPage() {
                 <BookCover
                   compact
                   title={title}
+                  seriesStatus={getBookSeriesStatus(highlight.book_id)}
                   className="h-16 w-11"
                   textClass="text-[8px]"
                 />
@@ -180,16 +186,16 @@ export default function HighlightsPage() {
                 >
                   <div className="flex items-center gap-2">
                     <h2 className="truncate text-sm font-semibold">{title}</h2>
-                    <span className="shrink-0 text-xs text-stone-400">
+                    <span className="shrink-0 text-xs text-slate-400">
                       {highlight.episode}화
                     </span>
                   </div>
 
-                  <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words border-l-2 border-[#e3b27a] bg-[#f3e4c4]/40 py-1 pl-3 pr-2 font-serif text-sm leading-6 text-stone-700">
+                  <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words border-l-2 border-[#7dd3fc] bg-[#f3e4c4]/40 py-1 pl-3 pr-2 font-serif text-sm leading-6 text-slate-700">
                     {highlight.text}
                   </p>
 
-                  <p className="mt-2 text-xs text-stone-400">
+                  <p className="mt-2 text-xs text-slate-400">
                     {formatDate(highlight.created_at)}
                   </p>
                 </Link>
@@ -199,7 +205,7 @@ export default function HighlightsPage() {
                   onClick={() => deleteHighlight(highlight.id)}
                   disabled={isDeleting || deletingId !== null}
                   aria-label="하이라이트 삭제"
-                  className="shrink-0 rounded-full p-2 text-stone-300 transition hover:bg-stone-200/60 hover:text-stone-600 disabled:opacity-40"
+                  className="shrink-0 rounded-full p-2 text-slate-300 transition hover:bg-slate-200/60 hover:text-slate-600 disabled:opacity-40"
                 >
                   {isDeleting ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
