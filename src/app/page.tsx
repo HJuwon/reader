@@ -15,6 +15,7 @@ import {
 	List,
 } from "lucide-react";
 import LogoutButton from "./LogoutButton";
+import BookCover, { getSearchTitle } from "./components/BookCover";
 
 type Book = {
 	id: string;
@@ -73,58 +74,10 @@ function ProgressBar({
 	);
 }
 
-// 제목에서 [완결], 1-300화, 확장자 등을 걷어낸 "작품명"만 추출
-function getSearchTitle(title: string): string {
-	return (
-		title
-			.replace(/\.(txt|epub|docx?)$/i, "")
-			.replace(/[\[(（【][^\])）】]*[\])）】]/g, " ")
-			.replace(/\d+\s*[-~]\s*\d+\s*화?/g, " ")
-			.replace(/\s+/g, " ")
-			.trim() || title
-	);
-}
-
 function getGoogleSearchUrl(title: string): string {
 	return `https://www.google.com/search?q=${encodeURIComponent(
 		`${getSearchTitle(title)} 웹소설`,
 	)}`;
-}
-
-// 표지 이미지가 없을 때 쓰는 책 모양 표지 (책등 + 제목)
-// 나중에 표지 이미지가 생기면 이 컴포넌트만 바꾸면 됨
-function BookCover({
-	title,
-	className = "",
-	textClass = "text-[11px]",
-}: {
-	title: string;
-	className?: string;
-	textClass?: string;
-}) {
-	const name = getSearchTitle(title);
-
-	let hash = 0;
-	for (const ch of name) {
-		hash = (hash * 31 + ch.codePointAt(0)!) % 360;
-	}
-
-	return (
-		<div
-			aria-hidden
-			className={`relative flex shrink-0 flex-col items-center justify-center overflow-hidden rounded-l-sm rounded-r-md px-2.5 pl-3.5 text-center font-serif font-semibold leading-snug text-white/95 shadow-[0_6px_14px_-4px_rgba(60,40,20,0.45)] ${className}`}
-			style={{
-				background: `linear-gradient(160deg, hsl(${hash} 34% 38%), hsl(${
-					(hash + 25) % 360
-				} 38% 24%))`,
-			}}
-		>
-			<span className="absolute inset-y-0 left-0 w-1.5 bg-black/20" />
-			<span className="absolute inset-y-0 left-1.5 w-px bg-white/20" />
-			<span className={`line-clamp-4 break-keep ${textClass}`}>{name}</span>
-			<span className="mt-1.5 h-px w-5 bg-white/40" />
-		</div>
-	);
 }
 
 function getTitleEpisodeCount(title: string): number {
@@ -854,6 +807,7 @@ export default function Home() {
 				{renderBookMenu(book)}
 
 				<BookCover
+					compact
 					title={book.title}
 					className="h-[88px] w-[60px] sm:h-24 sm:w-16"
 					textClass="text-[9px] sm:text-[10px]"
@@ -938,9 +892,6 @@ export default function Home() {
 					<h2 className="font-serif text-[28px] font-bold leading-tight tracking-tight sm:text-3xl">
 						내 서재
 					</h2>
-					<p className="mt-1 text-sm text-stone-500">
-						내가 읽고 있는 웹소설을 관리하세요.
-					</p>
 				</div>
 
 				{error && (
@@ -1051,10 +1002,10 @@ export default function Home() {
 							</div>
 						) : (
 							<>
-								<div className="relative overflow-hidden rounded-3xl bg-[#2b2118] p-4 text-[#f5ecdc] shadow-lg sm:p-5">
-									{renderBookMenu(recentBooks[0], "dark")}
+								<div className="relative rounded-3xl border border-[#e6d8bf] bg-[#f3e9d7] p-4 text-stone-900 sm:p-5">
+									{renderBookMenu(recentBooks[0])}
 
-									<p className="text-[11px] font-semibold tracking-[0.2em] text-[#e3b27a]">
+									<p className="text-[11px] font-semibold tracking-[0.2em] text-[#8a3a3a]">
 										이어 읽기
 									</p>
 
@@ -1070,7 +1021,7 @@ export default function Home() {
 												{recentBooks[0].title}
 											</h3>
 
-											<p className="mt-1 text-xs text-[#f5ecdc]/60">
+											<p className="mt-1 text-xs text-stone-500">
 												{getRound(recentBooks[0])}회독 ·{" "}
 												{getEpisode(recentBooks[0])}화 /{" "}
 												{getEffectiveTotalEpisodes(recentBooks[0])}화
@@ -1079,17 +1030,16 @@ export default function Home() {
 											<div className="mt-auto pt-4">
 												<div className="flex items-center gap-2.5">
 													<ProgressBar
-														dark
 														percent={getProgress(recentBooks[0])}
 														status={getDisplayStatus(recentBooks[0])}
 													/>
-													<span className="shrink-0 text-xs font-semibold tabular-nums text-[#e3b27a]">
+													<span className="shrink-0 text-xs font-semibold tabular-nums text-[#8a3a3a]">
 														{getProgress(recentBooks[0])}%
 													</span>
 												</div>
 
 												<div className="mt-3">
-													{renderAction(recentBooks[0], false, "light")}
+													{renderAction(recentBooks[0])}
 												</div>
 											</div>
 										</div>
