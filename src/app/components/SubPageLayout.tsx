@@ -14,8 +14,8 @@ export default function SubPageLayout({
   children: ReactNode;
 }) {
   return (
-    <main className="min-h-screen bg-[#eaf6fd] text-slate-900">
-      <header className="sticky top-0 z-10 border-b border-sky-200/70 bg-[#eaf6fd]/85 backdrop-blur-md">
+    <main className="min-h-screen bg-paper text-slate-900">
+      <header className="sticky top-0 z-10 border-b border-line/70 bg-paper/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3 sm:px-6">
           <Link
             href="/"
