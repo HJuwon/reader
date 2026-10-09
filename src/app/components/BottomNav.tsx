@@ -2,12 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BookOpen,
-  Bookmark,
-  Highlighter,
-  History,
-} from "lucide-react";
+import { BookOpen, Bookmark, Highlighter, History } from "lucide-react";
 
 export default function BottomNav() {
   const pathname = usePathname();
