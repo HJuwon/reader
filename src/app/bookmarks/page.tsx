@@ -18,6 +18,7 @@ type Book = {
   id: string;
   title: string;
   drive_file_id: string;
+  series_status?: "ongoing" | "completed";
 };
 
 export default function BookmarksPage() {
@@ -68,6 +69,10 @@ export default function BookmarksPage() {
   useEffect(() => {
     loadBookmarks();
   }, []);
+
+  function getBookSeriesStatus(bookId: string) {
+    return books.find((item) => item.id === bookId)?.series_status;
+  }
 
   function getBookTitle(bookId: string) {
     const book = books.find((item) => item.id === bookId);
@@ -159,7 +164,7 @@ export default function BookmarksPage() {
                 type="button"
                 onClick={exitSelectMode}
                 disabled={deleting}
-                className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold text-stone-500 transition hover:bg-stone-200/60 disabled:opacity-50"
+                className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-200/60 disabled:opacity-50"
               >
                 <X className="h-3.5 w-3.5" />
                 취소
@@ -169,7 +174,7 @@ export default function BookmarksPage() {
                 type="button"
                 onClick={deleteSelectedBookmarks}
                 disabled={selectedBookmarks.length === 0 || deleting}
-                className="flex items-center gap-1 rounded-full bg-[#8a3a3a] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#702e2e] disabled:cursor-not-allowed disabled:opacity-30"
+                className="flex items-center gap-1 rounded-full bg-[#0284c7] px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0369a1] disabled:cursor-not-allowed disabled:opacity-30"
               >
                 {deleting ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -185,7 +190,7 @@ export default function BookmarksPage() {
             <button
               type="button"
               onClick={enterSelectMode}
-              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold text-stone-500 ring-1 ring-stone-300 transition hover:bg-stone-100 hover:text-stone-900"
+              className="flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-semibold text-slate-500 ring-1 ring-sky-200 transition hover:bg-sky-100 hover:text-slate-900"
             >
               <Trash2 className="h-3.5 w-3.5" />
               삭제
@@ -195,7 +200,7 @@ export default function BookmarksPage() {
       }
     >
       {loading ? (
-        <div className="mt-6 flex items-center justify-center rounded-2xl bg-stone-200/50 py-16 text-sm text-stone-400">
+        <div className="mt-6 flex items-center justify-center rounded-2xl bg-sky-100/70 py-16 text-sm text-slate-400">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           북마크를 불러오는 중...
         </div>
@@ -204,14 +209,14 @@ export default function BookmarksPage() {
           {error}
         </div>
       ) : bookmarks.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-stone-300 px-6 py-16 text-center">
-          <Bookmark className="mx-auto h-7 w-7 text-stone-300" />
-          <p className="mt-4 text-sm text-stone-400">
+        <div className="mt-6 rounded-2xl border border-dashed border-sky-200 px-6 py-16 text-center">
+          <Bookmark className="mx-auto h-7 w-7 text-slate-300" />
+          <p className="mt-4 text-sm text-slate-400">
             저장한 북마크가 없습니다.
           </p>
         </div>
       ) : (
-        <div className="mt-6 divide-y divide-stone-200/70 rounded-2xl border border-stone-200/70 bg-white/60">
+        <div className="mt-6 divide-y divide-sky-200/70 rounded-2xl border border-sky-200/70 bg-white/60">
           {bookmarks.map((bookmark) => {
             const selected = selectedBookmarks.includes(bookmark.id);
             const title = getBookTitle(bookmark.book_id);
@@ -227,8 +232,8 @@ export default function BookmarksPage() {
                     onClick={() => toggleBookmarkSelection(bookmark.id)}
                     className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition ${
                       selected
-                        ? "border-[#8a3a3a] bg-[#8a3a3a] text-white"
-                        : "border-stone-300 bg-white"
+                        ? "border-[#0284c7] bg-[#0284c7] text-white"
+                        : "border-sky-200 bg-white"
                     }`}
                     aria-label={selected ? "선택 해제" : "북마크 선택"}
                   >
@@ -239,6 +244,7 @@ export default function BookmarksPage() {
                 <BookCover
                   compact
                   title={title}
+                  seriesStatus={getBookSeriesStatus(bookmark.book_id)}
                   className="h-16 w-11"
                   textClass="text-[8px]"
                 />
@@ -248,13 +254,13 @@ export default function BookmarksPage() {
                     {title}
                   </h2>
 
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-stone-500">
+                  <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
                     <Bookmark
-                      className="h-3 w-3 text-[#8a3a3a]"
+                      className="h-3 w-3 text-[#0284c7]"
                       fill="currentColor"
                     />
                     {bookmark.episode}화
-                    <span className="text-stone-300">·</span>
+                    <span className="text-slate-300">·</span>
                     {new Date(bookmark.created_at).toLocaleDateString("ko-KR")}
                   </p>
                 </div>
@@ -264,7 +270,7 @@ export default function BookmarksPage() {
                     href={`/drive?fileId=${encodeURIComponent(
                       bookmark.drive_file_id,
                     )}&episode=${bookmark.episode}`}
-                    className="shrink-0 rounded-full bg-[#8a3a3a] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#702e2e]"
+                    className="shrink-0 rounded-full bg-[#0284c7] px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-[#0369a1]"
                   >
                     읽기
                   </Link>
