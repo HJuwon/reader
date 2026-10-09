@@ -1,13 +1,71 @@
 @import "tailwindcss";
 
+/* ==========================================================
+   색상 테마 — 색을 바꾸고 싶으면 이 :root 블록의 값만 고치면 된다.
+   (다른 파일에서는 색 코드를 직접 쓰지 않고 아래 이름만 쓴다.)
+   ========================================================== */
 :root {
-  --background: #eaf6fd;
+  /* 바탕 */
+  --paper: #ffffff; /* 페이지 배경 */
+  --card: #f3f8fc; /* 카드 / 목록 hover */
+  --card-strong: #eef6fc; /* 이어 읽기 카드 */
+  --line: #e3edf5; /* 테두리 / 구분선 / 진행률 바 트랙 */
+  --line-strong: #d3e5f2; /* 강조 테두리 */
+
+  /* 포인트 (파스텔 스카이블루) */
+  --accent: #7db8e3; /* 바, 점, 버튼, 선택 */
+  --accent-hover: #5fa3d3; /* 버튼 hover */
+  --accent-ink: #3f86b8; /* 파란 글자 / 아이콘 */
+
+  /* 읽기 상태 */
+  --done: #8c9cd9; /* 완독 (바, 점) */
+
+  /* 완결 / 연재중 구분 */
+  --series-ongoing-ink: #3f86b8; /* "연재중" 글자 */
+  --series-done-ink: #5766b3; /* "완결" 글자 */
+
+  /* 표지가 없을 때 쓰는 표지 색 (왼쪽 위 → 오른쪽 아래) */
+  --cover-ongoing-text: #1f3b57;
+  --cover-ongoing-1-from: #8cc4ec;
+  --cover-ongoing-1-to: #7db8e3;
+  --cover-ongoing-2-from: #86bfe8;
+  --cover-ongoing-2-to: #74b0de;
+  --cover-ongoing-3-from: #92cbe8;
+  --cover-ongoing-3-to: #7fbcdc;
+
+  --cover-completed-text: #2a3366;
+  --cover-completed-1-from: #a9b6e6;
+  --cover-completed-1-to: #8c9bd6;
+  --cover-completed-2-from: #a3b0e0;
+  --cover-completed-2-to: #8795d0;
+  --cover-completed-3-from: #b0a6e0;
+  --cover-completed-3-to: #968bd0;
+
+  --cover-unknown-text: #334155;
+  --cover-unknown-1-from: #b4c2d3;
+  --cover-unknown-1-to: #a3b3c6;
+  --cover-unknown-2-from: #b8c6d8;
+  --cover-unknown-2-to: #a7b8cc;
+
+  /* 기본 글자 / 배경 */
+  --background: var(--paper);
   --foreground: #0f172a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-card-strong: var(--card-strong);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-ink: var(--accent-ink);
+  --color-done: var(--done);
+  --color-series-ongoing-ink: var(--series-ongoing-ink);
+  --color-series-done-ink: var(--series-done-ink);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
