@@ -25,6 +25,7 @@ type Book = {
   progress: number;
   status: string;
   updated_at: string;
+  series_status?: "ongoing" | "completed";
   rounds?: Round[];
 };
 
@@ -139,7 +140,7 @@ export default function HistoryPage() {
       count={!loading && !error ? historyEntries.length : undefined}
     >
       {loading ? (
-        <div className="mt-6 flex items-center justify-center rounded-2xl bg-stone-200/50 py-16 text-sm text-stone-400">
+        <div className="mt-6 flex items-center justify-center rounded-2xl bg-sky-100/70 py-16 text-sm text-slate-400">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           읽기 이력을 불러오는 중...
         </div>
@@ -148,14 +149,14 @@ export default function HistoryPage() {
           {error}
         </div>
       ) : historyEntries.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-stone-300 px-6 py-16 text-center">
-          <BookOpen className="mx-auto h-7 w-7 text-stone-300" />
-          <p className="mt-4 text-sm text-stone-400">
+        <div className="mt-6 rounded-2xl border border-dashed border-sky-200 px-6 py-16 text-center">
+          <BookOpen className="mx-auto h-7 w-7 text-slate-300" />
+          <p className="mt-4 text-sm text-slate-400">
             아직 읽기 이력이 없습니다.
           </p>
         </div>
       ) : (
-        <div className="mt-6 divide-y divide-stone-200/70 rounded-2xl border border-stone-200/70 bg-white/60">
+        <div className="mt-6 divide-y divide-sky-200/70 rounded-2xl border border-sky-200/70 bg-white/60">
           {historyEntries.map((entry) => {
             const progress = Math.min(
               100,
@@ -167,11 +168,12 @@ export default function HistoryPage() {
               <Link
                 key={entry.round.id}
                 href={getReaderUrl(entry)}
-                className="flex items-center gap-3.5 px-4 py-3.5 transition hover:bg-stone-100/60"
+                className="flex items-center gap-3.5 px-4 py-3.5 transition hover:bg-sky-100/60"
               >
                 <BookCover
                   compact
                   title={entry.book.title}
+                  seriesStatus={entry.book.series_status}
                   className="h-[72px] w-12"
                   textClass="text-[8px]"
                 />
@@ -181,41 +183,41 @@ export default function HistoryPage() {
                     {entry.book.title}
                   </h2>
 
-                  <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-stone-500">
+                  <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-slate-500">
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${
-                        completed ? "bg-[#4d7c5a]" : "bg-[#8a3a3a]"
+                        completed ? "bg-[#1e40af]" : "bg-[#0284c7]"
                       }`}
                     />
                     {statusLabel[entry.round.status]}
-                    <span className="text-stone-300">·</span>
+                    <span className="text-slate-300">·</span>
                     {entry.round.round}회독
-                    <span className="text-stone-300">·</span>
+                    <span className="text-slate-300">·</span>
                     {entry.round.episode ?? 0}화
                   </p>
 
                   <div className="mt-2 flex items-center gap-2.5">
-                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-stone-200/80">
+                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-sky-100">
                       <div
                         className={`h-full rounded-full ${
-                          completed ? "bg-[#4d7c5a]" : "bg-[#8a3a3a]"
+                          completed ? "bg-[#1e40af]" : "bg-[#0284c7]"
                         }`}
                         style={{ width: `${progress}%` }}
                       />
                     </div>
-                    <span className="w-8 shrink-0 text-right text-[11px] font-semibold tabular-nums text-stone-500">
+                    <span className="w-8 shrink-0 text-right text-[11px] font-semibold tabular-nums text-slate-500">
                       {progress}%
                     </span>
                   </div>
 
-                  <p className="mt-1.5 text-[11px] text-stone-400">
+                  <p className="mt-1.5 text-[11px] text-slate-400">
                     {formatDate(
                       entry.round.completed_at ?? entry.round.started_at,
                     )}
                   </p>
                 </div>
 
-                <ChevronRight className="h-4 w-4 shrink-0 text-stone-300" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
               </Link>
             );
           })}
