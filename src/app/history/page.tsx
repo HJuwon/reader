@@ -1,12 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import BookCover from "../components/BookCover";
+import SubPageLayout from "../components/SubPageLayout";
 import { useEffect, useMemo, useState } from "react";
-import {
-  ArrowLeft,
-  BookOpen,
-  Loader2,
-} from "lucide-react";
+import { BookOpen, ChevronRight, Loader2 } from "lucide-react";
 
 type Round = {
   id: string;
@@ -40,11 +38,6 @@ const statusLabel: Record<string, string> = {
   completed: "완독",
 };
 
-const statusStyle: Record<string, string> = {
-  reading: "bg-blue-50 text-blue-700",
-  completed: "bg-green-50 text-green-700",
-};
-
 export default function HistoryPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,10 +54,7 @@ export default function HistoryPage() {
         const data = await response.json();
 
         if (!response.ok) {
-          throw new Error(
-            data?.error ||
-              "읽기 이력을 불러오지 못했습니다."
-          );
+          throw new Error(data?.error || "읽기 이력을 불러오지 못했습니다.");
         }
 
         setBooks(data.data || []);
@@ -72,7 +62,7 @@ export default function HistoryPage() {
         setError(
           error instanceof Error
             ? error.message
-            : "읽기 이력을 불러오지 못했습니다."
+            : "읽기 이력을 불러오지 못했습니다.",
         );
       } finally {
         setLoading(false);
@@ -105,13 +95,11 @@ export default function HistoryPage() {
 
     return entries.sort((a, b) => {
       const dateA = new Date(
-        a.round.completed_at ??
-          a.round.started_at
+        a.round.completed_at ?? a.round.started_at,
       ).getTime();
 
       const dateB = new Date(
-        b.round.completed_at ??
-          b.round.started_at
+        b.round.completed_at ?? b.round.started_at,
       ).getTime();
 
       return dateB - dateA;
@@ -141,127 +129,98 @@ export default function HistoryPage() {
         : entry.book.last_episode;
 
     return `/drive?fileId=${encodeURIComponent(
-      entry.book.drive_file_id
+      entry.book.drive_file_id,
     )}&episode=${episode}`;
   }
 
   return (
-    <main className="min-h-screen bg-gray-50 text-gray-900">
-      <header className="sticky top-0 z-10 border-b bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            서재
-          </Link>
+    <SubPageLayout
+      title="읽기 이력"
+      count={!loading && !error ? historyEntries.length : undefined}
+    >
+      {loading ? (
+        <div className="mt-6 flex items-center justify-center rounded-2xl bg-stone-200/50 py-16 text-sm text-stone-400">
+          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          읽기 이력을 불러오는 중...
         </div>
-      </header>
-
-      <section className="mx-auto max-w-4xl px-6 py-10 pb-24">
-        <div>
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4" />
-            <h1 className="text-xl font-semibold">
-              읽기 이력
-            </h1>
-          </div>
-
-          <p className="mt-2 text-sm text-gray-500">
-            회독별 읽기 기록을 모아볼 수 있습니다.
+      ) : error ? (
+        <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 px-6 py-12 text-center text-sm text-red-600">
+          {error}
+        </div>
+      ) : historyEntries.length === 0 ? (
+        <div className="mt-6 rounded-2xl border border-dashed border-stone-300 px-6 py-16 text-center">
+          <BookOpen className="mx-auto h-7 w-7 text-stone-300" />
+          <p className="mt-4 text-sm text-stone-400">
+            아직 읽기 이력이 없습니다.
           </p>
         </div>
+      ) : (
+        <div className="mt-6 divide-y divide-stone-200/70 rounded-2xl border border-stone-200/70 bg-white/60">
+          {historyEntries.map((entry) => {
+            const progress = Math.min(
+              100,
+              Math.max(0, entry.round.progress ?? 0),
+            );
+            const completed = entry.round.status === "completed";
 
-        {loading ? (
-          <div className="mt-8 flex items-center justify-center rounded-2xl border bg-white py-16 text-sm text-gray-400">
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            읽기 이력을 불러오는 중...
-          </div>
-        ) : error ? (
-          <div className="mt-8 rounded-2xl border bg-white px-6 py-16 text-center text-sm text-red-500">
-            {error}
-          </div>
-        ) : historyEntries.length === 0 ? (
-          <div className="mt-8 rounded-2xl border bg-white px-6 py-16 text-center">
-            <BookOpen className="mx-auto h-7 w-7 text-gray-300" />
-
-            <p className="mt-4 text-sm text-gray-400">
-              아직 읽기 이력이 없습니다.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-8 overflow-hidden rounded-2xl border bg-white">
-            <div className="max-h-[60vh] overflow-y-auto">
-            {historyEntries.map((entry, index) => (
+            return (
               <Link
                 key={entry.round.id}
                 href={getReaderUrl(entry)}
-                className={`flex items-center gap-3 p-4 transition hover:bg-gray-50 ${
-                  index !== historyEntries.length - 1
-                    ? "border-b"
-                    : ""
-                }`}
+                className="flex items-center gap-3.5 px-4 py-3.5 transition hover:bg-stone-100/60"
               >
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100">
-                  <BookOpen className="h-3.5 w-3.5 text-gray-500" />
-                </div>
+                <BookCover
+                  compact
+                  title={entry.book.title}
+                  className="h-[72px] w-12"
+                  textClass="text-[8px]"
+                />
 
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="truncate text-sm font-medium">
-                      {entry.book.title}
-                    </h2>
+                  <h2 className="truncate text-[15px] font-semibold">
+                    {entry.book.title}
+                  </h2>
 
+                  <p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-stone-500">
                     <span
-                      className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-medium ${statusStyle[entry.round.status]}`}
-                    >
-                      {statusLabel[entry.round.status]}
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        completed ? "bg-[#4d7c5a]" : "bg-[#8a3a3a]"
+                      }`}
+                    />
+                    {statusLabel[entry.round.status]}
+                    <span className="text-stone-300">·</span>
+                    {entry.round.round}회독
+                    <span className="text-stone-300">·</span>
+                    {entry.round.episode ?? 0}화
+                  </p>
+
+                  <div className="mt-2 flex items-center gap-2.5">
+                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-stone-200/80">
+                      <div
+                        className={`h-full rounded-full ${
+                          completed ? "bg-[#4d7c5a]" : "bg-[#8a3a3a]"
+                        }`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <span className="w-8 shrink-0 text-right text-[11px] font-semibold tabular-nums text-stone-500">
+                      {progress}%
                     </span>
                   </div>
 
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <span className="text-xs font-medium text-gray-600">
-                      {entry.round.round}회독
-                    </span>
-
-                    <span className="text-xs text-gray-300">
-                      ·
-                    </span>
-
-                    <span className="text-xs text-gray-400">
-                      {entry.round.episode ?? 0}화 ·{" "}
-                      {entry.round.progress ?? 0}%
-                    </span>
-                  </div>
-
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className="mt-1.5 text-[11px] text-stone-400">
                     {formatDate(
-                      entry.round.completed_at ??
-                        entry.round.started_at
+                      entry.round.completed_at ?? entry.round.started_at,
                     )}
                   </p>
                 </div>
 
-                <div className="hidden w-24 shrink-0 sm:block">
-                  <div className="h-1.5 overflow-hidden rounded-full bg-gray-100">
-                    <div
-                      className="h-full rounded-full bg-gray-900"
-                      style={{
-                        width: `${Math.min(
-                          100,
-                          Math.max(0, entry.round.progress ?? 0)
-                        )}%`,
-                      }}
-                    />
-                  </div>
-                </div>
+                <ChevronRight className="h-4 w-4 shrink-0 text-stone-300" />
               </Link>
-            ))}
-            </div>
-          </div>
-        )}
-      </section>
-    </main>
+            );
+          })}
+        </div>
+      )}
+    </SubPageLayout>
   );
 }
