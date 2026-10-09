@@ -137,7 +137,7 @@ export default function HighlightsPage() {
       count={!loading && !error ? highlights.length : undefined}
     >
       {loading ? (
-        <div className="mt-6 flex items-center justify-center rounded-2xl bg-sky-100/70 py-16 text-sm text-slate-400">
+        <div className="mt-6 flex items-center justify-center rounded-2xl bg-card py-16 text-sm text-slate-400">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           하이라이트를 불러오는 중...
         </div>
@@ -146,7 +146,7 @@ export default function HighlightsPage() {
           {error}
         </div>
       ) : highlights.length === 0 ? (
-        <div className="mt-6 rounded-2xl border border-dashed border-sky-200 px-6 py-16 text-center">
+        <div className="mt-6 rounded-2xl border border-dashed border-line px-6 py-16 text-center">
           <Highlighter className="mx-auto h-7 w-7 text-slate-300" />
           <p className="mt-4 text-sm text-slate-400">
             저장한 하이라이트가 없습니다.
@@ -158,7 +158,7 @@ export default function HighlightsPage() {
           </p>
         </div>
       ) : (
-        <div className="mt-6 divide-y divide-sky-200/70 rounded-2xl border border-sky-200/70 bg-white/60">
+        <div className="mt-6 divide-y divide-line/70 rounded-2xl border border-line/70 bg-white/60">
           {highlights.map((highlight) => {
             const isDeleting = deletingId === highlight.id;
             const title = getBookTitle(highlight.book_id);
@@ -191,7 +191,7 @@ export default function HighlightsPage() {
                     </span>
                   </div>
 
-                  <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words border-l-2 border-[#7dd3fc] bg-[#f3e4c4]/40 py-1 pl-3 pr-2 font-serif text-sm leading-6 text-slate-700">
+                  <p className="mt-2 line-clamp-3 whitespace-pre-wrap break-words border-l-2 border-accent bg-[#f3e4c4]/40 py-1 pl-3 pr-2 font-serif text-sm leading-6 text-slate-700">
                     {highlight.text}
                   </p>
 
