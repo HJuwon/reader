@@ -17,7 +17,7 @@ const BOOK_COLUMNS =
 
 // 제목만 필요한 화면(북마크, 하이라이트)용
 const BOOK_TITLE_COLUMNS =
-  "id,drive_file_id,title";
+  "id,drive_file_id,title,series_status";
 
 const ROUND_COLUMNS =
   "id,book_id,round,status,started_at,completed_at,created_at";
