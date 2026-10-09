@@ -8,6 +8,7 @@ import {
 	ArrowUp,
 	Search,
 	X,
+	ChevronRight,
 	MoreVertical,
 	ChevronDown,
 	Filter,
@@ -37,9 +38,9 @@ type Book = {
 };
 
 const statusDot: Record<string, string> = {
-	"읽는 중": "bg-[#8a3a3a]",
-	완독: "bg-[#4d7c5a]",
-	"안 읽음": "bg-stone-300",
+	"읽는 중": "bg-[#0284c7]",
+	완독: "bg-[#1e40af]",
+	"안 읽음": "bg-slate-300",
 };
 
 function ProgressBar({
@@ -53,17 +54,17 @@ function ProgressBar({
 }) {
 	const value = Math.min(100, Math.max(0, percent));
 	const fill = dark
-		? "bg-[#e3b27a]"
+		? "bg-[#7dd3fc]"
 		: status === "완독"
-			? "bg-[#4d7c5a]"
+			? "bg-[#1e40af]"
 			: status === "읽는 중"
-				? "bg-[#8a3a3a]"
-				: "bg-stone-300";
+				? "bg-[#0284c7]"
+				: "bg-slate-300";
 
 	return (
 		<div
 			className={`h-1 w-full overflow-hidden rounded-full ${
-				dark ? "bg-white/15" : "bg-stone-200/80"
+				dark ? "bg-white/15" : "bg-sky-100"
 			}`}
 		>
 			<div
@@ -603,64 +604,6 @@ export default function Home() {
 		return book.status;
 	}
 
-	function renderAction(
-		book: Book,
-		compact = false,
-		variant: "default" | "light" = "default",
-	) {
-		const commonClass = compact
-			? "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition"
-			: "rounded-full px-5 py-2 text-sm font-semibold transition";
-
-		const dark =
-			variant === "light"
-				? "bg-[#f5ecdc] text-[#2b2118] hover:bg-white"
-				: "bg-stone-900 text-white hover:bg-stone-700";
-
-		const accent =
-			variant === "light"
-				? "bg-[#f5ecdc] text-[#2b2118] hover:bg-white"
-				: "bg-[#8a3a3a] text-white hover:bg-[#702e2e]";
-
-		if (book.status === "완독") {
-			return (
-				<button
-					type="button"
-					onClick={(event) => {
-						event.preventDefault();
-						event.stopPropagation();
-						restartReading(book);
-					}}
-					className={`${commonClass} ${dark}`}
-				>
-					다시 읽기
-				</button>
-			);
-		}
-
-		if (book.status === "안 읽음") {
-			return (
-				<Link
-					href={getReaderUrl(book)}
-					onClick={(event) => event.stopPropagation()}
-					className={`${commonClass} ${dark}`}
-				>
-					읽기 시작
-				</Link>
-			);
-		}
-
-		return (
-			<Link
-				href={getReaderUrl(book)}
-				onClick={(event) => event.stopPropagation()}
-				className={`${commonClass} ${accent}`}
-			>
-				이어읽기
-			</Link>
-		);
-	}
-
 	function renderBookMenu(
 		book: Book,
 		tone: "default" | "overlay" | "dark" = "default",
@@ -668,14 +611,14 @@ export default function Home() {
 	) {
 		const isOpen = openMenuId === book.id;
 		const itemClass =
-			"flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-stone-700 transition hover:bg-stone-100";
+			"flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-sky-100";
 
 		const buttonClass =
 			tone === "overlay"
 				? "h-7 w-7 bg-black/35 text-white backdrop-blur hover:bg-black/55"
 				: tone === "dark"
-					? "h-8 w-8 text-[#f5ecdc]/70 hover:bg-white/10 hover:text-white"
-					: "h-8 w-8 text-stone-400 hover:bg-stone-100 hover:text-stone-700";
+					? "h-8 w-8 text-[#e0f2fe]/70 hover:bg-white/10 hover:text-white"
+					: "h-8 w-8 text-slate-400 hover:bg-sky-100 hover:text-slate-700";
 
 		return (
 			<div
@@ -699,7 +642,7 @@ export default function Home() {
 
 				{isOpen && (
 					<div
-						className={`absolute top-9 w-44 rounded-xl border border-stone-200 bg-white p-1 text-stone-700 shadow-xl ${
+						className={`absolute top-9 w-44 rounded-xl border border-sky-200 bg-white p-1 text-slate-700 shadow-xl ${
 							align === "left" ? "left-0" : "right-0"
 						}`}
 					>
@@ -713,11 +656,11 @@ export default function Home() {
 							}}
 							className={itemClass}
 						>
-							<Search className="h-4 w-4 text-stone-400" strokeWidth={1.75} />
+							<Search className="h-4 w-4 text-slate-400" strokeWidth={1.75} />
 							구글에서 검색
 						</a>
 
-						<div className="my-1 border-t border-stone-100" />
+						<div className="my-1 border-t border-sky-200" />
 
 						<button
 							type="button"
@@ -756,16 +699,17 @@ export default function Home() {
 			<>
 				<BookCover
 					title={book.title}
+					seriesStatus={book.series_status}
 					className="aspect-[2/3] w-full"
 					textClass="text-[11px] sm:text-xs"
 				/>
-				<p className="mt-2.5 line-clamp-2 text-xs font-semibold leading-4 text-stone-800">
+				<p className="mt-2.5 line-clamp-2 text-xs font-semibold leading-4 text-slate-800">
 					{book.title}
 				</p>
 				<div className="mt-1.5">
 					<ProgressBar percent={getProgress(book)} status={status} />
 				</div>
-				<p className="mt-1 flex items-center gap-1 text-[10px] text-stone-400">
+				<p className="mt-1 flex items-center gap-1 text-[10px] text-slate-400">
 					<span className={`h-1.5 w-1.5 rounded-full ${statusDot[status]}`} />
 					{status === "완독"
 						? "완독 · 탭해서 다시 읽기"
@@ -796,34 +740,39 @@ export default function Home() {
 	}
 
 	// 책장 한 줄 (목록 보기)
+	// 버튼 없이 행 전체(또는 오른쪽 화살표)를 누르면 본문으로 이동한다.
+	// 완독한 작품은 탭하면 새 회독을 시작한다.
 	function renderRow(book: Book) {
 		const status = getDisplayStatus(book);
+		const completedSeries = book.series_status === "completed";
 
-		return (
-			<div
-				key={book.id}
-				className="relative flex gap-3.5 px-4 py-4 sm:gap-4 sm:px-5"
-			>
-				{renderBookMenu(book)}
-
+		const inner = (
+			<>
 				<BookCover
 					compact
 					title={book.title}
+					seriesStatus={book.series_status}
 					className="h-[88px] w-[60px] sm:h-24 sm:w-16"
 					textClass="text-[9px] sm:text-[10px]"
 				/>
 
-				<div className="flex min-w-0 flex-1 flex-col pr-6">
-					<h4 className="line-clamp-2 text-[15px] font-semibold leading-5 text-stone-900">
+				<div className="flex min-w-0 flex-1 flex-col pr-7">
+					<h4 className="line-clamp-2 text-[15px] font-semibold leading-5 text-slate-900">
 						{book.title}
 					</h4>
 
-					<p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-stone-500">
+					<p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-slate-500">
 						<span className={`h-1.5 w-1.5 rounded-full ${statusDot[status]}`} />
 						{status}
-						<span className="text-stone-300">·</span>
-						{book.series_status === "completed" ? "완결" : "연재중"}
-						<span className="text-stone-300">·</span>
+						<span className="text-slate-300">·</span>
+						<span
+							className={`font-semibold ${
+								completedSeries ? "text-blue-900" : "text-sky-600"
+							}`}
+						>
+							{completedSeries ? "완결" : "연재중"}
+						</span>
+						<span className="text-slate-300">·</span>
 						{getRound(book)}회독 {getEpisode(book)}화
 					</p>
 
@@ -831,12 +780,36 @@ export default function Home() {
 						<div className="flex-1">
 							<ProgressBar percent={getProgress(book)} status={status} />
 						</div>
-						<span className="w-8 shrink-0 text-right text-[11px] font-semibold tabular-nums text-stone-500">
+						<span className="w-9 shrink-0 text-right text-[11px] font-semibold tabular-nums text-slate-500">
 							{getProgress(book)}%
 						</span>
-						{renderAction(book, true)}
 					</div>
 				</div>
+
+				<ChevronRight className="h-4 w-4 shrink-0 self-center text-slate-300" />
+			</>
+		);
+
+		const rowClass =
+			"flex w-full gap-3.5 px-4 py-4 text-left transition hover:bg-sky-100/60 sm:gap-4 sm:px-5";
+
+		return (
+			<div key={book.id} className="relative">
+				{renderBookMenu(book)}
+
+				{book.status === "완독" ? (
+					<button
+						type="button"
+						onClick={() => restartReading(book)}
+						className={rowClass}
+					>
+						{inner}
+					</button>
+				) : (
+					<Link href={getReaderUrl(book)} className={rowClass}>
+						{inner}
+					</Link>
+				)}
 			</div>
 		);
 	}
@@ -870,12 +843,12 @@ export default function Home() {
 	}
 
 	return (
-		<main className="min-h-screen bg-[#faf6ef] text-stone-900">
-			<header className="sticky top-0 z-10 border-b border-stone-200/70 bg-[#faf6ef]/85 backdrop-blur-md">
+		<main className="min-h-screen bg-[#eaf6fd] text-slate-900">
+			<header className="sticky top-0 z-10 border-b border-sky-200/70 bg-[#eaf6fd]/85 backdrop-blur-md">
 				<div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3 sm:px-6">
 					<div className="flex items-center gap-2">
 						<BookOpen
-							className="h-[18px] w-[18px] text-[#8a3a3a]"
+							className="h-[18px] w-[18px] text-[#0284c7]"
 							strokeWidth={2}
 						/>
 						<h1 className="font-serif text-lg font-bold tracking-tight">
@@ -900,7 +873,7 @@ export default function Home() {
 					</div>
 				)}
 
-				<div className="mt-5 flex items-center border-b border-stone-300/60">
+				<div className="mt-5 flex items-center border-b border-sky-200/60">
 					{["전체", "읽는 중", "완독", "안 읽음"].map((item) => {
 						const active = managementFilter === "none" && filter === item;
 
@@ -915,8 +888,8 @@ export default function Home() {
 								}}
 								className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 pb-2.5 pt-1 text-sm font-semibold transition sm:px-4 ${
 									active
-										? "border-[#8a3a3a] text-stone-900"
-										: "border-transparent text-stone-400 hover:text-stone-700"
+										? "border-[#0284c7] text-slate-900"
+										: "border-transparent text-slate-400 hover:text-slate-700"
 								}`}
 							>
 								{item}
@@ -930,8 +903,8 @@ export default function Home() {
 							onClick={() => setManagementMenuOpen((prev) => !prev)}
 							className={`-mb-px flex items-center gap-1 border-b-2 px-2 pb-2.5 pt-1 text-sm font-semibold transition ${
 								managementFilter !== "none"
-									? "border-[#8a3a3a] text-[#8a3a3a]"
-									: "border-transparent text-stone-400 hover:text-stone-700"
+									? "border-[#0284c7] text-[#0284c7]"
+									: "border-transparent text-slate-400 hover:text-slate-700"
 							}`}
 						>
 							관리함
@@ -944,7 +917,7 @@ export default function Home() {
 						</button>
 
 						{managementMenuOpen && (
-							<div className="absolute right-0 top-10 z-40 w-40 rounded-xl border border-stone-200 bg-white p-1 shadow-xl">
+							<div className="absolute right-0 top-10 z-40 w-40 rounded-xl border border-sky-200 bg-white p-1 shadow-xl">
 								{(
 									[
 										["reread", "다시 볼 작품"],
@@ -961,8 +934,8 @@ export default function Home() {
 										}}
 										className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
 											managementFilter === key
-												? "bg-[#8a3a3a]/10 text-[#8a3a3a]"
-												: "text-stone-700 hover:bg-stone-100"
+												? "bg-[#0284c7]/10 text-[#0284c7]"
+												: "text-slate-700 hover:bg-sky-100"
 										}`}
 									>
 										{label}
@@ -971,7 +944,7 @@ export default function Home() {
 
 								{managementFilter !== "none" && (
 									<>
-										<div className="my-1 border-t border-stone-100" />
+										<div className="my-1 border-t border-sky-200" />
 										<button
 											type="button"
 											onClick={() => {
@@ -979,7 +952,7 @@ export default function Home() {
 												setFilter("전체");
 												setManagementMenuOpen(false);
 											}}
-											className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-stone-500 transition hover:bg-stone-100"
+											className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-500 transition hover:bg-sky-100"
 										>
 											일반 목록
 										</button>
@@ -993,57 +966,74 @@ export default function Home() {
 				{filter === "전체" && managementFilter === "none" && (
 					<section className="mt-6">
 						{loading ? (
-							<div className="rounded-3xl bg-stone-200/50 px-5 py-14 text-center text-sm text-stone-400">
+							<div className="rounded-3xl bg-sky-100/70 px-5 py-14 text-center text-sm text-slate-400">
 								서재를 불러오는 중...
 							</div>
 						) : recentBooks.length === 0 ? (
-							<div className="rounded-3xl border border-dashed border-stone-300 px-5 py-10 text-center text-sm text-stone-400">
+							<div className="rounded-3xl border border-dashed border-sky-200 px-5 py-10 text-center text-sm text-slate-400">
 								최근 읽은 소설이 없습니다.
 							</div>
 						) : (
 							<>
-								<div className="relative rounded-3xl border border-[#e6d8bf] bg-[#f3e9d7] p-4 text-stone-900 sm:p-5">
+								<div className="relative rounded-3xl border border-[#b6dcf5] bg-[#d9eefc] text-slate-900">
 									{renderBookMenu(recentBooks[0])}
 
-									<p className="text-[11px] font-semibold tracking-[0.2em] text-[#8a3a3a]">
-										이어 읽기
-									</p>
+									{(() => {
+										const hero = recentBooks[0];
+										const heroClass = "block w-full p-4 text-left sm:p-5";
+										const heroInner = (
+											<>
+												<p className="text-[11px] font-semibold tracking-[0.2em] text-[#0284c7]">
+													이어 읽기
+												</p>
 
-									<div className="mt-3 flex gap-4">
-										<BookCover
-											title={recentBooks[0].title}
-											className="h-36 w-24 sm:h-40 sm:w-28"
-											textClass="text-xs"
-										/>
-
-										<div className="flex min-w-0 flex-1 flex-col">
-											<h3 className="line-clamp-2 pr-8 font-serif text-lg font-semibold leading-snug">
-												{recentBooks[0].title}
-											</h3>
-
-											<p className="mt-1 text-xs text-stone-500">
-												{getRound(recentBooks[0])}회독 ·{" "}
-												{getEpisode(recentBooks[0])}화 /{" "}
-												{getEffectiveTotalEpisodes(recentBooks[0])}화
-											</p>
-
-											<div className="mt-auto pt-4">
-												<div className="flex items-center gap-2.5">
-													<ProgressBar
-														percent={getProgress(recentBooks[0])}
-														status={getDisplayStatus(recentBooks[0])}
+												<div className="mt-3 flex gap-4">
+													<BookCover
+														title={hero.title}
+														seriesStatus={hero.series_status}
+														className="h-36 w-24 sm:h-40 sm:w-28"
+														textClass="text-xs"
 													/>
-													<span className="shrink-0 text-xs font-semibold tabular-nums text-[#8a3a3a]">
-														{getProgress(recentBooks[0])}%
-													</span>
-												</div>
 
-												<div className="mt-3">
-													{renderAction(recentBooks[0])}
+													<div className="flex min-w-0 flex-1 flex-col">
+														<h3 className="line-clamp-2 pr-8 font-serif text-lg font-semibold leading-snug">
+															{hero.title}
+														</h3>
+
+														<p className="mt-1 text-xs text-slate-500">
+															{getRound(hero)}회독 · {getEpisode(hero)}화 /{" "}
+															{getEffectiveTotalEpisodes(hero)}화
+														</p>
+
+														<div className="mt-auto flex items-center gap-2.5 pt-4">
+															<ProgressBar
+																percent={getProgress(hero)}
+																status={getDisplayStatus(hero)}
+															/>
+															<span className="shrink-0 text-xs font-semibold tabular-nums text-[#0284c7]">
+																{getProgress(hero)}%
+															</span>
+															<ChevronRight className="h-4 w-4 shrink-0 text-[#0284c7]/60" />
+														</div>
+													</div>
 												</div>
-											</div>
-										</div>
-									</div>
+											</>
+										);
+
+										return hero.status === "완독" ? (
+											<button
+												type="button"
+												onClick={() => restartReading(hero)}
+												className={heroClass}
+											>
+												{heroInner}
+											</button>
+										) : (
+											<Link href={getReaderUrl(hero)} className={heroClass}>
+												{heroInner}
+											</Link>
+										);
+									})()}
 								</div>
 
 								{recentBooks.length > 1 && (
@@ -1073,13 +1063,13 @@ export default function Home() {
 					<div className="flex items-center justify-between">
 						<h3 className="font-serif text-lg font-bold">
 							{getSectionTitle()}
-							<span className="ml-2 font-sans text-sm font-normal text-stone-400">
+							<span className="ml-2 font-sans text-sm font-normal text-slate-400">
 								{sortedBooks.length.toLocaleString("ko-KR")}
 							</span>
 						</h3>
 
 						<div className="flex items-center gap-2">
-							<div className="flex rounded-full bg-stone-200/70 p-0.5">
+							<div className="flex rounded-full bg-slate-200/70 p-0.5">
 								{(
 									[
 										{ mode: "list", Icon: List, label: "목록 보기" },
@@ -1093,8 +1083,8 @@ export default function Home() {
 										onClick={() => changeViewMode(mode)}
 										className={`flex h-7 w-8 items-center justify-center rounded-full transition ${
 											viewMode === mode
-												? "bg-white text-stone-900 shadow-sm"
-												: "text-stone-400 hover:text-stone-700"
+												? "bg-white text-slate-900 shadow-sm"
+												: "text-slate-400 hover:text-slate-700"
 										}`}
 									>
 										<Icon className="h-4 w-4" strokeWidth={1.75} />
@@ -1133,7 +1123,7 @@ export default function Home() {
 										setSyncing(false);
 									}
 								}}
-								className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-200/70 text-stone-500 transition hover:text-stone-900 disabled:opacity-50"
+								className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-200/70 text-slate-500 transition hover:text-slate-900 disabled:opacity-50"
 							>
 								<RotateCcw
 									className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`}
@@ -1145,7 +1135,7 @@ export default function Home() {
 
 					<div className="relative mt-4">
 						<Search
-							className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400"
+							className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
 							strokeWidth={1.75}
 						/>
 
@@ -1154,7 +1144,7 @@ export default function Home() {
 							value={search}
 							onChange={(event) => setSearch(event.target.value)}
 							placeholder="소설 제목 검색"
-							className="h-11 w-full rounded-full border border-stone-200 bg-white pl-10 pr-10 text-sm outline-none transition placeholder:text-stone-400 focus:border-[#8a3a3a]/50 focus:ring-4 focus:ring-[#8a3a3a]/10"
+							className="h-11 w-full rounded-full border border-sky-200 bg-white pl-10 pr-10 text-sm outline-none transition placeholder:text-slate-400 focus:border-[#0284c7]/50 focus:ring-4 focus:ring-[#0284c7]/10"
 						/>
 
 						{search && (
@@ -1162,7 +1152,7 @@ export default function Home() {
 								type="button"
 								onClick={() => setSearch("")}
 								aria-label="검색어 지우기"
-								className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+								className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:bg-sky-100 hover:text-slate-600"
 							>
 								<X className="h-3.5 w-3.5" strokeWidth={2} />
 							</button>
@@ -1183,8 +1173,8 @@ export default function Home() {
 								onClick={() => changeSortOption(opt.key)}
 								className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
 									sortOption === opt.key
-										? "bg-stone-900 text-white"
-										: "bg-white text-stone-500 ring-1 ring-stone-200 hover:bg-stone-50"
+										? "bg-slate-900 text-white"
+										: "bg-white text-slate-500 ring-1 ring-sky-200 hover:bg-sky-50"
 								}`}
 							>
 								{opt.label}
@@ -1197,10 +1187,10 @@ export default function Home() {
 								onClick={() => setTagFilterOpen((prev) => !prev)}
 								className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
 									activeTags.size > 0
-										? "bg-[#8a3a3a]/10 text-[#8a3a3a] ring-1 ring-[#8a3a3a]/40"
+										? "bg-[#0284c7]/10 text-[#0284c7] ring-1 ring-[#0284c7]/40"
 										: tagFilterOpen
-											? "bg-stone-900 text-white"
-											: "bg-white text-stone-500 ring-1 ring-stone-200 hover:bg-stone-50"
+											? "bg-slate-900 text-white"
+											: "bg-white text-slate-500 ring-1 ring-sky-200 hover:bg-sky-50"
 								}`}
 							>
 								<Filter className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -1230,8 +1220,8 @@ export default function Home() {
 										onClick={() => toggleTag(tag)}
 										className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
 											isActive
-												? "bg-[#8a3a3a]/10 text-[#8a3a3a] ring-1 ring-[#8a3a3a]/40"
-												: "bg-white text-stone-500 ring-1 ring-stone-200 hover:bg-stone-50"
+												? "bg-[#0284c7]/10 text-[#0284c7] ring-1 ring-[#0284c7]/40"
+												: "bg-white text-slate-500 ring-1 ring-sky-200 hover:bg-sky-50"
 										}`}
 									>
 										{tag}
@@ -1243,7 +1233,7 @@ export default function Home() {
 								type="button"
 								onClick={resetTags}
 								disabled={activeTags.size === 0}
-								className="ml-1 shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold text-stone-400 ring-1 ring-stone-200 transition hover:bg-stone-50 hover:text-stone-600 disabled:cursor-default disabled:opacity-40"
+								className="ml-1 shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-400 ring-1 ring-sky-200 transition hover:bg-sky-50 hover:text-slate-600 disabled:cursor-default disabled:opacity-40"
 							>
 								초기화
 							</button>
@@ -1251,17 +1241,17 @@ export default function Home() {
 					)}
 
 					{loading ? (
-						<div className="mt-4 rounded-2xl bg-stone-200/50 px-5 py-12 text-center text-sm text-stone-400">
+						<div className="mt-4 rounded-2xl bg-sky-100/70 px-5 py-12 text-center text-sm text-slate-400">
 							불러오는 중...
 						</div>
 					) : filteredBooks.length === 0 ? (
-						<div className="mt-4 rounded-2xl border border-dashed border-stone-300 px-5 py-12 text-center text-sm text-stone-400">
+						<div className="mt-4 rounded-2xl border border-dashed border-sky-200 px-5 py-12 text-center text-sm text-slate-400">
 							{getEmptyMessage()}
 						</div>
 					) : (
 						<>
 							{viewMode === "list" ? (
-								<div className="mt-4 divide-y divide-stone-200/70 rounded-2xl border border-stone-200/70 bg-white/60">
+								<div className="mt-4 divide-y divide-sky-200/70 rounded-2xl border border-sky-200/70 bg-white/60">
 									{paginatedBooks.map((book) => renderRow(book))}
 								</div>
 							) : (
@@ -1279,7 +1269,7 @@ export default function Home() {
 										type="button"
 										onClick={goToPreviousPageGroup}
 										disabled={currentPageGroupStart === 1}
-										className="rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-600 ring-1 ring-stone-200 transition hover:bg-stone-50 disabled:cursor-default disabled:opacity-30 sm:text-sm"
+										className="rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-sky-200 transition hover:bg-sky-50 disabled:cursor-default disabled:opacity-30 sm:text-sm"
 									>
 										이전
 									</button>
@@ -1291,8 +1281,8 @@ export default function Home() {
 											onClick={() => changePage(page)}
 											className={`flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-semibold transition sm:h-9 sm:min-w-9 sm:text-sm ${
 												currentPage === page
-													? "bg-stone-900 text-white"
-													: "bg-white text-stone-500 ring-1 ring-stone-200 hover:bg-stone-50"
+													? "bg-slate-900 text-white"
+													: "bg-white text-slate-500 ring-1 ring-sky-200 hover:bg-sky-50"
 											}`}
 										>
 											{page}
@@ -1305,7 +1295,7 @@ export default function Home() {
 										disabled={
 											currentPageGroupStart + PAGE_GROUP_SIZE > totalPages
 										}
-										className="rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-600 ring-1 ring-stone-200 transition hover:bg-stone-50 disabled:cursor-default disabled:opacity-30 sm:text-sm"
+										className="rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-sky-200 transition hover:bg-sky-50 disabled:cursor-default disabled:opacity-30 sm:text-sm"
 									>
 										다음
 									</button>
@@ -1325,10 +1315,10 @@ export default function Home() {
 											}}
 											placeholder={`${currentPage}`}
 											aria-label="이동할 페이지"
-											className="h-8 w-14 rounded-full border border-stone-200 bg-white px-2 text-center text-xs outline-none transition focus:border-[#8a3a3a]/50 focus:ring-4 focus:ring-[#8a3a3a]/10 sm:h-9 sm:w-16 sm:text-sm"
+											className="h-8 w-14 rounded-full border border-sky-200 bg-white px-2 text-center text-xs outline-none transition focus:border-[#0284c7]/50 focus:ring-4 focus:ring-[#0284c7]/10 sm:h-9 sm:w-16 sm:text-sm"
 										/>
 
-										<span className="whitespace-nowrap text-xs text-stone-400 sm:text-sm">
+										<span className="whitespace-nowrap text-xs text-slate-400 sm:text-sm">
 											/ {totalPages}
 										</span>
 									</div>
@@ -1344,7 +1334,7 @@ export default function Home() {
 					type="button"
 					onClick={scrollToTop}
 					aria-label="맨 위로"
-					className="fixed bottom-20 right-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white text-stone-600 shadow-lg ring-1 ring-stone-200 transition hover:text-stone-900 sm:bottom-24 sm:right-8 sm:h-11 sm:w-11"
+					className="fixed bottom-20 right-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-sky-200 transition hover:text-slate-900 sm:bottom-24 sm:right-8 sm:h-11 sm:w-11"
 				>
 					<ArrowUp className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={1.75} />
 				</button>
