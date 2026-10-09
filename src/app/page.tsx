@@ -38,8 +38,8 @@ type Book = {
 };
 
 const statusDot: Record<string, string> = {
-	"읽는 중": "bg-[#0284c7]",
-	완독: "bg-[#1e40af]",
+	"읽는 중": "bg-accent",
+	완독: "bg-done",
 	"안 읽음": "bg-slate-300",
 };
 
@@ -54,17 +54,17 @@ function ProgressBar({
 }) {
 	const value = Math.min(100, Math.max(0, percent));
 	const fill = dark
-		? "bg-[#7dd3fc]"
+		? "bg-accent"
 		: status === "완독"
-			? "bg-[#1e40af]"
+			? "bg-done"
 			: status === "읽는 중"
-				? "bg-[#0284c7]"
+				? "bg-accent"
 				: "bg-slate-300";
 
 	return (
 		<div
 			className={`h-1 w-full overflow-hidden rounded-full ${
-				dark ? "bg-white/15" : "bg-sky-100"
+				dark ? "bg-white/15" : "bg-line"
 			}`}
 		>
 			<div
@@ -77,7 +77,7 @@ function ProgressBar({
 
 function getGoogleSearchUrl(title: string): string {
 	return `https://www.google.com/search?q=${encodeURIComponent(
-		`${getSearchTitle(title)} 웹소설`,
+		getSearchTitle(title),
 	)}`;
 }
 
@@ -611,14 +611,14 @@ export default function Home() {
 	) {
 		const isOpen = openMenuId === book.id;
 		const itemClass =
-			"flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-sky-100";
+			"flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:bg-card";
 
 		const buttonClass =
 			tone === "overlay"
 				? "h-7 w-7 bg-black/35 text-white backdrop-blur hover:bg-black/55"
 				: tone === "dark"
-					? "h-8 w-8 text-[#e0f2fe]/70 hover:bg-white/10 hover:text-white"
-					: "h-8 w-8 text-slate-400 hover:bg-sky-100 hover:text-slate-700";
+					? "h-8 w-8 text-card-strong/70 hover:bg-white/10 hover:text-white"
+					: "h-8 w-8 text-slate-400 hover:bg-card hover:text-slate-700";
 
 		return (
 			<div
@@ -642,7 +642,7 @@ export default function Home() {
 
 				{isOpen && (
 					<div
-						className={`absolute top-9 w-44 rounded-xl border border-sky-200 bg-white p-1 text-slate-700 shadow-xl ${
+						className={`absolute top-9 w-44 rounded-xl border border-line bg-white p-1 text-slate-700 shadow-xl ${
 							align === "left" ? "left-0" : "right-0"
 						}`}
 					>
@@ -660,7 +660,7 @@ export default function Home() {
 							구글에서 검색
 						</a>
 
-						<div className="my-1 border-t border-sky-200" />
+						<div className="my-1 border-t border-line" />
 
 						<button
 							type="button"
@@ -756,18 +756,18 @@ export default function Home() {
 					textClass="text-[9px] sm:text-[10px]"
 				/>
 
-				<div className="flex min-w-0 flex-1 flex-col pr-7">
-					<h4 className="line-clamp-2 text-[15px] font-semibold leading-5 text-slate-900">
+				<div className="flex min-w-0 flex-1 flex-col">
+					<h4 className="line-clamp-2 pr-8 text-[15px] font-semibold leading-5 text-slate-900">
 						{book.title}
 					</h4>
 
-					<p className="mt-1 flex flex-wrap items-center gap-x-1.5 text-xs text-slate-500">
+					<p className="mt-1 flex flex-wrap items-center gap-x-1.5 pr-8 text-xs text-slate-500">
 						<span className={`h-1.5 w-1.5 rounded-full ${statusDot[status]}`} />
 						{status}
 						<span className="text-slate-300">·</span>
 						<span
 							className={`font-semibold ${
-								completedSeries ? "text-blue-900" : "text-sky-600"
+								completedSeries ? "text-series-done-ink" : "text-series-ongoing-ink"
 							}`}
 						>
 							{completedSeries ? "완결" : "연재중"}
@@ -785,17 +785,17 @@ export default function Home() {
 						</span>
 					</div>
 				</div>
-
-				<ChevronRight className="h-4 w-4 shrink-0 self-center text-slate-300" />
 			</>
 		);
 
 		const rowClass =
-			"flex w-full gap-3.5 px-4 py-4 text-left transition hover:bg-sky-100/60 sm:gap-4 sm:px-5";
+			"flex w-full gap-3.5 px-4 py-4 text-left transition hover:bg-card sm:gap-4";
 
 		return (
 			<div key={book.id} className="relative">
 				{renderBookMenu(book)}
+
+				<ChevronRight className="pointer-events-none absolute right-4 top-11 h-4 w-4 text-slate-300" />
 
 				{book.status === "완독" ? (
 					<button
@@ -843,12 +843,12 @@ export default function Home() {
 	}
 
 	return (
-		<main className="min-h-screen bg-[#eaf6fd] text-slate-900">
-			<header className="sticky top-0 z-10 border-b border-sky-200/70 bg-[#eaf6fd]/85 backdrop-blur-md">
+		<main className="min-h-screen bg-paper text-slate-900">
+			<header className="sticky top-0 z-10 border-b border-line/70 bg-paper/85 backdrop-blur-md">
 				<div className="mx-auto flex max-w-3xl items-center justify-between px-5 py-3 sm:px-6">
 					<div className="flex items-center gap-2">
 						<BookOpen
-							className="h-[18px] w-[18px] text-[#0284c7]"
+							className="h-[18px] w-[18px] text-accent-ink"
 							strokeWidth={2}
 						/>
 						<h1 className="font-serif text-lg font-bold tracking-tight">
@@ -873,7 +873,7 @@ export default function Home() {
 					</div>
 				)}
 
-				<div className="mt-5 flex items-center border-b border-sky-200/60">
+				<div className="mt-5 flex items-center border-b border-line/60">
 					{["전체", "읽는 중", "완독", "안 읽음"].map((item) => {
 						const active = managementFilter === "none" && filter === item;
 
@@ -888,7 +888,7 @@ export default function Home() {
 								}}
 								className={`-mb-px shrink-0 whitespace-nowrap border-b-2 px-3 pb-2.5 pt-1 text-sm font-semibold transition sm:px-4 ${
 									active
-										? "border-[#0284c7] text-slate-900"
+										? "border-accent text-slate-900"
 										: "border-transparent text-slate-400 hover:text-slate-700"
 								}`}
 							>
@@ -903,7 +903,7 @@ export default function Home() {
 							onClick={() => setManagementMenuOpen((prev) => !prev)}
 							className={`-mb-px flex items-center gap-1 border-b-2 px-2 pb-2.5 pt-1 text-sm font-semibold transition ${
 								managementFilter !== "none"
-									? "border-[#0284c7] text-[#0284c7]"
+									? "border-accent text-accent-ink"
 									: "border-transparent text-slate-400 hover:text-slate-700"
 							}`}
 						>
@@ -917,7 +917,7 @@ export default function Home() {
 						</button>
 
 						{managementMenuOpen && (
-							<div className="absolute right-0 top-10 z-40 w-40 rounded-xl border border-sky-200 bg-white p-1 shadow-xl">
+							<div className="absolute right-0 top-10 z-40 w-40 rounded-xl border border-line bg-white p-1 shadow-xl">
 								{(
 									[
 										["reread", "다시 볼 작품"],
@@ -934,8 +934,8 @@ export default function Home() {
 										}}
 										className={`flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium transition ${
 											managementFilter === key
-												? "bg-[#0284c7]/10 text-[#0284c7]"
-												: "text-slate-700 hover:bg-sky-100"
+												? "bg-accent/20 text-accent-ink"
+												: "text-slate-700 hover:bg-card"
 										}`}
 									>
 										{label}
@@ -944,7 +944,7 @@ export default function Home() {
 
 								{managementFilter !== "none" && (
 									<>
-										<div className="my-1 border-t border-sky-200" />
+										<div className="my-1 border-t border-line" />
 										<button
 											type="button"
 											onClick={() => {
@@ -952,7 +952,7 @@ export default function Home() {
 												setFilter("전체");
 												setManagementMenuOpen(false);
 											}}
-											className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-500 transition hover:bg-sky-100"
+											className="flex w-full items-center rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-500 transition hover:bg-card"
 										>
 											일반 목록
 										</button>
@@ -966,16 +966,16 @@ export default function Home() {
 				{filter === "전체" && managementFilter === "none" && (
 					<section className="mt-6">
 						{loading ? (
-							<div className="rounded-3xl bg-sky-100/70 px-5 py-14 text-center text-sm text-slate-400">
+							<div className="rounded-3xl bg-card px-5 py-14 text-center text-sm text-slate-400">
 								서재를 불러오는 중...
 							</div>
 						) : recentBooks.length === 0 ? (
-							<div className="rounded-3xl border border-dashed border-sky-200 px-5 py-10 text-center text-sm text-slate-400">
+							<div className="rounded-3xl border border-dashed border-line px-5 py-10 text-center text-sm text-slate-400">
 								최근 읽은 소설이 없습니다.
 							</div>
 						) : (
 							<>
-								<div className="relative rounded-3xl border border-[#b6dcf5] bg-[#d9eefc] text-slate-900">
+								<div className="relative rounded-3xl border border-line-strong bg-card-strong text-slate-900">
 									{renderBookMenu(recentBooks[0])}
 
 									{(() => {
@@ -983,7 +983,7 @@ export default function Home() {
 										const heroClass = "block w-full p-4 text-left sm:p-5";
 										const heroInner = (
 											<>
-												<p className="text-[11px] font-semibold tracking-[0.2em] text-[#0284c7]">
+												<p className="text-[11px] font-semibold tracking-[0.2em] text-accent-ink">
 													이어 읽기
 												</p>
 
@@ -991,7 +991,7 @@ export default function Home() {
 													<BookCover
 														title={hero.title}
 														seriesStatus={hero.series_status}
-														className="h-36 w-24 sm:h-40 sm:w-28"
+														className="h-32 w-[5.25rem] sm:h-36 sm:w-24"
 														textClass="text-xs"
 													/>
 
@@ -1010,10 +1010,10 @@ export default function Home() {
 																percent={getProgress(hero)}
 																status={getDisplayStatus(hero)}
 															/>
-															<span className="shrink-0 text-xs font-semibold tabular-nums text-[#0284c7]">
+															<span className="shrink-0 text-xs font-semibold tabular-nums text-accent-ink">
 																{getProgress(hero)}%
 															</span>
-															<ChevronRight className="h-4 w-4 shrink-0 text-[#0284c7]/60" />
+															<ChevronRight className="h-4 w-4 shrink-0 text-accent-ink/60" />
 														</div>
 													</div>
 												</div>
@@ -1046,7 +1046,7 @@ export default function Home() {
 											{recentBooks.slice(1).map((book) => (
 												<div
 													key={book.id}
-													className="w-28 shrink-0 snap-start sm:w-32"
+													className="w-24 shrink-0 snap-start sm:w-28"
 												>
 													{renderTile(book)}
 												</div>
@@ -1144,7 +1144,7 @@ export default function Home() {
 							value={search}
 							onChange={(event) => setSearch(event.target.value)}
 							placeholder="소설 제목 검색"
-							className="h-11 w-full rounded-full border border-sky-200 bg-white pl-10 pr-10 text-sm outline-none transition placeholder:text-slate-400 focus:border-[#0284c7]/50 focus:ring-4 focus:ring-[#0284c7]/10"
+							className="h-11 w-full rounded-full border border-line bg-white pl-10 pr-10 text-sm outline-none transition placeholder:text-slate-400 focus:border-accent/50 focus:ring-4 focus:ring-accent/10"
 						/>
 
 						{search && (
@@ -1152,7 +1152,7 @@ export default function Home() {
 								type="button"
 								onClick={() => setSearch("")}
 								aria-label="검색어 지우기"
-								className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:bg-sky-100 hover:text-slate-600"
+								className="absolute right-3 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 hover:bg-card hover:text-slate-600"
 							>
 								<X className="h-3.5 w-3.5" strokeWidth={2} />
 							</button>
@@ -1174,7 +1174,7 @@ export default function Home() {
 								className={`shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
 									sortOption === opt.key
 										? "bg-slate-900 text-white"
-										: "bg-white text-slate-500 ring-1 ring-sky-200 hover:bg-sky-50"
+										: "bg-white text-slate-500 ring-1 ring-line hover:bg-card"
 								}`}
 							>
 								{opt.label}
@@ -1187,10 +1187,10 @@ export default function Home() {
 								onClick={() => setTagFilterOpen((prev) => !prev)}
 								className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
 									activeTags.size > 0
-										? "bg-[#0284c7]/10 text-[#0284c7] ring-1 ring-[#0284c7]/40"
+										? "bg-accent/20 text-accent-ink ring-1 ring-accent/60"
 										: tagFilterOpen
 											? "bg-slate-900 text-white"
-											: "bg-white text-slate-500 ring-1 ring-sky-200 hover:bg-sky-50"
+											: "bg-white text-slate-500 ring-1 ring-line hover:bg-card"
 								}`}
 							>
 								<Filter className="h-3.5 w-3.5" strokeWidth={1.75} />
@@ -1220,8 +1220,8 @@ export default function Home() {
 										onClick={() => toggleTag(tag)}
 										className={`shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
 											isActive
-												? "bg-[#0284c7]/10 text-[#0284c7] ring-1 ring-[#0284c7]/40"
-												: "bg-white text-slate-500 ring-1 ring-sky-200 hover:bg-sky-50"
+												? "bg-accent/20 text-accent-ink ring-1 ring-accent/60"
+												: "bg-white text-slate-500 ring-1 ring-line hover:bg-card"
 										}`}
 									>
 										{tag}
@@ -1233,7 +1233,7 @@ export default function Home() {
 								type="button"
 								onClick={resetTags}
 								disabled={activeTags.size === 0}
-								className="ml-1 shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-400 ring-1 ring-sky-200 transition hover:bg-sky-50 hover:text-slate-600 disabled:cursor-default disabled:opacity-40"
+								className="ml-1 shrink-0 rounded-full px-3.5 py-1.5 text-xs font-semibold text-slate-400 ring-1 ring-line transition hover:bg-card hover:text-slate-600 disabled:cursor-default disabled:opacity-40"
 							>
 								초기화
 							</button>
@@ -1241,17 +1241,17 @@ export default function Home() {
 					)}
 
 					{loading ? (
-						<div className="mt-4 rounded-2xl bg-sky-100/70 px-5 py-12 text-center text-sm text-slate-400">
+						<div className="mt-4 rounded-2xl bg-card px-5 py-12 text-center text-sm text-slate-400">
 							불러오는 중...
 						</div>
 					) : filteredBooks.length === 0 ? (
-						<div className="mt-4 rounded-2xl border border-dashed border-sky-200 px-5 py-12 text-center text-sm text-slate-400">
+						<div className="mt-4 rounded-2xl border border-dashed border-line px-5 py-12 text-center text-sm text-slate-400">
 							{getEmptyMessage()}
 						</div>
 					) : (
 						<>
 							{viewMode === "list" ? (
-								<div className="mt-4 divide-y divide-sky-200/70 rounded-2xl border border-sky-200/70 bg-white/60">
+								<div className="mt-4 divide-y divide-line/70 rounded-2xl border border-line/70 bg-white/60">
 									{paginatedBooks.map((book) => renderRow(book))}
 								</div>
 							) : (
@@ -1269,7 +1269,7 @@ export default function Home() {
 										type="button"
 										onClick={goToPreviousPageGroup}
 										disabled={currentPageGroupStart === 1}
-										className="rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-sky-200 transition hover:bg-sky-50 disabled:cursor-default disabled:opacity-30 sm:text-sm"
+										className="rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-line transition hover:bg-card disabled:cursor-default disabled:opacity-30 sm:text-sm"
 									>
 										이전
 									</button>
@@ -1282,7 +1282,7 @@ export default function Home() {
 											className={`flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-semibold transition sm:h-9 sm:min-w-9 sm:text-sm ${
 												currentPage === page
 													? "bg-slate-900 text-white"
-													: "bg-white text-slate-500 ring-1 ring-sky-200 hover:bg-sky-50"
+													: "bg-white text-slate-500 ring-1 ring-line hover:bg-card"
 											}`}
 										>
 											{page}
@@ -1295,7 +1295,7 @@ export default function Home() {
 										disabled={
 											currentPageGroupStart + PAGE_GROUP_SIZE > totalPages
 										}
-										className="rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-sky-200 transition hover:bg-sky-50 disabled:cursor-default disabled:opacity-30 sm:text-sm"
+										className="rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-line transition hover:bg-card disabled:cursor-default disabled:opacity-30 sm:text-sm"
 									>
 										다음
 									</button>
@@ -1315,7 +1315,7 @@ export default function Home() {
 											}}
 											placeholder={`${currentPage}`}
 											aria-label="이동할 페이지"
-											className="h-8 w-14 rounded-full border border-sky-200 bg-white px-2 text-center text-xs outline-none transition focus:border-[#0284c7]/50 focus:ring-4 focus:ring-[#0284c7]/10 sm:h-9 sm:w-16 sm:text-sm"
+											className="h-8 w-14 rounded-full border border-line bg-white px-2 text-center text-xs outline-none transition focus:border-accent/50 focus:ring-4 focus:ring-accent/10 sm:h-9 sm:w-16 sm:text-sm"
 										/>
 
 										<span className="whitespace-nowrap text-xs text-slate-400 sm:text-sm">
@@ -1334,7 +1334,7 @@ export default function Home() {
 					type="button"
 					onClick={scrollToTop}
 					aria-label="맨 위로"
-					className="fixed bottom-20 right-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-sky-200 transition hover:text-slate-900 sm:bottom-24 sm:right-8 sm:h-11 sm:w-11"
+					className="fixed bottom-20 right-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-white text-slate-600 shadow-lg ring-1 ring-line transition hover:text-slate-900 sm:bottom-24 sm:right-8 sm:h-11 sm:w-11"
 				>
 					<ArrowUp className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={1.75} />
 				</button>
