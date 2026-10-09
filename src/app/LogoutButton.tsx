@@ -15,7 +15,7 @@ export default function LoginButton() {
     return (
       <button
         onClick={() => signOut({ callbackUrl: "/" })}
-        className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white hover:bg-gray-800"
+        className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-stone-500 ring-1 ring-stone-300 transition hover:bg-stone-100 hover:text-stone-900"
       >
         로그아웃
       </button>
@@ -25,7 +25,7 @@ export default function LoginButton() {
   return (
     <button
       onClick={() => router.push("/login")}
-      className="rounded-lg bg-gray-900 px-4 py-3 text-sm font-medium text-white hover:bg-gray-800"
+      className="rounded-full px-3.5 py-1.5 text-xs font-semibold text-stone-500 ring-1 ring-stone-300 transition hover:bg-stone-100 hover:text-stone-900"
     >
       Google로 로그인
     </button>
