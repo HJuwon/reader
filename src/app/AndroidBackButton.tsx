@@ -23,6 +23,12 @@ export default function AndroidBackButton() {
 
     import("@capacitor/app").then(({ App }) =>
       App.addListener("backButton", () => {
+        // 표지 확대 창이 열려 있으면 앱 종료나 화면 이동 대신 창만 닫는다.
+        if (document.querySelector("[data-cover-modal]")) {
+          window.dispatchEvent(new Event("close-cover-modal"));
+          return;
+        }
+
         if (pathname === "/") {
           App.exitApp();
           return;
