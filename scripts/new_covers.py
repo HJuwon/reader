@@ -37,11 +37,15 @@ BOOKS_TABLE = "books"
 COVERS_TABLE = "book_covers"
 PENDING_TABLE = "cover_pending"
 
+# 웹사이트 검색용 User-Agent
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
     "Chrome/130.0.0.0 Safari/537.36"
 )
+
+# Supabase 서버 요청 전용 User-Agent
+SUPABASE_USER_AGENT = "reader-cover-worker/1.0"
 
 NAVER_SEARCH_URL = "https://series.naver.com/search/search.series"
 KAKAO_SEARCH_URL = "https://page.kakao.com/search/result/"
@@ -69,14 +73,19 @@ logging.basicConfig(
 )
 
 session = requests.Session()
+
+# 일반 웹사이트 검색·다운로드용 기본 헤더
 session.headers.update({"User-Agent": USER_AGENT})
 
+# Supabase REST API 전용 헤더
+# 중요: requests.Session의 웹 브라우저 User-Agent를 덮어쓴다.
 SUPABASE_HEADERS = {
     "apikey": SUPABASE_SERVICE_ROLE_KEY,
     "Content-Type": "application/json",
+    "User-Agent": SUPABASE_USER_AGENT,
 }
 
-# JWT 형식의 기존 service_role 키는 Authorization 헤더도 사용.
+# 기존 JWT 형식의 service_role 키는 Authorization 헤더도 사용.
 # sb_secret_ 형식의 새 키는 apikey 헤더로 전달.
 if SUPABASE_SERVICE_ROLE_KEY.startswith("eyJ"):
     SUPABASE_HEADERS["Authorization"] = (
@@ -808,10 +817,12 @@ def upload_storage(key, webp_bytes):
     encoded_path = quote(object_path, safe="/")
     url = f"{SUPABASE_URL}/storage/v1/object/{BUCKET_NAME}/{encoded_path}"
 
+    # Storage 요청에도 브라우저 User-Agent가 전달되지 않도록 명시한다.
     headers = {
         "apikey": SUPABASE_SERVICE_ROLE_KEY,
         "Content-Type": "image/webp",
         "x-upsert": "true",
+        "User-Agent": SUPABASE_USER_AGENT,
     }
 
     if SUPABASE_SERVICE_ROLE_KEY.startswith("eyJ"):
