@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+
 // 제목에서 [완결], 1-300화, 확장자 등을 걷어낸 "작품명"만 추출
 export function getSearchTitle(title: string): string {
   return (
@@ -41,17 +45,33 @@ export type SeriesStatus = "ongoing" | "completed" | null | undefined;
 export default function BookCover({
   title,
   seriesStatus,
+  coverUrl,
   className = "",
   textClass = "text-[11px]",
   compact = false,
 }: {
   title: string;
   seriesStatus?: SeriesStatus;
+  coverUrl?: string | null;
   className?: string;
   textClass?: string;
   compact?: boolean;
 }) {
+  const [failed, setFailed] = useState(false);
   const name = getSearchTitle(title);
+
+  if (coverUrl && !failed) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={coverUrl}
+        alt=""
+        loading="lazy"
+        onError={() => setFailed(true)}
+        className={`shrink-0 rounded-l-sm rounded-r-md object-cover shadow-[0_6px_14px_-4px_rgb(0_0_0/0.18)] ${className}`}
+      />
+    );
+  }
 
   let hash = 0;
   for (const ch of name) {
