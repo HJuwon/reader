@@ -133,7 +133,8 @@ def supa(method, table, params=None, payload=None, extra_headers=None):
     return response.json()
 
 
-def get_all(table, params=None, page_size=1000, order="id.asc"):
+
+def get_all(table, params=None, page_size=1000, order=None):
     """페이지 단위로 테이블 데이터를 모두 조회."""
     results = []
     offset = 0
@@ -142,7 +143,10 @@ def get_all(table, params=None, page_size=1000, order="id.asc"):
     while True:
         query = dict(base_params)
         query["select"] = query.get("select", "*")
-        query["order"] = order
+
+        if order:
+            query["order"] = order
+
         query["limit"] = page_size
         query["offset"] = offset
 
