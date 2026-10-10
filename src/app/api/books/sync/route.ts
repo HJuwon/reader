@@ -33,6 +33,39 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return result;
 }
 
+// 새 책이 들어오면 표지 채우기 작업(GitHub Actions)을 바로 시작한다.
+// 토큰이 없거나 실패해도 동기화 자체에는 영향을 주지 않는다.
+async function startCoverJob(): Promise<boolean> {
+  const token = process.env.GITHUB_DISPATCH_TOKEN;
+  const repo = process.env.GITHUB_REPO || "HJuwon/reader";
+
+  if (!token) return false;
+
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${repo}/actions/workflows/new-covers.yml/dispatches`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ref: process.env.GITHUB_REF_NAME || "main",
+        }),
+        signal: AbortSignal.timeout(8000),
+      }
+    );
+
+    return response.status === 204;
+  } catch (error) {
+    console.error("표지 작업 시작 실패:", error);
+    return false;
+  }
+}
+
 export async function GET() {
   const session: any = await getServerSession(authOptions);
 
@@ -285,11 +318,19 @@ export async function GET() {
     }
 
     // =========================================================
-    // 7. 결과 반환
+    // 7. 새 책이 들어왔으면 표지 채우기 작업 시작
+    // =========================================================
+
+    const coverJobStarted =
+      insertedBooks.length > 0 ? await startCoverJob() : false;
+
+    // =========================================================
+    // 8. 결과 반환
     // =========================================================
 
     return Response.json({
       success: true,
+      coverJobStarted,
       totalDriveFiles: files.length,
       newFiles: newFiles.length,
       inserted: insertedBooks.length,
