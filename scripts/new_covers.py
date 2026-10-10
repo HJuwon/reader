@@ -221,13 +221,28 @@ def make_title_key(title):
     return normalize_key(clean_title(title))
 
 
+
 def make_search_title(title):
     """
-    플랫폼 검색에만 사용할 제목.
-    선행 숫자 접두어와 앞뒤 공백만 제거한다.
+    플랫폼 검색용 제목 정리.
+    - 제목 앞의 숫자 접두어 제거
+    - 제목 뒤의 회차 범위 제거
+    - 앞뒤 공백 제거
+    - 원본 books.title은 변경하지 않음
     """
-    value = str(title or "").strip()
+    value = unicodedata.normalize("NFKC", str(title or "")).strip()
+
+    # 제목 앞의 숫자 접두어 제거: "1-작품명" -> "작품명"
     value = SEARCH_PREFIX_RE.sub("", value)
+
+    # 제목 뒤의 회차 범위 제거: "판타지 부활 1-482" -> "판타지 부활"
+    value = re.sub(
+        r"\s+\d+\s*[-~]\s*\d+\s*(?:화|권|부)?\s*$",
+        "",
+        value,
+        flags=re.IGNORECASE,
+    )
+
     return value.strip()
 
 
