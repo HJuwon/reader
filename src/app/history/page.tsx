@@ -26,6 +26,7 @@ type Book = {
   status: string;
   updated_at: string;
   series_status?: "ongoing" | "completed";
+  cover_url?: string | null;
   rounds?: Round[];
 };
 
@@ -174,6 +175,7 @@ export default function HistoryPage() {
                   compact
                   title={entry.book.title}
                   seriesStatus={entry.book.series_status}
+                  coverUrl={entry.book.cover_url}
                   className="h-[72px] w-12"
                   textClass="text-[8px]"
                 />
