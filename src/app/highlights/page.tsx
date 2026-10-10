@@ -22,6 +22,7 @@ type Book = {
   title: string;
   drive_file_id: string;
   series_status?: "ongoing" | "completed";
+  cover_url?: string | null;
 };
 
 export default function HighlightsPage() {
@@ -74,6 +75,10 @@ export default function HighlightsPage() {
 
   function getBookSeriesStatus(bookId: string) {
     return books.find((item) => item.id === bookId)?.series_status;
+  }
+
+  function getBookCover(bookId: string) {
+    return books.find((item) => item.id === bookId)?.cover_url;
   }
 
   function getBookTitle(bookId: string) {
@@ -172,6 +177,7 @@ export default function HighlightsPage() {
                   compact
                   title={title}
                   seriesStatus={getBookSeriesStatus(highlight.book_id)}
+                  coverUrl={getBookCover(highlight.book_id)}
                   className="h-16 w-11"
                   textClass="text-[8px]"
                 />
