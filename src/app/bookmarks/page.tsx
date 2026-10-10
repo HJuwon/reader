@@ -19,6 +19,7 @@ type Book = {
   title: string;
   drive_file_id: string;
   series_status?: "ongoing" | "completed";
+  cover_url?: string | null;
 };
 
 export default function BookmarksPage() {
@@ -72,6 +73,10 @@ export default function BookmarksPage() {
 
   function getBookSeriesStatus(bookId: string) {
     return books.find((item) => item.id === bookId)?.series_status;
+  }
+
+  function getBookCover(bookId: string) {
+    return books.find((item) => item.id === bookId)?.cover_url;
   }
 
   function getBookTitle(bookId: string) {
@@ -245,6 +250,7 @@ export default function BookmarksPage() {
                   compact
                   title={title}
                   seriesStatus={getBookSeriesStatus(bookmark.book_id)}
+                  coverUrl={getBookCover(bookmark.book_id)}
                   className="h-16 w-11"
                   textClass="text-[8px]"
                 />
