@@ -13,11 +13,11 @@ const PAGE_SIZE = 1000;
 
 // 서재 / 이력 화면이 실제로 사용하는 컬럼만 받는다.
 const BOOK_COLUMNS =
-  "id,drive_file_id,title,total_episodes,last_episode,progress,status,series_status,updated_at,is_reread_wanted,is_excluded";
+  "id,drive_file_id,title,total_episodes,last_episode,progress,status,series_status,updated_at,is_reread_wanted,is_excluded,book_covers(cover_url)";
 
 // 제목만 필요한 화면(북마크, 하이라이트)용
 const BOOK_TITLE_COLUMNS =
-  "id,drive_file_id,title,series_status";
+  "id,drive_file_id,title,series_status,book_covers(cover_url)";
 
 const ROUND_COLUMNS =
   "id,book_id,round,status,started_at,completed_at,created_at";
@@ -158,9 +158,15 @@ async function fetchAllBooks(
   }
 
   return {
-    data: pages.flatMap(
-      (page) => page.data ?? []
-    ),
+    data: pages
+      .flatMap((page) => page.data ?? [])
+      .map(({ book_covers, ...book }: any) => ({
+        ...book,
+        cover_url:
+          (Array.isArray(book_covers)
+            ? book_covers[0]?.cover_url
+            : book_covers?.cover_url) ?? null,
+      })),
     error: null,
   };
 }
