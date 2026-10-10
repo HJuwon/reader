@@ -28,6 +28,7 @@ type Book = {
 	status: "읽는 중" | "완독" | "안 읽음";
 	updated_at: string;
 	series_status: "ongoing" | "completed";
+	cover_url?: string | null;
 	round_count?: number;
 	completed_round_count?: number;
 	current_round?: number | null;
@@ -700,6 +701,7 @@ export default function Home() {
 				<BookCover
 					title={book.title}
 					seriesStatus={book.series_status}
+					coverUrl={book.cover_url}
 					className="aspect-[2/3] w-full"
 					textClass="text-[11px] sm:text-xs"
 				/>
@@ -752,6 +754,7 @@ export default function Home() {
 					compact
 					title={book.title}
 					seriesStatus={book.series_status}
+					coverUrl={book.cover_url}
 					className="h-[88px] w-[60px] sm:h-24 sm:w-16"
 					textClass="text-[9px] sm:text-[10px]"
 				/>
@@ -991,6 +994,7 @@ export default function Home() {
 													<BookCover
 														title={hero.title}
 														seriesStatus={hero.series_status}
+														coverUrl={hero.cover_url}
 														className="h-32 w-[5.25rem] sm:h-36 sm:w-24"
 														textClass="text-xs"
 													/>
