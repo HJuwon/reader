@@ -453,7 +453,7 @@ export default function Home() {
 				(a, b) =>
 					new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
 			)
-			.slice(0,6);
+			.slice(0,7);
 	}, [books]);
 
 	function getReaderUrl(book: Book) {
@@ -1058,7 +1058,7 @@ export default function Home() {
 											최근 읽은 소설
 										</h3>
 
-										<div className="scrollbar-hide -mx-5 mt-3 flex snap-x gap-4 overflow-x-auto px-5 pb-3 sm:mx-0 sm:px-0">
+										<div className="scrollbar-hide -mx-5 mt-3 flex snap-x scroll-px-5 gap-4 overflow-x-auto px-5 pb-3 sm:mx-0 sm:scroll-px-0 sm:px-0">
 											{recentBooks.slice(1).map((book) => (
 												<div
 													key={book.id}
