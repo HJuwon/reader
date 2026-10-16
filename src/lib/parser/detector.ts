@@ -123,6 +123,78 @@ function escapeRegExp(value: string): string {
 }
 
 /**
+ * 여는 괄호 → 닫는 괄호
+ */
+const BRACKET_PAIRS: Record<string, string> = {
+  "<": ">",
+  "[": "]",
+  "(": ")",
+  "{": "}",
+  "〈": "〉",
+  "《": "》",
+  "「": "」",
+  "『": "』",
+  "【": "】",
+  "（": "）",
+  "［": "］",
+};
+
+/**
+ * 규칙에서 xxx 바로 앞이 여는 괄호이면, 짝이 되는 닫는 괄호를 돌려준다.
+ *
+ * 예:
+ *   "<xxx"      → { open: "<", close: ">" }
+ *   "[xxx"      → { open: "[", close: "]" }
+ *   "외전 제xxx화" → null
+ */
+function getClosingBracket(
+  rule: string
+): { open: string; close: string } | null {
+  const markerIndex = rule.indexOf("xxx");
+
+  if (markerIndex === -1) {
+    return null;
+  }
+
+  const open = rule
+    .slice(0, markerIndex)
+    .trim()
+    .slice(-1);
+
+  const close = BRACKET_PAIRS[open];
+
+  return close ? { open, close } : null;
+}
+
+/**
+ * 제목 끝에 남은 닫는 괄호를 제거한다.
+ *
+ * 예: "첫만남>"  → "첫만남"
+ *     ">"       → ""            (제목 없이 "<1>"만 있는 경우)
+ *     "A <B>"   → "A <B>"       (괄호가 짝이 맞으면 제목의 일부이므로 유지)
+ */
+function stripClosingBracket(
+  title: string,
+  bracket: { open: string; close: string } | null
+): string {
+  if (!bracket || !title.endsWith(bracket.close)) {
+    return title;
+  }
+
+  const countOf = (char: string) =>
+    title.split(char).length - 1;
+
+  // 닫는 괄호가 여는 괄호보다 많을 때만(= 짝이 없는 닫는 괄호일 때만) 제거한다.
+  if (countOf(bracket.close) <= countOf(bracket.open)) {
+    return title;
+  }
+
+  return title
+    .slice(0, -bracket.close.length)
+    .trim();
+}
+
+/**
  * 사용자가 설정한 공통 회차 규칙을 정규식으로 변환한다.
  *
  * 예:
@@ -211,6 +283,9 @@ export function detectCandidates(
       regex: buildCustomRulePattern(
         rule.rule
       ),
+      bracket: getClosingBracket(
+        rule.rule
+      ),
     }))
     .filter(
       (
@@ -218,6 +293,10 @@ export function detectCandidates(
       ): item is {
         rule: string;
         regex: RegExp;
+        bracket: {
+          open: string;
+          close: string;
+        } | null;
       } => item.regex !== null
     );
 
@@ -253,8 +332,10 @@ export function detectCandidates(
 
       const number = Number(match[1]);
 
-      const title =
-        match[2]?.trim() || "";
+      const title = stripClosingBracket(
+        match[2]?.trim() || "",
+        customPattern.bracket
+      );
 
       candidates.push({
         lineIndex,
