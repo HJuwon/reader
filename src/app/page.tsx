@@ -453,7 +453,7 @@ export default function Home() {
 				(a, b) =>
 					new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime(),
 			)
-			.slice(0, 3);
+			.slice(0,11);
 	}, [books]);
 
 	function getReaderUrl(book: Book) {
