@@ -175,13 +175,22 @@ function buildCustomRulePattern(
   const suffixPattern =
     escapeRegExp(suffix);
 
+  // suffix가 "."으로 끝나는 규칙(예: "xxx.")은 소수점이 있는 숫자
+  // (예: "3.14159", "12.5kg")도 "3화 + 제목 14159"처럼 잡아 버린다.
+  // 회차 번호의 점 바로 뒤에 숫자가 붙어 있으면 소수점으로 보고 제외한다.
+  // (점 뒤에 공백을 두고 숫자로 시작하는 제목, 예: "3. 14일 후"는 그대로 허용)
+  const notDecimalPattern =
+    suffix.endsWith(".")
+      ? "(?!\\d)"
+      : "";
+
   // suffix(예: "화", ".") 뒤에는 구분자(-, ., :, · 등)가 있을 수도 있고
   // 없이 공백만 두고 바로 제목이 이어질 수도 있다.
   // (예: "#001. 첫 번째 화 제목" → suffix "." 를 이미 소비했으므로
   //  그 뒤에는 별도 구분자 없이 공백 + 제목만 온다.)
   // 따라서 구분자 자체를 옵셔널로 두고, 제목 캡처 그룹은 항상 존재하게 한다.
   return new RegExp(
-    `^\\s*${prefixPattern}\\s*(\\d{1,6})\\s*${suffixPattern}\\s*(?:[-.:·]\\s*)?(.*?)\\s*$`,
+    `^\\s*${prefixPattern}\\s*(\\d{1,6})\\s*${suffixPattern}${notDecimalPattern}\\s*(?:[-.:·]\\s*)?(.*?)\\s*$`,
     "i"
   );
 }
