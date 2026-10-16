@@ -24,7 +24,11 @@ import { useSearchParams } from "next/navigation";
 
 import { useReadingProgress } from "./hooks/useReadingProgress";
 import { useEpisodeRules } from "./hooks/useEpisodeRules";
-import { useBodySearch } from "./hooks/useBodySearch";
+import {
+	useBodySearch,
+	EMPTY_SEARCH_EPISODES,
+	GLOBAL_SEARCH_MIN_LENGTH,
+} from "./hooks/useBodySearch";
 import { useContentEditor } from "./hooks/useContentEditor";
 import { useEpisodeNavigation } from "./hooks/useEpisodeNavigation";
 import { useFileClose } from "./hooks/useFileClose";
@@ -232,11 +236,20 @@ export default function DriveBrowser() {
 		setBodySearchIndex,
 		bodySearchMatches,
 		scrollToBodySearchMatch,
+		scrollToBodySearchMatchAt,
+		bodySearchScope,
+		setBodySearchScope,
+		allSearchResults,
+		allSearchTotalCount,
+		allSearchPending,
+		prepareBodySearchJump,
 	} = useBodySearch({
 		contentRef,
 		selectedEpisodeContent:
 			selectedEpisode?.content,
 		selectedEpisodeIndex,
+		episodes:
+			parsedNovel?.episodes ?? EMPTY_SEARCH_EPISODES,
 	});
 
 
@@ -277,6 +290,31 @@ export default function DriveBrowser() {
 		scrollPositionRef,
 		restoreScrollPositionRef,
 	});
+
+
+	/*
+	 * 전체 검색 결과 클릭 → 해당 화로 이동 후 검색어 위치로 스크롤
+	 * (changeEpisode 는 이동하면서 검색어를 비우기 때문에 다시 채워 넣는다)
+	 */
+	async function handleSearchResultClick(
+		episodeIndex: number,
+	) {
+		const keyword = bodySearch;
+
+		setBodySearchScope("episode");
+
+		if (episodeIndex === selectedEpisodeIndex) {
+			setBodySearchIndex(0);
+			scrollToBodySearchMatchAt(0);
+			return;
+		}
+
+		prepareBodySearchJump(episodeIndex);
+
+		await changeEpisode(episodeIndex);
+
+		setBodySearch(keyword);
+	}
 
 
 	const {
@@ -1133,9 +1171,15 @@ export default function DriveBrowser() {
 																		e.key ===
 																		"Enter"
 																	) {
-																		scrollToBodySearchMatch(
-																			1
-																		);
+																		if (bodySearchScope === "all") {
+																			if (allSearchResults[0]) {
+																				handleSearchResultClick(
+																					allSearchResults[0].episodeIndex,
+																				);
+																			}
+																		} else {
+																			scrollToBodySearchMatch(1);
+																		}
 																	}
 
 																	if (
@@ -1151,13 +1195,43 @@ export default function DriveBrowser() {
 																		);
 																	}
 																}}
-																placeholder="본문에서 검색"
+																placeholder={
+																bodySearchScope === "all"
+																	? "전체 회차에서 검색"
+																	: "본문에서 검색"
+															}
 																className="min-w-0 flex-1 bg-transparent text-sm outline-none"
 																style={{
 																	color:
 																		theme.title,
 																}}
 															/>
+
+															<button
+																onClick={() =>
+																	setBodySearchScope(
+																		bodySearchScope === "all"
+																			? "episode"
+																			: "all",
+																	)
+																}
+																aria-label="검색 범위 전환"
+																className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition hover:opacity-80"
+																style={{
+																	color:
+																		bodySearchScope === "all"
+																			? theme.accent
+																			: theme.muted,
+																	backgroundColor:
+																		bodySearchScope === "all"
+																			? `${theme.accent}22`
+																			: theme.divider,
+																}}
+															>
+																{bodySearchScope === "all"
+																	? "전체"
+																	: "이 화"}
+															</button>
 
 															{bodySearch.trim() && (
 																<span
@@ -1167,8 +1241,13 @@ export default function DriveBrowser() {
 																			theme.muted,
 																	}}
 																>
-																	{bodySearchMatches.length >
-																	0
+																	{bodySearchScope === "all"
+																	? allSearchPending ||
+																			bodySearch.trim().length <
+																				GLOBAL_SEARCH_MIN_LENGTH
+																		? ""
+																		: `${allSearchResults.length}개 화`
+																	: bodySearchMatches.length > 0
 																		? `${bodySearchIndex + 1}/${bodySearchMatches.length}`
 																		: "0/0"}
 																</span>
@@ -1184,7 +1263,9 @@ export default function DriveBrowser() {
 																	bodySearchMatches.length ===
 																	0
 																}
-																className="shrink-0 rounded-full p-1 disabled:opacity-30"
+																className={`shrink-0 rounded-full p-1 disabled:opacity-30 ${
+																	bodySearchScope === "all" ? "hidden" : ""
+																}`}
 																style={{
 																	color:
 																		theme.title,
@@ -1204,7 +1285,9 @@ export default function DriveBrowser() {
 																	bodySearchMatches.length ===
 																	0
 																}
-																className="shrink-0 rounded-full p-1 disabled:opacity-30"
+																className={`shrink-0 rounded-full p-1 disabled:opacity-30 ${
+																	bodySearchScope === "all" ? "hidden" : ""
+																}`}
 																style={{
 																	color:
 																		theme.title,
@@ -1236,6 +1319,106 @@ export default function DriveBrowser() {
 														</div>
 													)}
 												</div>
+
+
+												{bodySearchOpen &&
+												bodySearchScope === "all" &&
+												bodySearch.trim() && (
+													<div
+														className="mt-2 max-h-80 overflow-y-auto overscroll-contain rounded-lg"
+														style={{
+															boxShadow: `0 0 0 0.5px ${theme.divider}`,
+														}}
+													>
+														{bodySearch.trim().length <
+														GLOBAL_SEARCH_MIN_LENGTH ? (
+															<p
+																className="px-3 py-3 text-xs"
+																style={{ color: theme.muted }}
+															>
+																{GLOBAL_SEARCH_MIN_LENGTH}글자 이상
+																입력해 주세요.
+															</p>
+														) : allSearchPending ? (
+															<p
+																className="px-3 py-3 text-xs"
+																style={{ color: theme.muted }}
+															>
+																검색 중…
+															</p>
+														) : allSearchResults.length === 0 ? (
+															<p
+																className="px-3 py-3 text-xs"
+																style={{ color: theme.muted }}
+															>
+																검색 결과가 없습니다.
+															</p>
+														) : (
+															<>
+																<p
+																	className="px-3 pt-2.5 pb-1 text-[11px]"
+																	style={{ color: theme.muted }}
+																>
+																	{allSearchResults.length}개 화에서
+																	총 {allSearchTotalCount}건
+																</p>
+
+																{allSearchResults.map((result) => (
+																	<button
+																		key={result.episodeIndex}
+																		onClick={() =>
+																			handleSearchResultClick(
+																				result.episodeIndex,
+																			)
+																		}
+																		className="block w-full px-3 py-2.5 text-left transition hover:opacity-80"
+																		style={{
+																			borderTop: `0.5px solid ${theme.divider}`,
+																		}}
+																	>
+																		<div className="flex items-center justify-between gap-2">
+																			<span
+																				className="min-w-0 truncate text-xs font-medium"
+																				style={{ color: theme.accent }}
+																			>
+																				{result.episode}화
+																				{result.title
+																					? ` · ${result.title}`
+																					: ""}
+																			</span>
+
+																			<span
+																				className="shrink-0 text-[11px] tabular-nums"
+																				style={{ color: theme.muted }}
+																			>
+																				{result.count}건
+																			</span>
+																		</div>
+
+																		<p
+																			className="mt-1 break-words text-sm leading-relaxed"
+																			style={{ color: theme.text }}
+																		>
+																			{result.hasMoreBefore && "…"}
+																			{result.before}
+																			<mark
+																				className="rounded-sm"
+																				style={{
+																					backgroundColor: `${theme.accent}33`,
+																					color: "inherit",
+																				}}
+																			>
+																				{result.match}
+																			</mark>
+																			{result.after}
+																			{result.hasMoreAfter && "…"}
+																		</p>
+																	</button>
+																))}
+															</>
+														)}
+													</div>
+												)}
 
 
 												{editError && (
