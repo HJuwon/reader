@@ -32,18 +32,57 @@ function selectForOption(
 }
 
 /**
- * 선택된 규칙 하나로 회차를 나눈다.
+ * 선택된 규칙들로 회차를 나눈다. (여러 규칙을 함께 쓸 수 있다)
  * 규칙이 없으면 기본 규칙("N화")을 쓴다.
  */
+function selectForOptions(
+  lines: string[],
+  options: RuleOption[]
+): EpisodeCandidate[] {
+  if (options.length === 1) {
+    return selectForOption(lines, options[0]);
+  }
+
+  // 규칙마다 찾은 후보를 합친 뒤, 같은 줄은 한 번만 쓴다.
+  const merged: EpisodeCandidate[] = [];
+  const usedLines = new Set<number>();
+
+  options
+    .flatMap((option) =>
+      detectCandidates(lines, option)
+    )
+    .sort((a, b) => a.lineIndex - b.lineIndex)
+    .forEach((candidate) => {
+      if (usedLines.has(candidate.lineIndex)) {
+        return;
+      }
+
+      usedLines.add(candidate.lineIndex);
+      merged.push(candidate);
+    });
+
+  return selectCandidates(
+    scoreCandidates(merged, lines)
+  );
+}
+
 export function parseNovel(
   text: string,
-  option: RuleOption | null = null
+  option: RuleOption | RuleOption[] | null = null
 ): ParsedNovel {
   const lines = getLines(normalizeText(text));
 
-  const selected = selectForOption(
+  const options = Array.isArray(option)
+    ? option
+    : option
+      ? [option]
+      : [];
+
+  const selected = selectForOptions(
     lines,
-    option ?? DEFAULT_RULE_OPTION
+    options.length > 0
+      ? options
+      : [DEFAULT_RULE_OPTION]
   );
 
   const { episodes, preface } = buildEpisodes(
@@ -141,6 +180,8 @@ export {
   buildRuleOptions,
   customRuleKey,
   findRuleOption,
+  parseRuleKeys,
+  serializeRuleKeys,
 } from "./rules";
 
 export type { RuleKind, RuleOption } from "./rules";
