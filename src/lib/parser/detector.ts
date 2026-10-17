@@ -39,6 +39,17 @@ const patterns: Pattern[] = [
     getTitle: (m) => m[2]?.trim() || "",
   },
 
+  // 소설제목 1화
+  // 아무 글자 1화 - 부제
+  // (앞에 붙는 글자는 소설마다 달라서 무엇이든 허용한다. 짧은 줄만 대상)
+  {
+    name: "titled_episode",
+    regex:
+      /^(?=.{1,80}$)\s*(\S.*?)\s+(\d{1,5})\s*화(?=$|\s|[-.:·])(?:\s*[-.:·]\s*|\s+)?(.*?)\s*$/,
+    getNumber: (m) => Number(m[2]),
+    getTitle: (m) => m[3]?.trim() || "",
+  },
+
   {
     name: "korean_chapter",
     regex:
@@ -190,6 +201,7 @@ function buildCustomLabel(
 
   const word = rule
     .slice(0, markerIndex)
+    .replace(/\*/g, " ")
     .replace(/[^0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ\s]/g, " ")
     .replace(/\s+/g, " ")
     .trim()
@@ -286,8 +298,17 @@ function buildCustomRulePattern(
     return null;
   }
 
+  // 규칙 앞부분의 * 는 "아무 글자"를 뜻한다. (예: "* xxx화")
+  // 소설마다 다른 제목을 규칙마다 따로 쓰지 않아도 되게 하기 위함이다.
+  // 본문 문장이 잡히지 않도록 짧은 줄만 대상으로 한다.
+  const hasWildcard = prefix.includes("*");
+
   const prefixPattern =
-    escapeRegExp(prefix);
+    (hasWildcard ? "(?=.{1,80}$)" : "") +
+    prefix
+      .split("*")
+      .map(escapeRegExp)
+      .join(".+?");
 
   const suffixPattern =
     escapeRegExp(suffix);
@@ -296,6 +317,12 @@ function buildCustomRulePattern(
   // (예: "3.14159", "12.5kg")도 "3화 + 제목 14159"처럼 잡아 버린다.
   // 회차 번호의 점 바로 뒤에 숫자가 붙어 있으면 소수점으로 보고 제외한다.
   // (점 뒤에 공백을 두고 숫자로 시작하는 제목, 예: "3. 14일 후"는 그대로 허용)
+  // 와일드카드(*) 규칙은 "3화에서 만난…" 같은 본문 문장이 잡히지 않도록
+  // suffix 바로 뒤가 줄 끝, 공백, 구분자 중 하나일 때만 허용한다.
+  const boundaryPattern = hasWildcard
+    ? "(?=$|\\s|[-.:·])"
+    : "";
+
   const notDecimalPattern =
     suffix.endsWith(".")
       ? "(?!\\d)"
@@ -307,7 +334,7 @@ function buildCustomRulePattern(
   //  그 뒤에는 별도 구분자 없이 공백 + 제목만 온다.)
   // 따라서 구분자 자체를 옵셔널로 두고, 제목 캡처 그룹은 항상 존재하게 한다.
   return new RegExp(
-    `^\\s*${prefixPattern}\\s*(\\d{1,6})\\s*${suffixPattern}${notDecimalPattern}\\s*(?:[-.:·]\\s*)?(.*?)\\s*$`,
+    `^\\s*${prefixPattern}\\s*(\\d{1,6})\\s*${suffixPattern}${boundaryPattern}${notDecimalPattern}\\s*(?:[-.:·]\\s*)?(.*?)\\s*$`,
     "i"
   );
 }
