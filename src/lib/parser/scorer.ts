@@ -8,7 +8,11 @@ import { EpisodeCandidate } from "./types";
  *   "외전 제xxx화" → false  ("외전 제"가 있어서 그 자체로 구분된다)
  */
 function isPrefixlessRule(pattern: string): boolean {
-  const rule = pattern.slice("custom:".length);
+  // 앞의 ^ 는 "줄 맨 앞" 표시일 뿐이라 글자로 치지 않는다.
+  const rule = pattern
+    .slice("custom:".length)
+    .trim()
+    .replace(/^\^/, "");
   const markerIndex = rule.indexOf("xxx");
 
   return (
