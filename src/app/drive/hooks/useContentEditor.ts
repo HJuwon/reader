@@ -21,7 +21,7 @@ type UseContentEditorParams = {
     id: string;
   } | null;
   selectedEpisode: SelectedEpisode | undefined;
-  selectedRuleOption: RuleOption | null;
+  selectedRuleOptions: RuleOption[];
   setFileContent: (content: string) => void;
   setParsedNovel: (
     novel: ParsedNovel | null
@@ -32,7 +32,7 @@ export function useContentEditor({
   fileContent,
   selectedFile,
   selectedEpisode,
-  selectedRuleOption,
+  selectedRuleOptions,
   setFileContent,
   setParsedNovel,
 }: UseContentEditorParams) {
@@ -135,7 +135,7 @@ export function useContentEditor({
         const reparsed =
           parseNovel(
             newFullText,
-            selectedRuleOption
+            selectedRuleOptions
           );
 
         setParsedNovel(reparsed);
@@ -166,7 +166,7 @@ export function useContentEditor({
       selectedEpisode,
       fileContent,
       editedText,
-      selectedRuleOption,
+      selectedRuleOptions,
       setFileContent,
       setParsedNovel,
     ]);
