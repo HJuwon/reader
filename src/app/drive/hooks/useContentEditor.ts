@@ -7,8 +7,8 @@ import {
 
 import {
   parseNovel,
-  type EpisodeRule,
   type ParsedNovel,
+  type RuleOption,
 } from "@/lib/parser";
 
 import { getLines } from "@/lib/parser/normalize";
@@ -21,7 +21,7 @@ type UseContentEditorParams = {
     id: string;
   } | null;
   selectedEpisode: SelectedEpisode | undefined;
-  episodeRules: EpisodeRule[];
+  selectedRuleOption: RuleOption | null;
   setFileContent: (content: string) => void;
   setParsedNovel: (
     novel: ParsedNovel | null
@@ -32,7 +32,7 @@ export function useContentEditor({
   fileContent,
   selectedFile,
   selectedEpisode,
-  episodeRules,
+  selectedRuleOption,
   setFileContent,
   setParsedNovel,
 }: UseContentEditorParams) {
@@ -135,7 +135,7 @@ export function useContentEditor({
         const reparsed =
           parseNovel(
             newFullText,
-            episodeRules
+            selectedRuleOption
           );
 
         setParsedNovel(reparsed);
@@ -166,7 +166,7 @@ export function useContentEditor({
       selectedEpisode,
       fileContent,
       editedText,
-      episodeRules,
+      selectedRuleOption,
       setFileContent,
       setParsedNovel,
     ]);
