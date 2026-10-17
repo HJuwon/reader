@@ -184,17 +184,24 @@ export default function DriveBrowser() {
 		setEpisodeRules,
 		episodeRuleInput,
 		setEpisodeRuleInput,
-		episodeRulesLoading,
 		episodeRuleSaving,
 		episodeRuleError,
 		episodeRuleSearch,
 		setEpisodeRuleSearch,
-		filteredEpisodeRules,
-		loadEpisodeRules,
+		ruleOptions,
+		filteredRuleOptions,
+		selectedRuleOption,
+		pendingRuleKey,
+		setPendingRuleKey,
+		ruleSource,
+		ruleStats,
+		recommendedRuleKey,
+		setRuleSelection,
+		confirmRuleSelection,
 		addEpisodeRule,
 		deleteEpisodeRule,
-		reparseWithRules,
 	} = useEpisodeRules({
+		fileId: searchParams.get("fileId"),
 		fileContent,
 		selectedEpisodeStartLine:
 			selectedEpisode?.startLine,
@@ -218,7 +225,7 @@ export default function DriveBrowser() {
 		fileContent,
 		selectedFile,
 		selectedEpisode,
-		episodeRules,
+		selectedRuleOption,
 		setFileContent,
 		setParsedNovel,
 	});
@@ -400,6 +407,7 @@ export default function DriveBrowser() {
 		setParsedNovel,
 		setSelectedEpisodeIndex,
 		setEpisodeRules,
+		setRuleSelection,
 
 		initializeReadingState,
 		getBookmarkStatus,
@@ -1950,8 +1958,9 @@ export default function DriveBrowser() {
 										theme.muted,
 								}}
 							>
-								작품 전체에 공통으로 적용할 회차 형식을
-								등록할 수 있습니다.
+								이 소설에 바로 적용할 회차 형식을
+								추가합니다. 추가한 규칙은 다른 소설의
+								규칙 목록에도 나타납니다.
 								<br />
 								숫자 부분은{" "}
 								<b>xxx</b>로 입력하세요.
@@ -2052,7 +2061,7 @@ export default function DriveBrowser() {
 												theme.title,
 										}}
 									>
-										등록된 회차 규칙 관리
+										이 소설의 회차 규칙
 									</p>
 
 									<p
@@ -2062,10 +2071,13 @@ export default function DriveBrowser() {
 												theme.muted,
 										}}
 									>
-										{episodeRules.length >
-										0
-											? `${episodeRules.length}개의 규칙이 등록되어 있습니다.`
-											: "등록된 규칙이 없습니다."}
+										{`현재: ${selectedRuleOption.label} (${
+											ruleSource === "manual"
+												? "직접 선택"
+												: ruleSource === "auto"
+													? "자동 감지"
+													: "기본값"
+										})`}
 									</p>
 								</div>
 
@@ -2275,11 +2287,7 @@ export default function DriveBrowser() {
 												theme.muted,
 										}}
 									>
-										총{" "}
-										{
-											episodeRules.length
-										}
-										개
+										목록에서 하나를 골라 확인을 누르세요
 									</p>
 								</div>
 							</div>
@@ -2333,7 +2341,7 @@ export default function DriveBrowser() {
 												.value
 										)
 									}
-									placeholder="등록된 규칙 검색"
+									placeholder="규칙 검색"
 									className="min-w-0 flex-1 bg-transparent text-sm outline-none"
 									style={{
 										color:
@@ -2372,7 +2380,7 @@ export default function DriveBrowser() {
 									}}
 								>
 									{
-										filteredEpisodeRules.length
+										filteredRuleOptions.length
 									}
 									개 검색됨
 								</p>
@@ -2381,150 +2389,161 @@ export default function DriveBrowser() {
 
 
 						<div className="min-h-0 flex-1 overflow-y-auto px-5 pb-5">
-							{episodeRulesLoading ? (
-								<div className="flex items-center justify-center py-12">
-									<div
-										className="flex items-center gap-2 text-xs"
-										style={{
-											color:
-												theme.muted,
-										}}
-									>
-										<Loader2 className="h-4 w-4 animate-spin" />
-										규칙을 불러오는 중...
-									</div>
-								</div>
-							) : episodeRules.length ===
-							  0 ? (
-								<div className="py-12 text-center">
-									<p
-										className="text-xs"
-										style={{
-											color:
-												theme.text,
-										}}
-									>
-										등록된 회차 규칙이 없습니다.
-									</p>
+							<div className="space-y-2">
+								{recommendedRuleKey &&
+									!episodeRuleSearch &&
+									ruleStats &&
+									(() => {
+										const recommended =
+											ruleOptions.find(
+												(option) =>
+													option.key ===
+													recommendedRuleKey
+											);
 
-									<p
-										className="mt-1.5 text-[10px]"
-										style={{
-											color:
-												theme.muted,
-										}}
-									>
-										회차 수정에서 새로운 규칙을
-										등록하세요.
-									</p>
-								</div>
-							) : filteredEpisodeRules.length ===
-							  0 ? (
-								<div className="py-12 text-center">
-									<Search
-										className="mx-auto mb-3 h-5 w-5"
-										style={{
-											color:
-												theme.muted,
-										}}
-									/>
-
-									<p
-										className="text-xs"
-										style={{
-											color:
-												theme.text,
-										}}
-									>
-										검색 결과가 없습니다.
-									</p>
-
-									<button
-										type="button"
-										onClick={() =>
-											setEpisodeRuleSearch(
-												""
-											)
+										if (!recommended) {
+											return null;
 										}
-										className="mt-2 text-[10px] hover:opacity-70"
-										style={{
-											color:
-												theme.accent,
-										}}
-									>
-										검색어 초기화
-									</button>
-								</div>
-							) : (
-								<div className="space-y-2">
-									{filteredEpisodeRules.map(
-										(
-											rule
-										) => (
-											<div
-												key={
-													rule.id ??
-													rule.rule
+
+										return (
+											<button
+												type="button"
+												onClick={() =>
+													setPendingRuleKey(
+														recommended.key
+													)
 												}
-												className="flex items-center gap-3 rounded-xl px-4 py-3"
+												className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition hover:opacity-80"
 												style={{
-													backgroundColor:
-														theme.divider,
+													border: `1px dashed ${theme.accent}`,
+													color: theme.text,
 												}}
 											>
-												<div className="min-w-0 flex-1">
-													<p
-														className="break-all text-sm"
-														style={{
-															color:
-																theme.text,
-														}}
-													>
-														{
-															rule.rule
-														}
-													</p>
+												<p className="min-w-0 flex-1 break-all text-sm">
+													추천: {recommended.label} (
+													{ruleStats[recommended.key]
+														?.count ?? 0}
+													개 화)
+												</p>
+											</button>
+										);
+									})()}
 
-													<p
-														className="mt-1 text-[10px]"
-														style={{
-															color:
-																theme.muted,
-														}}
-													>
-														xxx 부분이 숫자로 인식됩니다.
-													</p>
-												</div>
+								{filteredRuleOptions.length === 0 ? (
+									<div className="py-12 text-center">
+										<Search
+											className="mx-auto mb-3 h-5 w-5"
+											style={{ color: theme.muted }}
+										/>
 
+										<p
+											className="text-xs"
+											style={{ color: theme.text }}
+										>
+											검색 결과가 없습니다.
+										</p>
+
+										<button
+											type="button"
+											onClick={() =>
+												setEpisodeRuleSearch("")
+											}
+											className="mt-2 text-[10px] hover:opacity-70"
+											style={{ color: theme.accent }}
+										>
+											검색어 초기화
+										</button>
+									</div>
+								) : (
+									filteredRuleOptions.map((option) => {
+										const picked =
+											option.key === pendingRuleKey;
+
+										const applied =
+											option.key ===
+											selectedRuleOption.key;
+
+										const count =
+											ruleStats?.[option.key]?.count;
+
+										return (
+											<div
+												key={option.key}
+												className="flex items-center gap-2"
+											>
 												<button
 													type="button"
-													onClick={() => {
-														if (
-															rule.id
-														) {
-															void deleteEpisodeRule(
-																rule.id
-															);
-														}
-													}}
-													disabled={
-														!rule.id
+													onClick={() =>
+														setPendingRuleKey(
+															option.key
+														)
 													}
-													className="shrink-0 rounded-lg px-3 py-2 text-[11px] transition hover:opacity-60 disabled:opacity-30"
+													className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-4 py-3 text-left transition hover:opacity-80"
 													style={{
-														color:
-															theme.muted,
-														backgroundColor:
-															theme.bg,
+														backgroundColor: theme.divider,
+														border: picked
+															? `1px solid ${theme.accent}`
+															: "1px solid transparent",
 													}}
 												>
-													삭제
+													<span className="flex h-4 w-4 shrink-0 items-center justify-center">
+														{picked && (
+															<Check
+																className="h-4 w-4"
+																style={{
+																	color: theme.accent,
+																}}
+															/>
+														)}
+													</span>
+
+													<div className="min-w-0 flex-1">
+														<p
+															className="break-all text-sm"
+															style={{ color: theme.text }}
+														>
+															{option.label}
+														</p>
+
+														<p
+															className="mt-1 text-[10px]"
+															style={{ color: theme.muted }}
+														>
+															{option.kind === "custom"
+																? "내가 추가한 규칙"
+																: option.hint}
+															{typeof count === "number" &&
+																` · 이 소설 ${count}개 화`}
+															{applied && " · 적용 중"}
+														</p>
+													</div>
 												</button>
+
+												{option.kind === "custom" &&
+													option.ruleId && (
+														<button
+															type="button"
+															onClick={() => {
+																if (option.ruleId) {
+																	void deleteEpisodeRule(
+																		option.ruleId
+																	);
+																}
+															}}
+															className="shrink-0 rounded-lg px-3 py-2 text-[11px] transition hover:opacity-60"
+															style={{
+																color: theme.muted,
+																backgroundColor: theme.bg,
+															}}
+														>
+															삭제
+														</button>
+													)}
 											</div>
-										)
-									)}
-								</div>
-							)}
+										);
+									})
+								)}
+							</div>
 						</div>
 
 
@@ -2534,22 +2553,33 @@ export default function DriveBrowser() {
 								borderTop: `0.5px solid ${theme.divider}`,
 							}}
 						>
+							{episodeRuleError && (
+								<p className="mb-3 text-[11px] text-red-500">
+									{episodeRuleError}
+								</p>
+							)}
+
 							<button
 								type="button"
-								onClick={() =>
-									setEpisodeRuleManagerOpen(
-										false
-									)
-								}
-								className="w-full rounded-lg px-4 py-2.5 text-xs font-medium transition hover:opacity-80"
+								onClick={() => {
+									void confirmRuleSelection().then(
+										(ok) => {
+											if (ok) {
+												setEpisodeRuleManagerOpen(
+													false
+												);
+											}
+										}
+									);
+								}}
+								disabled={episodeRuleSaving}
+								className="w-full rounded-lg px-4 py-2.5 text-xs font-medium transition hover:opacity-80 disabled:opacity-40"
 								style={{
-									backgroundColor:
-										theme.title,
-									color:
-										theme.bg,
+									backgroundColor: theme.title,
+									color: theme.bg,
 								}}
 							>
-								확인
+								{episodeRuleSaving ? "저장 중" : "확인"}
 							</button>
 						</div>
 					</div>
