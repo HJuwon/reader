@@ -107,7 +107,7 @@ export async function GET() {
     return new Response("로그인이 필요합니다.", { status: 401 });
   }
 
-  const accessToken = await getDriveAccessToken();
+  const accessToken = await getDriveAccessToken(session);
   const folderId = process.env.GOOGLE_DRIVE_NOVEL_FOLDER_ID;
 
   if (!accessToken || !folderId) {
@@ -298,7 +298,7 @@ export async function POST(request: Request) {
   }
 
   // 안전장치: 드라이브에 아직 있는 책은 지우지 않는다.
-  const accessToken = await getDriveAccessToken();
+  const accessToken = await getDriveAccessToken(session);
   const folderId = process.env.GOOGLE_DRIVE_NOVEL_FOLDER_ID;
 
   if (!accessToken || !folderId) {
