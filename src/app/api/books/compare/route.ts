@@ -100,6 +100,39 @@ async function listDriveFiles(
   };
 }
 
+// Supabase는 한 번에 최대 1000행만 돌려준다.
+// books가 1000권을 넘으면 나머지는 보이지 않으므로, 페이지로 나눠서 전부 읽는다.
+async function fetchAllUserBooks(
+  userId: string,
+  columns: string
+): Promise<{ data: any[]; error: any }> {
+  const PAGE = 1000;
+  const all: any[] = [];
+
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("books")
+      .select(columns)
+      .eq("user_id", userId)
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+
+    if (error) {
+      return { data: [], error };
+    }
+
+    const rows = (data || []) as any[];
+
+    all.push(...rows);
+
+    if (rows.length < PAGE) {
+      break;
+    }
+  }
+
+  return { data: all, error: null };
+}
+
 export async function GET() {
   const session: any = await getServerSession(authOptions);
 
@@ -126,10 +159,10 @@ export async function GET() {
     return new Response(driveError, { status: 500 });
   }
 
-  const { data: books, error } = await supabase
-    .from("books")
-    .select("*")
-    .eq("user_id", session.user.email);
+  const { data: books, error } = await fetchAllUserBooks(
+    session.user.email,
+    "*"
+  );
 
   if (error) {
     return new Response(error.message, { status: 500 });
