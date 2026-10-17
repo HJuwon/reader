@@ -837,10 +837,7 @@ export default function DriveBrowser() {
 																				: theme.muted,
 																	}}
 																>
-																	{
-																		episode.episode
-																	}
-																	화
+																	{episode.label ?? `${episode.episode}화`}
 																</span>
 
 																<span
@@ -1011,10 +1008,7 @@ export default function DriveBrowser() {
 																			: 0.7,
 																}}
 															>
-																{
-																	episode.episode
-																}
-																화
+																{episode.label ?? `${episode.episode}화`}
 															</span>
 
 															<p
