@@ -264,8 +264,32 @@ function stripClosingBracket(
  *
  * xxx는 반드시 숫자로 치환되는 부분이다.
  */
+/**
+ * 규칙 앞뒤의 ^ 와 $ 를 분리한다.
+ *
+ *   "* xxx화$"  → 줄이 "화"로 끝나야 한다 (뒤에 글자가 더 있으면 제외)
+ *   "^xxx화"    → 줄 맨 앞에서 시작 (원래도 줄 맨 앞부터 보므로 같은 뜻)
+ *
+ * 본문 속 "1화에서 있었던 일…" 같은 문장이 잡히는 것을 막을 때 쓴다.
+ */
+export function splitRuleAnchors(rule: string): {
+  core: string;
+  endAnchored: boolean;
+} {
+  const trimmed = rule.trim();
+
+  return {
+    core: trimmed
+      .replace(/^\^/, "")
+      .replace(/\$$/, "")
+      .trim(),
+    endAnchored: trimmed.endsWith("$"),
+  };
+}
+
 function buildCustomRulePattern(
-  rule: string
+  rule: string,
+  endAnchored = false
 ): RegExp | null {
   const marker = "xxx";
 
@@ -333,6 +357,15 @@ function buildCustomRulePattern(
   // (예: "#001. 첫 번째 화 제목" → suffix "." 를 이미 소비했으므로
   //  그 뒤에는 별도 구분자 없이 공백 + 제목만 온다.)
   // 따라서 구분자 자체를 옵셔널로 두고, 제목 캡처 그룹은 항상 존재하게 한다.
+  // 끝을 $ 로 고정한 규칙: 회차 표시(예: "화") 바로 뒤에서 줄이 끝나야 한다.
+  // 제목 칸은 비어 있는 그룹으로 둔다.
+  if (endAnchored) {
+    return new RegExp(
+      `^\\s*${prefixPattern}\\s*(\\d{1,6})\\s*${suffixPattern}${notDecimalPattern}()\\s*$`,
+      "i"
+    );
+  }
+
   return new RegExp(
     `^\\s*${prefixPattern}\\s*(\\d{1,6})\\s*${suffixPattern}${boundaryPattern}${notDecimalPattern}\\s*(?:[-.:·]\\s*)?(.*?)\\s*$`,
     "i"
@@ -352,9 +385,16 @@ export function detectCandidates(
    * - builtin: 해당 형식에 속한 기본 패턴들만 사용
    */
   if (option.kind === "custom") {
-    const rule = option.rule ?? "";
+    const fullRule = option.rule ?? "";
 
-    const regex = buildCustomRulePattern(rule);
+    // 앞뒤의 ^ $ 를 떼어 낸 규칙으로 패턴을 만든다.
+    const { core: rule, endAnchored } =
+      splitRuleAnchors(fullRule);
+
+    const regex = buildCustomRulePattern(
+      rule,
+      endAnchored
+    );
 
     if (!regex) {
       return candidates;
@@ -383,7 +423,7 @@ export function detectCandidates(
           bracket
         ),
         raw: line,
-        pattern: `custom:${rule}`,
+        pattern: `custom:${fullRule}`,
         score: 0,
         label: buildCustomLabel(rule, Number(match[1])),
       });
