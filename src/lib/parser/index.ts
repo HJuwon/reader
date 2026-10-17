@@ -115,7 +115,7 @@ const MIN_SEQUENTIAL = 3;
 
 /**
  * 모든 규칙을 본문에 돌려보고, 번호가 가장 잘 이어지는 규칙을 추천한다.
- * 점수가 같으면 회차가 더 많이 잡힌 쪽, 그래도 같으면 목록 앞쪽(기본 "N화" 우선)이 이긴다.
+ * 점수가 같으면 회차가 더 많이 잡힌 쪽, 그래도 같으면 더 구체적인 규칙이 이긴다.
  */
 export function detectBestRule(
   text: string,
@@ -128,23 +128,42 @@ export function detectBestRule(
   let bestKey: string | null = null;
   let bestSequential = 0;
   let bestCount = 0;
+  let bestPriority = -1;
+
+  // 같은 점수면 더 구체적인 규칙을 고른다.
+  // 내가 추가한 일반 규칙 > 기본 형식 > "아무 글자" 규칙(* 규칙, "제목 N화")
+  const priorityOf = (option: RuleOption) => {
+    if (option.kind === "custom") {
+      return option.rule?.includes("*") ? 1 : 3;
+    }
+
+    return option.key === "builtin:titled_episode" ? 0 : 2;
+  };
 
   options.forEach((option) => {
     const selected = selectForOption(lines, option);
 
+    // 번호가 1, 2, 3… 으로 이어지는 회차 수.
+    // 본문 중에 우연히 섞인 줄(번호가 안 맞는 후보)은 건너뛰고 세고,
+    // 번호가 1로 돌아오면(권·외전이 새로 시작) 새 흐름으로 본다.
     let sequential = 0;
-    let previous: number | undefined;
+    let expected: number | undefined;
 
     selected.forEach((candidate) => {
-      if (
-        previous !== undefined &&
-        candidate.number !== undefined &&
-        candidate.number === previous + 1
-      ) {
-        sequential += 1;
+      const n = candidate.number;
+
+      if (n === undefined) {
+        return;
       }
 
-      previous = candidate.number;
+      if (expected !== undefined && n === expected) {
+        sequential += 1;
+        expected = n + 1;
+      } else if (n === 1) {
+        expected = 2;
+      } else if (expected === undefined) {
+        expected = n + 1;
+      }
     });
 
     stats[option.key] = {
@@ -152,15 +171,20 @@ export function detectBestRule(
       sequential,
     };
 
+    const priority = priorityOf(option);
+
     if (
       sequential > bestSequential ||
       (sequential === bestSequential &&
         sequential > 0 &&
-        selected.length > bestCount)
+        (selected.length > bestCount ||
+          (selected.length === bestCount &&
+            priority > bestPriority)))
     ) {
       bestKey = option.key;
       bestSequential = sequential;
       bestCount = selected.length;
+      bestPriority = priority;
     }
   });
 
