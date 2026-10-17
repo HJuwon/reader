@@ -4,6 +4,7 @@ import {
   detectBestRule,
   findRuleOption,
   parseNovel,
+  parseRuleKeys,
   type EpisodeRule,
   type ParsedNovel,
   type RuleOption,
@@ -12,7 +13,8 @@ import {
 export type RuleSource = "manual" | "auto" | "default";
 
 export type RuleSelection = {
-  key: string;
+  /** 이 소설에 적용 중인 규칙들 (하나 이상) */
+  keys: string[];
   /** manual: 직접 고름 / auto: 자동 감지 / default: 감지 실패 → 기본값 */
   source: RuleSource;
 };
@@ -31,7 +33,7 @@ export type LoadedNovel = {
   parsedNovel: ParsedNovel;
   episodeRules: EpisodeRule[];
   ruleSelection: RuleSelection;
-  selectedRuleOption: RuleOption;
+  selectedRuleOptions: RuleOption[];
 };
 
 function extractErrorMessage(
@@ -199,7 +201,7 @@ export async function loadNovel(
    */
   const ruleOptions = buildRuleOptions(episodeRules);
 
-  const savedKey =
+  const savedKeysRaw =
     savedRuleResponse.ok &&
     typeof savedRuleData === "object" &&
     savedRuleData !== null &&
@@ -216,13 +218,15 @@ export async function loadNovel(
         ).data.rule_key
       : null;
 
+  // 삭제된 규칙은 걸러낸다.
+  const savedKeys = parseRuleKeys(savedKeysRaw).filter(
+    (key) => findRuleOption(ruleOptions, key)
+  );
+
   let ruleSelection: RuleSelection;
 
-  if (findRuleOption(ruleOptions, savedKey)) {
-    ruleSelection = {
-      key: savedKey as string,
-      source: "manual",
-    };
+  if (savedKeys.length > 0) {
+    ruleSelection = { keys: savedKeys, source: "manual" };
   } else {
     const detection = detectBestRule(
       file.content,
@@ -230,18 +234,20 @@ export async function loadNovel(
     );
 
     ruleSelection = detection.recommendedKey
-      ? { key: detection.recommendedKey, source: "auto" }
-      : { key: DEFAULT_RULE_KEY, source: "default" };
+      ? {
+          keys: [detection.recommendedKey],
+          source: "auto",
+        }
+      : { keys: [DEFAULT_RULE_KEY], source: "default" };
   }
 
-  const selectedRuleOption = findRuleOption(
-    ruleOptions,
-    ruleSelection.key
-  ) as RuleOption;
+  const selectedRuleOptions = ruleSelection.keys
+    .map((key) => findRuleOption(ruleOptions, key))
+    .filter((option): option is RuleOption => !!option);
 
   const parsedNovel = parseNovel(
     file.content,
-    selectedRuleOption
+    selectedRuleOptions
   );
 
   const driveItem: DriveItem = {
@@ -265,6 +271,6 @@ export async function loadNovel(
     parsedNovel,
     episodeRules,
     ruleSelection,
-    selectedRuleOption,
+    selectedRuleOptions,
   };
 }
