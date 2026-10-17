@@ -34,23 +34,37 @@ function chunk<T>(arr: T[], size: number): T[][] {
 }
 
 // 삭제된 책에 딸린 데이터(읽기 기록, 회차 규칙 선택, 북마크, 하이라이트)를 지운다.
-// 하나라도 실패하면 true를 반환한다.
+// 실패한 항목의 오류 메시지 목록을 반환한다. (비어 있으면 전부 성공)
 async function deleteRelatedData(
   userId: string,
   driveFileIds: string[],
   bookIds: string[]
-): Promise<boolean> {
-  let failed = false;
+): Promise<string[]> {
+  const errors: string[] = [];
 
   const run = async (
     label: string,
-    task: PromiseLike<{ error: any }>
+    task: PromiseLike<{ error: any }>,
+    ignoreMissingTable = false
   ) => {
     const { error } = await task;
 
+    // 아직 만들지 않은 테이블(예: book_episode_rules)은 건너뛴다.
+    if (
+      error &&
+      ignoreMissingTable &&
+      (error.code === "42P01" ||
+        error.code === "PGRST205" ||
+        /does not exist|schema cache/i.test(
+          error.message ?? ""
+        ))
+    ) {
+      return;
+    }
+
     if (error) {
       console.error(`${label} 정리 실패:`, error);
-      failed = true;
+      errors.push(`${label}: ${error.message ?? error}`);
     }
   };
 
@@ -64,7 +78,7 @@ async function deleteRelatedData(
 
     if (roundsError) {
       console.error("읽기 회차 조회 실패:", roundsError);
-      failed = true;
+      errors.push(`읽기 회차 조회: ${roundsError.message}`);
     } else {
       const roundIds = (rounds || []).map((r: any) => r.id);
 
@@ -113,10 +127,11 @@ async function deleteRelatedData(
       .from("book_episode_rules")
       .delete()
       .eq("user_id", userId)
-      .in("drive_file_id", driveFileIds)
+      .in("drive_file_id", driveFileIds),
+    true
   );
 
-  return failed;
+  return errors;
 }
 
 // 새 책이 들어오면 표지 채우기 작업(GitHub Actions)을 바로 시작한다.
@@ -386,6 +401,7 @@ export async function GET() {
     // =========================================================
 
     let deletedCount = 0;
+    const removeErrors: string[] = [];
     const deleteBatches = chunk(removedIds as string[], 50);
 
     for (const batch of deleteBatches) {
@@ -395,16 +411,17 @@ export async function GET() {
         .map((id) => (existingMap.get(id) as any)?.id)
         .filter(Boolean);
 
-      const cleanupFailed = await deleteRelatedData(
+      const cleanupErrors = await deleteRelatedData(
         session.user.email,
         batch,
         bookIds
       );
 
-      // 딸린 데이터 정리가 실패하면 책을 남겨 둔다.
-      // (책을 먼저 지우면 다음 동기화에서 고아 데이터를 찾을 방법이 없다)
-      if (cleanupFailed) {
-        continue;
+      // 딸린 데이터 정리가 일부 실패해도 책 삭제는 계속 시도한다.
+      // (실패한 내용은 removeErrors로 알려 준다. 책 삭제 자체가
+      //  막히면 아래에서 다시 오류로 기록된다.)
+      if (cleanupErrors.length > 0) {
+        removeErrors.push(...cleanupErrors);
       }
 
       const { error, count } = await supabase
@@ -415,6 +432,7 @@ export async function GET() {
 
       if (error) {
         console.error("삭제된 파일 DB 정리 실패:", error);
+        removeErrors.push(`소설 삭제: ${error.message}`);
         continue;
       }
 
@@ -440,6 +458,8 @@ export async function GET() {
       inserted: insertedBooks.length,
       updated: updatedCount,
       removed: deletedCount,
+      removeCandidates: removedIds.length,
+      removeErrors,
       books: insertedBooks,
     });
   } catch (error) {
