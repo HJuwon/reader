@@ -156,14 +156,59 @@ function getClosingBracket(
     return null;
   }
 
-  const open = rule
+  const prefix = rule.slice(0, markerIndex).trim();
+
+  // xxx 바로 앞 글자가 여는 괄호이거나(예: "[xxx"),
+  // 규칙 맨 앞이 여는 괄호인 경우(예: "< [외전] xxx화")를 찾는다.
+  for (const open of [prefix.slice(-1), prefix.slice(0, 1)]) {
+    const close = BRACKET_PAIRS[open];
+
+    if (close) {
+      return { open, close };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * 사용자 규칙에서 목록에 보여줄 이름을 만든다.
+ *
+ * 예: "< [외전] xxx화" → 1 → "외전 1화"
+ *     "외전 제xxx화"   → 1 → "외전 1화"
+ *     "xxx화" 처럼 앞에 붙은 말이 없으면 undefined (기본 "N화")
+ */
+function buildCustomLabel(
+  rule: string,
+  number: number
+): string | undefined {
+  const markerIndex = rule.indexOf("xxx");
+
+  if (markerIndex === -1) {
+    return undefined;
+  }
+
+  const word = rule
     .slice(0, markerIndex)
+    .replace(/[^0-9A-Za-z가-힣ㄱ-ㅎㅏ-ㅣ\s]/g, " ")
+    .replace(/\s+/g, " ")
     .trim()
-    .slice(-1);
+    .replace(/\s*제$/, "")
+    .trim();
 
-  const close = BRACKET_PAIRS[open];
+  const suffix = rule
+    .slice(markerIndex + "xxx".length)
+    .trim();
 
-  return close ? { open, close } : null;
+  const unit = /^[A-Za-z가-힣]+$/.test(suffix)
+    ? suffix
+    : "";
+
+  if (!word) {
+    return unit ? `${number}${unit}` : undefined;
+  }
+
+  return `${word} ${number}${unit}`;
 }
 
 /**
@@ -313,6 +358,7 @@ export function detectCandidates(
         raw: line,
         pattern: `custom:${rule}`,
         score: 0,
+        label: buildCustomLabel(rule, Number(match[1])),
       });
     });
 
