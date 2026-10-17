@@ -14,6 +14,7 @@ import {
 	detectBestRule,
 	findRuleOption,
 	parseNovel,
+	serializeRuleKeys,
 	type EpisodeRule,
 	type ParsedNovel,
 	type RuleOption,
@@ -122,12 +123,12 @@ export function useEpisodeRules({
 	const [episodeRuleSearch, setEpisodeRuleSearch] =
 		useState("");
 
-	/* 이 소설에 적용 중인 규칙 / 목록에서 고르는 중인 규칙 */
-	const [selectedRuleKey, setSelectedRuleKey] =
-		useState<string>(DEFAULT_RULE_KEY);
+	/* 이 소설에 적용 중인 규칙들 / 목록에서 고르는 중인 규칙들 (여러 개 가능) */
+	const [selectedRuleKeys, setSelectedRuleKeys] =
+		useState<string[]>([DEFAULT_RULE_KEY]);
 
-	const [pendingRuleKey, setPendingRuleKey] =
-		useState<string>(DEFAULT_RULE_KEY);
+	const [pendingRuleKeys, setPendingRuleKeys] =
+		useState<string[]>([DEFAULT_RULE_KEY]);
 
 	const [ruleSource, setRuleSource] =
 		useState<RuleSource>("default");
@@ -137,12 +138,15 @@ export function useEpisodeRules({
 		[episodeRules]
 	);
 
-	const selectedRuleOption = useMemo<RuleOption>(
-		() =>
-			findRuleOption(ruleOptions, selectedRuleKey) ??
-			ruleOptions[0],
-		[ruleOptions, selectedRuleKey]
-	);
+	const selectedRuleOptions = useMemo<RuleOption[]>(() => {
+		const found = selectedRuleKeys
+			.map((key) => findRuleOption(ruleOptions, key))
+			.filter(
+				(option): option is RuleOption => !!option
+			);
+
+		return found.length > 0 ? found : [ruleOptions[0]];
+	}, [ruleOptions, selectedRuleKeys]);
 
 	/*
 	 * 관리 창을 열었을 때만 모든 규칙을 본문에 돌려본다.
@@ -166,7 +170,7 @@ export function useEpisodeRules({
 			return;
 		}
 
-		setPendingRuleKey(selectedRuleKey);
+		setPendingRuleKeys(selectedRuleKeys);
 		// 창을 열 때만 현재 적용 중인 규칙으로 되돌린다.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [episodeRuleManagerOpen]);
@@ -193,23 +197,39 @@ export function useEpisodeRules({
 
 	const setRuleSelection = useCallback(
 		(selection: RuleSelection) => {
-			setSelectedRuleKey(selection.key);
-			setPendingRuleKey(selection.key);
+			setSelectedRuleKeys(selection.keys);
+			setPendingRuleKeys(selection.keys);
 			setRuleSource(selection.source);
 		},
 		[]
 	);
 
-	/* 선택한 규칙으로 다시 나누고, 보고 있던 회차 위치는 최대한 유지한다. */
-	const reparseWithOption = useCallback(
-		(option: RuleOption) => {
+	/* 목록에서 규칙을 켜고 끈다. 최소 하나는 켜져 있어야 한다. */
+	const togglePendingRuleKey = useCallback(
+		(key: string) => {
+			setPendingRuleKeys((previous) => {
+				if (previous.includes(key)) {
+					return previous.length > 1
+						? previous.filter((item) => item !== key)
+						: previous;
+				}
+
+				return [...previous, key];
+			});
+		},
+		[]
+	);
+
+	/* 선택한 규칙들로 다시 나누고, 보고 있던 회차 위치는 최대한 유지한다. */
+	const reparseWithOptions = useCallback(
+		(options: RuleOption[]) => {
 			if (!fileContent) {
 				return;
 			}
 
 			const nextParsed = parseNovel(
 				fileContent,
-				option
+				options
 			);
 
 			setParsedNovel(nextParsed);
@@ -251,7 +271,7 @@ export function useEpisodeRules({
 
 	/* 이 소설의 규칙 선택을 서버에 저장한다. 실패하면 예외를 던진다. */
 	const persistRuleChoice = useCallback(
-		async (ruleKey: string) => {
+		async (ruleKeys: string[]) => {
 			if (!fileId) {
 				throw new Error(
 					"파일 정보를 찾을 수 없습니다."
@@ -267,7 +287,7 @@ export function useEpisodeRules({
 					},
 					body: JSON.stringify({
 						fileId,
-						ruleKey,
+						ruleKey: serializeRuleKeys(ruleKeys),
 					}),
 				}
 			);
@@ -292,22 +312,28 @@ export function useEpisodeRules({
 		[fileId]
 	);
 
-	/* 목록에서 고른 규칙을 "확인"으로 적용한다. */
+	/* 목록에서 고른 규칙들을 "확인"으로 적용한다. */
 	const confirmRuleSelection = useCallback(
 		async (): Promise<boolean> => {
-			const option = findRuleOption(
-				ruleOptions,
-				pendingRuleKey
-			);
+			const options = pendingRuleKeys
+				.map((key) => findRuleOption(ruleOptions, key))
+				.filter(
+					(option): option is RuleOption => !!option
+				);
 
-			if (!option) {
+			if (options.length === 0) {
 				return false;
 			}
 
-			if (
-				option.key === selectedRuleKey &&
-				ruleSource === "manual"
-			) {
+			const keys = options.map((option) => option.key);
+
+			const unchanged =
+				keys.length === selectedRuleKeys.length &&
+				keys.every((key) =>
+					selectedRuleKeys.includes(key)
+				);
+
+			if (unchanged && ruleSource === "manual") {
 				return true;
 			}
 
@@ -315,11 +341,11 @@ export function useEpisodeRules({
 			setEpisodeRuleError("");
 
 			try {
-				await persistRuleChoice(option.key);
+				await persistRuleChoice(keys);
 
-				reparseWithOption(option);
+				reparseWithOptions(options);
 
-				setSelectedRuleKey(option.key);
+				setSelectedRuleKeys(keys);
 				setRuleSource("manual");
 
 				return true;
@@ -342,11 +368,11 @@ export function useEpisodeRules({
 		},
 		[
 			ruleOptions,
-			pendingRuleKey,
-			selectedRuleKey,
+			pendingRuleKeys,
+			selectedRuleKeys,
 			ruleSource,
 			persistRuleChoice,
-			reparseWithOption,
+			reparseWithOptions,
 		]
 	);
 
@@ -390,7 +416,7 @@ export function useEpisodeRules({
 	}, []);
 
 	/*
-	 * 규칙 추가: 목록에 넣고 바로 이 소설에 선택한다.
+	 * 규칙 추가: 목록에 넣고, 지금 선택된 규칙들에 더해 바로 적용한다.
 	 * 단, 이 소설에서 한 화도 잡히지 않는 규칙이면 적용하지 않는다.
 	 */
 	const addEpisodeRule = useCallback(async () => {
@@ -446,14 +472,14 @@ export function useEpisodeRules({
 
 				setEpisodeRules(nextRules);
 
+				const nextOptions = buildRuleOptions(nextRules);
+
 				const option = findRuleOption(
-					buildRuleOptions(nextRules),
+					nextOptions,
 					customRuleKey(addedRule.rule)
 				);
 
 				if (option) {
-					setPendingRuleKey(option.key);
-
 					const matched = fileContent
 						? parseNovel(fileContent, option)
 								.episodes.length
@@ -464,11 +490,27 @@ export function useEpisodeRules({
 							"규칙은 추가했지만, 이 소설에서는 맞는 회차를 찾지 못해 적용하지 않았습니다."
 						);
 					} else {
-						await persistRuleChoice(option.key);
+						const nextKeys = Array.from(
+							new Set([
+								...selectedRuleKeys,
+								option.key,
+							])
+						);
 
-						reparseWithOption(option);
+						const nextSelected = nextKeys
+							.map((key) =>
+								findRuleOption(nextOptions, key)
+							)
+							.filter(
+								(item): item is RuleOption => !!item
+							);
 
-						setSelectedRuleKey(option.key);
+						await persistRuleChoice(nextKeys);
+
+						reparseWithOptions(nextSelected);
+
+						setSelectedRuleKeys(nextKeys);
+						setPendingRuleKeys(nextKeys);
 						setRuleSource("manual");
 					}
 				}
@@ -490,13 +532,14 @@ export function useEpisodeRules({
 		episodeRuleInput,
 		episodeRules,
 		fileContent,
+		selectedRuleKeys,
 		persistRuleChoice,
-		reparseWithOption,
+		reparseWithOptions,
 	]);
 
 	/*
 	 * 규칙 삭제. 지금 이 소설에 적용 중인 규칙을 지우면
-	 * 남은 규칙 중에서 자동 감지로 다시 고른다.
+	 * 남은 선택으로 다시 나누고, 남은 게 없으면 자동 감지로 고른다.
 	 */
 	const deleteEpisodeRule = useCallback(
 		async (id: string) => {
@@ -543,37 +586,67 @@ export function useEpisodeRules({
 					removed.rule
 				);
 
-				if (selectedRuleKey === removedKey) {
-					const nextOptions =
-						buildRuleOptions(nextRules);
-
-					const recommended = fileContent
-						? detectBestRule(
-								fileContent,
-								nextOptions
-							).recommendedKey
-						: null;
-
-					const nextKey =
-						recommended ?? DEFAULT_RULE_KEY;
-
-					const nextOption = findRuleOption(
-						nextOptions,
-						nextKey
+				setPendingRuleKeys((previous) => {
+					const next = previous.filter(
+						(key) => key !== removedKey
 					);
 
-					if (nextOption) {
-						reparseWithOption(nextOption);
-					}
+					return next.length > 0
+						? next
+						: selectedRuleKeys.filter(
+								(key) => key !== removedKey
+							);
+				});
 
-					setSelectedRuleKey(nextKey);
-					setPendingRuleKey(nextKey);
-					setRuleSource(
-						recommended ? "auto" : "default"
-					);
-				} else if (pendingRuleKey === removedKey) {
-					setPendingRuleKey(selectedRuleKey);
+				if (!selectedRuleKeys.includes(removedKey)) {
+					return;
 				}
+
+				const nextOptions = buildRuleOptions(nextRules);
+
+				const remainingKeys = selectedRuleKeys.filter(
+					(key) => key !== removedKey
+				);
+
+				if (remainingKeys.length > 0) {
+					reparseWithOptions(
+						remainingKeys
+							.map((key) =>
+								findRuleOption(nextOptions, key)
+							)
+							.filter(
+								(item): item is RuleOption => !!item
+							)
+					);
+
+					setSelectedRuleKeys(remainingKeys);
+					setPendingRuleKeys(remainingKeys);
+
+					return;
+				}
+
+				const recommended = fileContent
+					? detectBestRule(fileContent, nextOptions)
+							.recommendedKey
+					: null;
+
+				const nextKey =
+					recommended ?? DEFAULT_RULE_KEY;
+
+				const nextOption = findRuleOption(
+					nextOptions,
+					nextKey
+				);
+
+				if (nextOption) {
+					reparseWithOptions([nextOption]);
+				}
+
+				setSelectedRuleKeys([nextKey]);
+				setPendingRuleKeys([nextKey]);
+				setRuleSource(
+					recommended ? "auto" : "default"
+				);
 			} catch (error) {
 				console.error("회차 규칙 삭제 실패:", error);
 
@@ -587,9 +660,8 @@ export function useEpisodeRules({
 		[
 			episodeRules,
 			fileContent,
-			pendingRuleKey,
-			selectedRuleKey,
-			reparseWithOption,
+			selectedRuleKeys,
+			reparseWithOptions,
 		]
 	);
 
@@ -609,10 +681,11 @@ export function useEpisodeRules({
 
 		ruleOptions,
 		filteredRuleOptions,
-		selectedRuleKey,
-		selectedRuleOption,
-		pendingRuleKey,
-		setPendingRuleKey,
+		selectedRuleKeys,
+		selectedRuleOptions,
+		pendingRuleKeys,
+		setPendingRuleKeys,
+		togglePendingRuleKey,
 		ruleSource,
 		ruleStats,
 		recommendedRuleKey,
