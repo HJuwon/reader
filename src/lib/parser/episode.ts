@@ -36,6 +36,7 @@ export function buildEpisodes(
     episodes.push({
       episode: candidate.number ?? index + 1,
       title: candidate.title || `제${candidate.number ?? index + 1}화`,
+      label: candidate.label,
       content,
       startLine,
       endLine,
