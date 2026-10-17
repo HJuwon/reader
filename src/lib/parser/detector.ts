@@ -1,5 +1,5 @@
 import { EpisodeCandidate } from "./types";
-import type { EpisodeRule } from "./types";
+import type { RuleOption } from "./rules";
 
 type Pattern = {
   name: string;
@@ -269,36 +269,61 @@ function buildCustomRulePattern(
 
 export function detectCandidates(
   lines: string[],
-  customRules: EpisodeRule[] = []
+  option: RuleOption
 ): EpisodeCandidate[] {
   const candidates: EpisodeCandidate[] = [];
 
   /**
-   * 사용자가 설정한 공통 회차 규칙을
-   * 실제 정규식으로 변환한다.
+   * 선택된 규칙 하나만 사용한다.
+   *
+   * - custom : 사용자가 추가한 규칙(예: "외전 제xxx화")을 정규식으로 변환
+   * - builtin: 해당 형식에 속한 기본 패턴들만 사용
    */
-  const customPatterns = customRules
-    .map((rule) => ({
-      rule: rule.rule,
-      regex: buildCustomRulePattern(
-        rule.rule
-      ),
-      bracket: getClosingBracket(
-        rule.rule
-      ),
-    }))
-    .filter(
-      (
-        item
-      ): item is {
-        rule: string;
-        regex: RegExp;
-        bracket: {
-          open: string;
-          close: string;
-        } | null;
-      } => item.regex !== null
-    );
+  if (option.kind === "custom") {
+    const rule = option.rule ?? "";
+
+    const regex = buildCustomRulePattern(rule);
+
+    if (!regex) {
+      return candidates;
+    }
+
+    const bracket = getClosingBracket(rule);
+
+    lines.forEach((line, lineIndex) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) {
+        return;
+      }
+
+      const match = trimmed.match(regex);
+
+      if (!match) {
+        return;
+      }
+
+      candidates.push({
+        lineIndex,
+        number: Number(match[1]),
+        title: stripClosingBracket(
+          match[2]?.trim() || "",
+          bracket
+        ),
+        raw: line,
+        pattern: `custom:${rule}`,
+        score: 0,
+      });
+    });
+
+    return candidates;
+  }
+
+  const names = new Set(option.patternNames ?? []);
+
+  const activePatterns = patterns.filter((pattern) =>
+    names.has(pattern.name)
+  );
 
   lines.forEach((line, lineIndex) => {
     const trimmed = line.trim();
@@ -307,74 +332,17 @@ export function detectCandidates(
       return;
     }
 
-    /**
-     * =====================================================
-     * 1. 사용자 공통 회차 규칙 먼저 검사
-     * =====================================================
-     *
-     * 예:
-     *   규칙: 외전 제xxx화
-     *
-     *   외전 제1화
-     *   외전 제2화
-     *   외전 제10화
-     *
-     * 모두 여기서 잡힌다.
-     */
-    for (const customPattern of customPatterns) {
-      const match = trimmed.match(
-        customPattern.regex
-      );
+    for (const pattern of activePatterns) {
+      const match = trimmed.match(pattern.regex);
 
       if (!match) {
         continue;
       }
 
-      const number = Number(match[1]);
-
-      const title = stripClosingBracket(
-        match[2]?.trim() || "",
-        customPattern.bracket
-      );
-
       candidates.push({
         lineIndex,
-        number,
-        title,
-        raw: line,
-        pattern: `custom:${customPattern.rule}`,
-        score: 0,
-      });
-
-      // 사용자 규칙에 매칭됐으면
-      // 기본 패턴은 다시 검사하지 않는다.
-      return;
-    }
-
-    /**
-     * =====================================================
-     * 2. 기존 기본 회차 규칙 검사
-     * =====================================================
-     */
-    for (const pattern of patterns) {
-      const match = trimmed.match(
-        pattern.regex
-      );
-
-      if (!match) {
-        continue;
-      }
-
-      const number =
-        pattern.getNumber?.(match);
-
-      const title =
-        pattern.getTitle?.(match) || "";
-
-      candidates.push({
-        lineIndex,
-        number,
-        title,
+        number: pattern.getNumber?.(match),
+        title: pattern.getTitle?.(match) || "",
         raw: line,
         pattern: pattern.name,
         score: 0,
