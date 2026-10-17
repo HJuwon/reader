@@ -129,3 +129,36 @@ export function findRuleOption(
     null
   );
 }
+
+/**
+ * 한 소설에 여러 규칙을 고를 수 있으므로, 저장할 때는 키 목록을 JSON 문자열로 묶는다.
+ * (예전에 저장된 단일 키 문자열도 읽을 수 있다.)
+ */
+export function serializeRuleKeys(keys: string[]): string {
+  return JSON.stringify(keys);
+}
+
+export function parseRuleKeys(
+  raw: string | null | undefined
+): string[] {
+  if (!raw) {
+    return [];
+  }
+
+  if (raw.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(raw);
+
+      return Array.isArray(parsed)
+        ? parsed.filter(
+            (item): item is string =>
+              typeof item === "string"
+          )
+        : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [raw];
+}
