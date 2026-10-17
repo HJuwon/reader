@@ -10,6 +10,8 @@ import type {
 	ParsedNovel,
 } from "@/lib/parser";
 
+import type { RuleSelection } from "../utils/novelLoader";
+
 type DriveItem = {
 	id: string;
 	name: string;
@@ -30,6 +32,7 @@ type UseFileOpenParams = {
 		content: string;
 		parsedNovel: ParsedNovel;
 		episodeRules: EpisodeRule[];
+		ruleSelection: RuleSelection;
 	}>;
 
 	setLoading: (
@@ -58,6 +61,10 @@ type UseFileOpenParams = {
 
 	setEpisodeRules: (
 		rules: EpisodeRule[]
+	) => void;
+
+	setRuleSelection: (
+		selection: RuleSelection
 	) => void;
 
 	initializeReadingState: (
@@ -111,6 +118,7 @@ export function useFileOpen({
 	setParsedNovel,
 	setSelectedEpisodeIndex,
 	setEpisodeRules,
+	setRuleSelection,
 	initializeReadingState,
 	getBookmarkStatus,
 	saveProgress,
@@ -131,6 +139,7 @@ export function useFileOpen({
 		setParsedNovel,
 		setSelectedEpisodeIndex,
 		setEpisodeRules,
+		setRuleSelection,
 		initializeReadingState,
 		getBookmarkStatus,
 		saveProgress,
@@ -146,6 +155,7 @@ export function useFileOpen({
 			setParsedNovel,
 			setSelectedEpisodeIndex,
 			setEpisodeRules,
+			setRuleSelection,
 			initializeReadingState,
 			getBookmarkStatus,
 			saveProgress,
@@ -162,6 +172,7 @@ export function useFileOpen({
 			setParsedNovel,
 			setSelectedEpisodeIndex,
 			setEpisodeRules,
+			setRuleSelection,
 			initializeReadingState,
 			getBookmarkStatus,
 			saveProgress,
@@ -199,10 +210,15 @@ export function useFileOpen({
 					parsedNovel: parsed,
 					episodeRules:
 						loadedEpisodeRules,
+					ruleSelection,
 				} = result;
 
 				setEpisodeRules(
 					loadedEpisodeRules
+				);
+
+				setRuleSelection(
+					ruleSelection
 				);
 
 				console.log(
