@@ -190,9 +190,11 @@ export default function DriveBrowser() {
 		setEpisodeRuleSearch,
 		ruleOptions,
 		filteredRuleOptions,
-		selectedRuleOption,
-		pendingRuleKey,
-		setPendingRuleKey,
+		selectedRuleKeys,
+		selectedRuleOptions,
+		pendingRuleKeys,
+		setPendingRuleKeys,
+		togglePendingRuleKey,
 		ruleSource,
 		ruleStats,
 		recommendedRuleKey,
@@ -225,7 +227,7 @@ export default function DriveBrowser() {
 		fileContent,
 		selectedFile,
 		selectedEpisode,
-		selectedRuleOption,
+		selectedRuleOptions,
 		setFileContent,
 		setParsedNovel,
 	});
@@ -2071,7 +2073,9 @@ export default function DriveBrowser() {
 												theme.muted,
 										}}
 									>
-										{`현재: ${selectedRuleOption.label} (${
+										{`현재: ${selectedRuleOptions
+											.map((option) => option.label)
+											.join(", ")} (${
 											ruleSource === "manual"
 												? "직접 선택"
 												: ruleSource === "auto"
@@ -2287,7 +2291,7 @@ export default function DriveBrowser() {
 												theme.muted,
 										}}
 									>
-										목록에서 하나를 골라 확인을 누르세요
+										여러 개를 고를 수 있습니다. 확인을 누르면 적용됩니다
 									</p>
 								</div>
 							</div>
@@ -2409,9 +2413,9 @@ export default function DriveBrowser() {
 											<button
 												type="button"
 												onClick={() =>
-													setPendingRuleKey(
-														recommended.key
-													)
+													setPendingRuleKeys([
+														recommended.key,
+													])
 												}
 												className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left transition hover:opacity-80"
 												style={{
@@ -2457,11 +2461,14 @@ export default function DriveBrowser() {
 								) : (
 									filteredRuleOptions.map((option) => {
 										const picked =
-											option.key === pendingRuleKey;
+											pendingRuleKeys.includes(
+												option.key
+											);
 
 										const applied =
-											option.key ===
-											selectedRuleOption.key;
+											selectedRuleKeys.includes(
+												option.key
+											);
 
 										const count =
 											ruleStats?.[option.key]?.count;
@@ -2474,7 +2481,7 @@ export default function DriveBrowser() {
 												<button
 													type="button"
 													onClick={() =>
-														setPendingRuleKey(
+														togglePendingRuleKey(
 															option.key
 														)
 													}
