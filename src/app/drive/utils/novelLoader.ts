@@ -1,8 +1,21 @@
 import {
+  DEFAULT_RULE_KEY,
+  buildRuleOptions,
+  detectBestRule,
+  findRuleOption,
   parseNovel,
   type EpisodeRule,
   type ParsedNovel,
+  type RuleOption,
 } from "@/lib/parser";
+
+export type RuleSource = "manual" | "auto" | "default";
+
+export type RuleSelection = {
+  key: string;
+  /** manual: 직접 고름 / auto: 자동 감지 / default: 감지 실패 → 기본값 */
+  source: RuleSource;
+};
 
 export type DriveItem = {
   id: string;
@@ -17,6 +30,8 @@ export type LoadedNovel = {
   content: string;
   parsedNovel: ParsedNovel;
   episodeRules: EpisodeRule[];
+  ruleSelection: RuleSelection;
+  selectedRuleOption: RuleOption;
 };
 
 function extractErrorMessage(
@@ -87,6 +102,7 @@ export async function loadNovel(
     infoResponse,
     fileResponse,
     rulesResponse,
+    savedRuleResponse,
   ] = await Promise.all([
     fetch(
       `/api/drive/file-info?fileId=${encodedFileId}`
@@ -95,16 +111,21 @@ export async function loadNovel(
       `/api/drive/file?fileId=${encodedFileId}`
     ),
     fetch("/api/episode-rules"),
+    fetch(
+      `/api/book-episode-rule?fileId=${encodedFileId}`
+    ),
   ]);
 
   const [
     infoData,
     fileData,
     rulesData,
+    savedRuleData,
   ] = await Promise.all([
     readJson(infoResponse),
     readJson(fileResponse),
     readJson(rulesResponse),
+    readJson(savedRuleResponse),
   ]);
 
   if (!infoResponse.ok) {
@@ -170,11 +191,58 @@ export async function loadNovel(
         ).data
       : [];
 
-  const parsedNovel =
-    parseNovel(
+  /**
+   * 이 소설에 적용할 규칙 하나를 정한다.
+   *   1. 직접 골라서 저장해 둔 규칙
+   *   2. 없으면 자동 감지 (번호가 이어지는 형식)
+   *   3. 감지가 불확실하면 기본값 "N화"
+   */
+  const ruleOptions = buildRuleOptions(episodeRules);
+
+  const savedKey =
+    savedRuleResponse.ok &&
+    typeof savedRuleData === "object" &&
+    savedRuleData !== null &&
+    "data" in savedRuleData &&
+    typeof (
+      savedRuleData as {
+        data?: { rule_key?: unknown } | null;
+      }
+    ).data?.rule_key === "string"
+      ? (
+          savedRuleData as {
+            data: { rule_key: string };
+          }
+        ).data.rule_key
+      : null;
+
+  let ruleSelection: RuleSelection;
+
+  if (findRuleOption(ruleOptions, savedKey)) {
+    ruleSelection = {
+      key: savedKey as string,
+      source: "manual",
+    };
+  } else {
+    const detection = detectBestRule(
       file.content,
-      episodeRules
+      ruleOptions
     );
+
+    ruleSelection = detection.recommendedKey
+      ? { key: detection.recommendedKey, source: "auto" }
+      : { key: DEFAULT_RULE_KEY, source: "default" };
+  }
+
+  const selectedRuleOption = findRuleOption(
+    ruleOptions,
+    ruleSelection.key
+  ) as RuleOption;
+
+  const parsedNovel = parseNovel(
+    file.content,
+    selectedRuleOption
+  );
 
   const driveItem: DriveItem = {
     id: info.id,
@@ -196,5 +264,7 @@ export async function loadNovel(
     content: file.content,
     parsedNovel,
     episodeRules,
+    ruleSelection,
+    selectedRuleOption,
   };
 }
