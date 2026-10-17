@@ -8,6 +8,10 @@ import {
   scoreCandidates,
   selectCandidates,
 } from "./scorer";
+import {
+  DEFAULT_RULE_OPTION,
+  type RuleOption,
+} from "./rules";
 
 import type {
   Episode,
@@ -16,35 +20,33 @@ import type {
   ParsedNovel,
 } from "./types";
 
+function selectForOption(
+  lines: string[],
+  option: RuleOption
+): EpisodeCandidate[] {
+  const detected = detectCandidates(lines, option);
+
+  const scored = scoreCandidates(detected, lines);
+
+  return selectCandidates(scored);
+}
+
+/**
+ * 선택된 규칙 하나로 회차를 나눈다.
+ * 규칙이 없으면 기본 규칙("N화")을 쓴다.
+ */
 export function parseNovel(
   text: string,
-  customRules: EpisodeRule[] = []
+  option: RuleOption | null = null
 ): ParsedNovel {
-  const normalized =
-    normalizeText(text);
+  const lines = getLines(normalizeText(text));
 
-  const lines =
-    getLines(normalized);
+  const selected = selectForOption(
+    lines,
+    option ?? DEFAULT_RULE_OPTION
+  );
 
-  const detected =
-    detectCandidates(
-      lines,
-      customRules
-    );
-
-  const scored =
-    scoreCandidates(
-      detected,
-      lines
-    );
-
-  const selected =
-    selectCandidates(scored);
-
-  const {
-    episodes,
-    preface,
-  } = buildEpisodes(
+  const { episodes, preface } = buildEpisodes(
     lines,
     selected
   );
@@ -52,10 +54,96 @@ export function parseNovel(
   return {
     episodes,
     preface,
-    totalEpisodes:
-      episodes.length,
+    totalEpisodes: episodes.length,
   };
 }
+
+export type RuleStat = {
+  /** 이 규칙으로 잡힌 회차 수 */
+  count: number;
+  /** 번호가 1, 2, 3… 으로 이어지는 회차 수 */
+  sequential: number;
+};
+
+export type RuleDetection = {
+  stats: Record<string, RuleStat>;
+  /** 확신할 수 있을 때만 값이 있다. 없으면 기본 규칙을 써야 한다. */
+  recommendedKey: string | null;
+};
+
+/** 번호가 이어지는 회차가 이 개수 이상이면 확신한다. */
+const MIN_SEQUENTIAL = 3;
+
+/**
+ * 모든 규칙을 본문에 돌려보고, 번호가 가장 잘 이어지는 규칙을 추천한다.
+ * 점수가 같으면 회차가 더 많이 잡힌 쪽, 그래도 같으면 목록 앞쪽(기본 "N화" 우선)이 이긴다.
+ */
+export function detectBestRule(
+  text: string,
+  options: RuleOption[]
+): RuleDetection {
+  const lines = getLines(normalizeText(text));
+
+  const stats: Record<string, RuleStat> = {};
+
+  let bestKey: string | null = null;
+  let bestSequential = 0;
+  let bestCount = 0;
+
+  options.forEach((option) => {
+    const selected = selectForOption(lines, option);
+
+    let sequential = 0;
+    let previous: number | undefined;
+
+    selected.forEach((candidate) => {
+      if (
+        previous !== undefined &&
+        candidate.number !== undefined &&
+        candidate.number === previous + 1
+      ) {
+        sequential += 1;
+      }
+
+      previous = candidate.number;
+    });
+
+    stats[option.key] = {
+      count: selected.length,
+      sequential,
+    };
+
+    if (
+      sequential > bestSequential ||
+      (sequential === bestSequential &&
+        sequential > 0 &&
+        selected.length > bestCount)
+    ) {
+      bestKey = option.key;
+      bestSequential = sequential;
+      bestCount = selected.length;
+    }
+  });
+
+  return {
+    stats,
+    recommendedKey:
+      bestSequential >= MIN_SEQUENTIAL
+        ? bestKey
+        : null,
+  };
+}
+
+export {
+  BUILTIN_RULE_OPTIONS,
+  DEFAULT_RULE_KEY,
+  DEFAULT_RULE_OPTION,
+  buildRuleOptions,
+  customRuleKey,
+  findRuleOption,
+} from "./rules";
+
+export type { RuleKind, RuleOption } from "./rules";
 
 export type {
   Episode,
