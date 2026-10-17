@@ -33,6 +33,39 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return result;
 }
 
+// Supabase는 한 번에 최대 1000행만 돌려준다.
+// books가 1000권을 넘으면 나머지는 보이지 않으므로, 페이지로 나눠서 전부 읽는다.
+async function fetchAllUserBooks(
+  userId: string,
+  columns: string
+): Promise<{ data: any[]; error: any }> {
+  const PAGE = 1000;
+  const all: any[] = [];
+
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("books")
+      .select(columns)
+      .eq("user_id", userId)
+      .order("id", { ascending: true })
+      .range(from, from + PAGE - 1);
+
+    if (error) {
+      return { data: [], error };
+    }
+
+    const rows = (data || []) as any[];
+
+    all.push(...rows);
+
+    if (rows.length < PAGE) {
+      break;
+    }
+  }
+
+  return { data: all, error: null };
+}
+
 // 삭제된 책에 딸린 데이터(읽기 기록, 회차 규칙 선택, 북마크, 하이라이트)를 지운다.
 // 실패한 항목의 오류 메시지 목록을 반환한다. (비어 있으면 전부 성공)
 async function deleteRelatedData(
@@ -259,10 +292,10 @@ export async function GET() {
     // =========================================================
 
     const { data: existingBooks, error: existingError } =
-      await supabase
-        .from("books")
-        .select("id, drive_file_id, title, series_status")
-        .eq("user_id", session.user.email);
+      await fetchAllUserBooks(
+        session.user.email,
+        "id, drive_file_id, title, series_status"
+      );
 
     if (existingError) {
       return Response.json(
