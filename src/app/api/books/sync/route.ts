@@ -33,6 +33,92 @@ function chunk<T>(arr: T[], size: number): T[][] {
   return result;
 }
 
+// 삭제된 책에 딸린 데이터(읽기 기록, 회차 규칙 선택, 북마크, 하이라이트)를 지운다.
+// 하나라도 실패하면 true를 반환한다.
+async function deleteRelatedData(
+  userId: string,
+  driveFileIds: string[],
+  bookIds: string[]
+): Promise<boolean> {
+  let failed = false;
+
+  const run = async (
+    label: string,
+    task: PromiseLike<{ error: any }>
+  ) => {
+    const { error } = await task;
+
+    if (error) {
+      console.error(`${label} 정리 실패:`, error);
+      failed = true;
+    }
+  };
+
+  if (bookIds.length > 0) {
+    // reading_progress는 round_id로 연결되어 있으므로 회차 기록(rounds)보다 먼저 지운다.
+    const { data: rounds, error: roundsError } = await supabase
+      .from("reading_rounds")
+      .select("id")
+      .eq("user_id", userId)
+      .in("book_id", bookIds);
+
+    if (roundsError) {
+      console.error("읽기 회차 조회 실패:", roundsError);
+      failed = true;
+    } else {
+      const roundIds = (rounds || []).map((r: any) => r.id);
+
+      if (roundIds.length > 0) {
+        await run(
+          "읽기 진행상황",
+          supabase
+            .from("reading_progress")
+            .delete()
+            .in("round_id", roundIds)
+        );
+      }
+
+      await run(
+        "읽기 회차",
+        supabase
+          .from("reading_rounds")
+          .delete()
+          .eq("user_id", userId)
+          .in("book_id", bookIds)
+      );
+    }
+
+    await run(
+      "북마크",
+      supabase
+        .from("bookmarks")
+        .delete()
+        .eq("user_id", userId)
+        .in("book_id", bookIds)
+    );
+
+    await run(
+      "하이라이트",
+      supabase
+        .from("highlights")
+        .delete()
+        .eq("user_id", userId)
+        .in("book_id", bookIds)
+    );
+  }
+
+  await run(
+    "소설별 회차 규칙",
+    supabase
+      .from("book_episode_rules")
+      .delete()
+      .eq("user_id", userId)
+      .in("drive_file_id", driveFileIds)
+  );
+
+  return failed;
+}
+
 // 새 책이 들어오면 표지 채우기 작업(GitHub Actions)을 바로 시작한다.
 // 토큰이 없거나 실패해도 동기화 자체에는 영향을 주지 않는다.
 async function startCoverJob(): Promise<boolean> {
@@ -160,7 +246,7 @@ export async function GET() {
     const { data: existingBooks, error: existingError } =
       await supabase
         .from("books")
-        .select("drive_file_id, title, series_status")
+        .select("id, drive_file_id, title, series_status")
         .eq("user_id", session.user.email);
 
     if (existingError) {
@@ -300,9 +386,27 @@ export async function GET() {
     // =========================================================
 
     let deletedCount = 0;
-    const deleteBatches = chunk(removedIds, 50);
+    const deleteBatches = chunk(removedIds as string[], 50);
 
     for (const batch of deleteBatches) {
+      // 이 책들에 딸린 데이터를 먼저 지운다.
+      // (DB에 ON DELETE CASCADE가 걸려 있지 않아도 고아 데이터가 남지 않도록)
+      const bookIds = batch
+        .map((id) => (existingMap.get(id) as any)?.id)
+        .filter(Boolean);
+
+      const cleanupFailed = await deleteRelatedData(
+        session.user.email,
+        batch,
+        bookIds
+      );
+
+      // 딸린 데이터 정리가 실패하면 책을 남겨 둔다.
+      // (책을 먼저 지우면 다음 동기화에서 고아 데이터를 찾을 방법이 없다)
+      if (cleanupFailed) {
+        continue;
+      }
+
       const { error, count } = await supabase
         .from("books")
         .delete({ count: "exact" })
