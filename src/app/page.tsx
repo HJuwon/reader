@@ -1129,6 +1129,15 @@ export default function Home() {
 										}
 
 										await loadBooks();
+
+										if (
+											Array.isArray(data?.removeErrors) &&
+											data.removeErrors.length > 0
+										) {
+											setError(
+												`삭제된 소설 ${data.removeCandidates}개 중 정리하지 못한 항목이 있습니다: ${data.removeErrors[0]}`,
+											);
+										}
 									} catch (error) {
 										setError(
 											error instanceof Error
