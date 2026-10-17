@@ -33,6 +33,13 @@ export const BUILTIN_RULE_OPTIONS: RuleOption[] = [
     ],
   },
   {
+    key: "builtin:titled_episode",
+    kind: "builtin",
+    label: "제목 N화",
+    hint: "소설제목 1화처럼 앞에 글자가 붙은 형식 (제목은 아무거나)",
+    patternNames: ["titled_episode"],
+  },
+  {
     key: "builtin:ko_chapter",
     kind: "builtin",
     label: "N장",
