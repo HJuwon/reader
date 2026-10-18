@@ -42,6 +42,10 @@ export function useContentEditor({
   const [editedText, setEditedText] =
     useState("");
 
+  /* 회차 제목 줄(원문 그대로) */
+  const [editedTitle, setEditedTitle] =
+    useState("");
+
   const [savingEdit, setSavingEdit] =
     useState(false);
 
@@ -58,14 +62,21 @@ export function useContentEditor({
         selectedEpisode.content
       );
 
+      setEditedTitle(
+        getLines(fileContent)[
+          selectedEpisode.startLine
+        ] ?? ""
+      );
+
       setEditError("");
       setEditingContent(true);
-    }, [selectedEpisode]);
+    }, [selectedEpisode, fileContent]);
 
   const cancelEditingContent =
     useCallback(() => {
       setEditingContent(false);
       setEditedText("");
+      setEditedTitle("");
       setEditError("");
     }, []);
 
@@ -85,11 +96,16 @@ export function useContentEditor({
         const lines =
           getLines(fileContent);
 
+        // 제목 줄은 한 줄이어야 하므로 줄바꿈은 공백으로 바꾼다.
+        const titleLine =
+          editedTitle.replace(/\s*[\r\n]+\s*/g, " ");
+
         const newLines = [
           ...lines.slice(
             0,
-            selectedEpisode.startLine + 1
+            selectedEpisode.startLine
           ),
+          titleLine,
           ...editedText.split("\n"),
           ...lines.slice(
             selectedEpisode.endLine + 1
@@ -142,6 +158,7 @@ export function useContentEditor({
 
         setEditingContent(false);
         setEditedText("");
+        setEditedTitle("");
 
         return true;
       } catch (error) {
@@ -166,6 +183,7 @@ export function useContentEditor({
       selectedEpisode,
       fileContent,
       editedText,
+      editedTitle,
       selectedRuleOptions,
       setFileContent,
       setParsedNovel,
@@ -174,10 +192,12 @@ export function useContentEditor({
   return {
     editingContent,
     editedText,
+    editedTitle,
     savingEdit,
     editError,
 
     setEditedText,
+    setEditedTitle,
 
     startEditingContent,
     cancelEditingContent,
