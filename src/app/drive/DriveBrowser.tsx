@@ -14,6 +14,7 @@ import type {
 	EpisodeRule,
 	ParsedNovel,
 } from "@/lib/parser";
+import { inspectParsing, type InspectResult } from "@/lib/parser";
 
 import {
 	useRef,
@@ -101,6 +102,40 @@ export default function DriveBrowser() {
 
 	const [parsedNovel, setParsedNovel] =
 		useState<ParsedNovel | null>(null);
+
+	/* 회차 점검 결과 */
+	const [inspectResult, setInspectResult] =
+		useState<InspectResult | null>(null);
+
+	/* 번호가 비어 있는 회차 찾기: 1, 2, 3… 으로 이어져야 하는데 빠진 번호를 알려 준다. (일반 회차만 검사) */
+	const missingEpisodeNumbers = (() => {
+		if (!parsedNovel) {
+			return [] as number[];
+		}
+
+		const plain = parsedNovel.episodes.filter(
+			(episode) => !episode.label
+		);
+
+		const present = new Set(
+			plain.map((episode) => episode.episode)
+		);
+
+		const max = plain.reduce(
+			(acc, episode) => Math.max(acc, episode.episode),
+			0
+		);
+
+		const missing: number[] = [];
+
+		for (let n = 1; n <= max; n += 1) {
+			if (!present.has(n)) {
+				missing.push(n);
+			}
+		}
+
+		return missing;
+	})();
 
 	const [selectedEpisodeIndex, setSelectedEpisodeIndex] =
 		useState(0);
@@ -572,6 +607,16 @@ export default function DriveBrowser() {
 								화
 							</p>
 
+							{missingEpisodeNumbers.length > 0 && (
+								<p
+									className="mt-1 text-[10px]"
+									style={{ color: theme.accent }}
+								>
+									빠진 번호: {missingEpisodeNumbers.slice(0, 5).join(", ")}화
+									{missingEpisodeNumbers.length > 5 ? " 외" : ""}
+								</p>
+							)}
+
 							{progressSaving && (
 								<p
 									className="mt-1 text-[10px]"
@@ -875,6 +920,63 @@ export default function DriveBrowser() {
 													);
 												}
 											)
+										)}
+									</div>
+
+									<div
+										className="border-t px-4 py-3"
+										style={{ borderColor: theme.divider }}
+									>
+										<button
+											type="button"
+											onClick={() =>
+												setInspectResult(
+													inspectResult
+														? null
+														: inspectParsing(
+																fileContent,
+																selectedRuleOptions
+															)
+												)
+											}
+											className="text-xs underline"
+											style={{ color: theme.muted }}
+										>
+											{inspectResult ? "점검 닫기" : "회차 점검"}
+										</button>
+
+										{inspectResult && (
+											<div
+												className="mt-2 space-y-2 text-xs"
+												style={{ color: theme.text }}
+											>
+												<p>
+													{`잡힌 회차 ${inspectResult.count}개 · 마지막 번호 ${
+														inspectResult.lastNumber ?? "-"
+													}`}
+												</p>
+
+												{inspectResult.issues.length === 0 ? (
+													<p style={{ color: theme.muted }}>
+														빠지거나 겹친 회차를 찾지 못했어요.
+													</p>
+												) : (
+													inspectResult.issues.map((issue, i) => (
+														<div key={i}>
+															<p>{issue.message}</p>
+															{issue.lines?.map((line, j) => (
+																<p
+																	key={j}
+																	className="truncate"
+																	style={{ color: theme.muted }}
+																>
+																	{line}
+																</p>
+															))}
+														</div>
+													))
+												)}
+											</div>
 										)}
 									</div>
 								</div>
