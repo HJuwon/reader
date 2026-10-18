@@ -6,7 +6,18 @@ type Pattern = {
   regex: RegExp;
   getNumber?: (match: RegExpMatchArray) => number | undefined;
   getTitle?: (match: RegExpMatchArray) => string;
+  /** true를 돌려주면 회차 제목이 아니라 본문 문장으로 보고 후보에서 뺀다. */
+  rejectTitle?: (title: string) => boolean;
 };
+
+/**
+ * "1화에서 있었던 일이 떠올랐다." 처럼 줄 앞이 회차처럼 보이는 본문 문장을 걸러낸다.
+ *   - 제목이 너무 길다 (50자 초과)
+ *   - 한글 뒤에 마침표로 끝난다 (문장의 끝)
+ */
+function looksLikeSentence(title: string): boolean {
+  return title.length > 50 || /[가-힣]\.\s*$/.test(title);
+}
 
 const patterns: Pattern[] = [
   // === Episode 1 ===
@@ -34,9 +45,10 @@ const patterns: Pattern[] = [
   {
     name: "korean_episode",
     regex:
-      /^\s*(?:제\s*)?(\d{1,5})\s*화(?:\s*[-.:·]\s*|\s+)?(.*?)\s*$/,
+      /^\s*(?:제\s*)?(\d{1,5})\s*화(?=$|\s|[-.:·])(?:\s*[-.:·]\s*|\s+)?(.*?)\s*$/,
     getNumber: (m) => Number(m[1]),
     getTitle: (m) => m[2]?.trim() || "",
+    rejectTitle: looksLikeSentence,
   },
 
   // 소설제목 1화
@@ -48,14 +60,16 @@ const patterns: Pattern[] = [
       /^(?=.{1,80}$)\s*(\S.*?)\s+(\d{1,5})\s*화(?=$|\s|[-.:·])(?:\s*[-.:·]\s*|\s+)?(.*?)\s*$/,
     getNumber: (m) => Number(m[2]),
     getTitle: (m) => m[3]?.trim() || "",
+    rejectTitle: looksLikeSentence,
   },
 
   {
     name: "korean_chapter",
     regex:
-      /^\s*(?:제\s*)?(\d{1,5})\s*장(?:\s*[-.:·]\s*|\s+)?(.*?)\s*$/,
+      /^\s*(?:제\s*)?(\d{1,5})\s*장(?=$|\s|[-.:·])(?:\s*[-.:·]\s*|\s+)?(.*?)\s*$/,
     getNumber: (m) => Number(m[1]),
     getTitle: (m) => m[2]?.trim() || "",
+    rejectTitle: looksLikeSentence,
   },
 
   {
@@ -384,7 +398,7 @@ export function detectCandidates(
    * - custom : 사용자가 추가한 규칙(예: "외전 제xxx화")을 정규식으로 변환
    * - builtin: 해당 형식에 속한 기본 패턴들만 사용
    */
-  if (option.kind === "custom") {
+  if (option.rule !== undefined) {
     const fullRule = option.rule ?? "";
 
     // 앞뒤의 ^ $ 를 떼어 낸 규칙으로 패턴을 만든다.
@@ -452,10 +466,17 @@ export function detectCandidates(
         continue;
       }
 
+      const title = pattern.getTitle?.(match) || "";
+
+      // 본문 문장처럼 보이면 이 줄은 회차가 아니다.
+      if (pattern.rejectTitle?.(title)) {
+        break;
+      }
+
       candidates.push({
         lineIndex,
         number: pattern.getNumber?.(match),
-        title: pattern.getTitle?.(match) || "",
+        title,
         raw: line,
         pattern: pattern.name,
         score: 0,
