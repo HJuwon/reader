@@ -215,3 +215,79 @@ export async function DELETE(
     );
   }
 }
+
+export async function PUT(request: Request) {
+  const session: any = await getServerSession(authOptions);
+
+  if (!session?.user?.email) {
+    return NextResponse.json(
+      { error: "로그인이 필요합니다." },
+      { status: 401 }
+    );
+  }
+
+  const userId = session.user.email;
+
+  try {
+    const body = await request.json();
+
+    const id = body.id;
+
+    const rule =
+      typeof body.rule === "string"
+        ? body.rule.trim()
+        : "";
+
+    if (!id || !rule) {
+      return NextResponse.json(
+        {
+          error: "수정할 회차 규칙을 찾을 수 없습니다.",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!rule.includes("xxx")) {
+      return NextResponse.json(
+        {
+          error: "회차 규칙에는 xxx가 포함되어야 합니다.",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("episode_rules")
+      .update({ rule })
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select("id,rule,created_at")
+      .single();
+
+    if (error) {
+      console.error("회차 규칙 수정 실패:", error);
+
+      // 같은 규칙이 이미 있을 때 (user_id, rule 중복)
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { error: "같은 규칙이 이미 있습니다." },
+          { status: 409 }
+        );
+      }
+
+      return NextResponse.json(
+        { error: "회차 규칙을 수정하지 못했습니다." },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ data });
+  } catch (error) {
+    console.error("회차 규칙 수정 중 오류:", error);
+
+    return NextResponse.json(
+      { error: "회차 규칙을 수정하지 못했습니다." },
+      { status: 500 }
+    );
+  }
+}
