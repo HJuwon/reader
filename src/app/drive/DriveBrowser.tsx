@@ -145,6 +145,12 @@ export default function DriveBrowser() {
 		selectedEpisodeIndex,
 	});
 
+	/* 규칙 목록에서 수정 중인 규칙과 입력 중인 글자 */
+	const [editingRuleKey, setEditingRuleKey] =
+		useState<string | null>(null);
+
+	const [editingRuleText, setEditingRuleText] =
+		useState("");
 
 	const {
 		episodeRuleManagerOpen,
@@ -190,6 +196,9 @@ export default function DriveBrowser() {
 		setEpisodeRuleSearch,
 		ruleOptions,
 		filteredRuleOptions,
+		hiddenRuleCount,
+		showAllRules,
+		setShowAllRules,
 		selectedRuleKeys,
 		selectedRuleOptions,
 		pendingRuleKeys,
@@ -202,6 +211,8 @@ export default function DriveBrowser() {
 		confirmRuleSelection,
 		addEpisodeRule,
 		deleteEpisodeRule,
+		saveRuleEdit,
+		resetRuleEdit,
 	} = useEpisodeRules({
 		fileId: searchParams.get("fileId"),
 		fileContent,
@@ -2467,6 +2478,103 @@ export default function DriveBrowser() {
 										const count =
 											ruleStats?.[option.key]?.count;
 
+										if (editingRuleKey === option.key) {
+											return (
+												<div
+													key={option.key}
+													className="space-y-2 rounded-xl p-3"
+													style={{
+														backgroundColor: theme.divider,
+														border: `1px solid ${theme.accent}`,
+													}}
+												>
+													<input
+														value={editingRuleText}
+														onChange={(event) =>
+															setEditingRuleText(
+																event.target.value
+															)
+														}
+														placeholder="예: * xxx화$"
+														className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+														style={{
+															backgroundColor: theme.bg,
+															color: theme.text,
+														}}
+													/>
+
+													<p
+														className="text-[10px] leading-relaxed"
+														style={{ color: theme.muted }}
+													>
+														xxx = 번호 자리 · * = 아무 글자 · $ = 줄이
+														거기서 끝남. 모든 소설에 공통으로 바뀝니다.
+													</p>
+
+													<div className="flex gap-2">
+														<button
+															type="button"
+															onClick={() => {
+																void saveRuleEdit(
+																	option,
+																	editingRuleText
+																).then((ok) => {
+																	if (ok) {
+																		setEditingRuleKey(null);
+																	}
+																});
+															}}
+															disabled={episodeRuleSaving}
+															className="rounded-lg px-4 py-2 text-[11px] font-medium transition hover:opacity-80 disabled:opacity-40"
+															style={{
+																backgroundColor: theme.title,
+																color: theme.bg,
+															}}
+														>
+															저장
+														</button>
+
+														<button
+															type="button"
+															onClick={() =>
+																setEditingRuleKey(null)
+															}
+															className="rounded-lg px-4 py-2 text-[11px] transition hover:opacity-70"
+															style={{
+																backgroundColor: theme.bg,
+																color: theme.muted,
+															}}
+														>
+															취소
+														</button>
+
+														{option.overridden && (
+															<button
+																type="button"
+																onClick={() => {
+																	void resetRuleEdit(
+																		option
+																	).then((ok) => {
+																		if (ok) {
+																			setEditingRuleKey(null);
+																		}
+																	});
+																}}
+																disabled={episodeRuleSaving}
+																className="ml-auto rounded-lg px-3 py-2 text-[11px] transition hover:opacity-70 disabled:opacity-40"
+																style={{
+																	backgroundColor: theme.bg,
+																	color: theme.accent,
+																}}
+															>
+																원래대로
+															</button>
+														)}
+													</div>
+												</div>
+											);
+										}
+
 										return (
 											<div
 												key={option.key}
@@ -2520,6 +2628,25 @@ export default function DriveBrowser() {
 													</div>
 												</button>
 
+												<button
+													type="button"
+													onClick={() => {
+														setEditingRuleText(
+															option.rule ??
+																option.seedRule ??
+																option.label
+														);
+														setEditingRuleKey(option.key);
+													}}
+													className="shrink-0 rounded-lg px-3 py-2 text-[11px] transition hover:opacity-60"
+													style={{
+														color: theme.muted,
+														backgroundColor: theme.bg,
+													}}
+												>
+													수정
+												</button>
+
 												{option.kind === "custom" &&
 													option.ruleId && (
 														<button
@@ -2544,6 +2671,27 @@ export default function DriveBrowser() {
 										);
 									})
 								)}
+
+								{!episodeRuleSearch &&
+									(hiddenRuleCount > 0 ||
+										showAllRules) && (
+										<button
+											type="button"
+											onClick={() =>
+												setShowAllRules(
+													(previous) => !previous
+												)
+											}
+											className="w-full rounded-lg px-4 py-3 text-center text-[11px] transition hover:opacity-70"
+											style={{
+												color: theme.accent,
+											}}
+										>
+											{showAllRules
+												? "안 맞는 규칙 접기"
+												: `이 소설에 안 맞는 규칙 ${hiddenRuleCount}개 보기`}
+										</button>
+									)}
 							</div>
 						</div>
 
