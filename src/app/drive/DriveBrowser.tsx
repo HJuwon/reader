@@ -107,36 +107,6 @@ export default function DriveBrowser() {
 	const [inspectResult, setInspectResult] =
 		useState<InspectResult | null>(null);
 
-	/* 번호가 비어 있는 회차 찾기: 1, 2, 3… 으로 이어져야 하는데 빠진 번호를 알려 준다. (일반 회차만 검사) */
-	const missingEpisodeNumbers = (() => {
-		if (!parsedNovel) {
-			return [] as number[];
-		}
-
-		const plain = parsedNovel.episodes.filter(
-			(episode) => !episode.label
-		);
-
-		const present = new Set(
-			plain.map((episode) => episode.episode)
-		);
-
-		const max = plain.reduce(
-			(acc, episode) => Math.max(acc, episode.episode),
-			0
-		);
-
-		const missing: number[] = [];
-
-		for (let n = 1; n <= max; n += 1) {
-			if (!present.has(n)) {
-				missing.push(n);
-			}
-		}
-
-		return missing;
-	})();
-
 	const [selectedEpisodeIndex, setSelectedEpisodeIndex] =
 		useState(0);
 
@@ -606,16 +576,6 @@ export default function DriveBrowser() {
 								}
 								화
 							</p>
-
-							{missingEpisodeNumbers.length > 0 && (
-								<p
-									className="mt-1 text-[10px]"
-									style={{ color: theme.accent }}
-								>
-									빠진 번호: {missingEpisodeNumbers.slice(0, 5).join(", ")}화
-									{missingEpisodeNumbers.length > 5 ? " 외" : ""}
-								</p>
-							)}
 
 							{progressSaving && (
 								<p
