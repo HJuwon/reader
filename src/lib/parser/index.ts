@@ -306,3 +306,137 @@ export type {
   EpisodeRule,
   ParsedNovel,
 } from "./types";
+
+/* ───────── 회차 점검 ───────── */
+
+export type InspectIssue = {
+  kind: "gap" | "duplicate" | "dropped";
+  /** 화면에 보여줄 설명 */
+  message: string;
+  /** 원문 줄 (있을 때) */
+  lines?: string[];
+};
+
+export type InspectResult = {
+  count: number;
+  lastNumber: number | null;
+  issues: InspectIssue[];
+};
+
+/**
+ * 회차가 왜 모자라는지 찾는다.
+ *  - gap      : 번호가 건너뛴 곳 (+ 원문에서 그 번호가 들어간 줄)
+ *  - duplicate: 같은 번호가 연속으로 두 번 잡힌 곳
+ *  - dropped  : 회차 줄처럼 보였지만 점수·번호 흐름 때문에 빠진 줄
+ */
+export function inspectParsing(
+  text: string,
+  option: RuleOption | RuleOption[] | null = null
+): InspectResult {
+  const lines = getLines(normalizeText(text));
+
+  const options = Array.isArray(option)
+    ? option
+    : option
+      ? [option]
+      : [DEFAULT_RULE_OPTION];
+
+  const usedLines = new Set<number>();
+  const detected: EpisodeCandidate[] = [];
+
+  options
+    .flatMap((o) => detectCandidates(lines, o))
+    .sort((a, b) => a.lineIndex - b.lineIndex)
+    .forEach((candidate) => {
+      if (usedLines.has(candidate.lineIndex)) {
+        return;
+      }
+
+      usedLines.add(candidate.lineIndex);
+      detected.push(candidate);
+    });
+
+  const scored = scoreCandidates(detected, lines);
+  const selected = selectCandidates(scored);
+  const finalList = pruneOutOfSequence(selected);
+
+  const keptLines = new Set(
+    finalList.map((c) => c.lineIndex)
+  );
+
+  const issues: InspectIssue[] = [];
+  const shorten = (s: string) =>
+    s.trim().length > 60 ? `${s.trim().slice(0, 60)}…` : s.trim();
+
+  // 1) 빠진 줄
+  scored.forEach((candidate) => {
+    if (keptLines.has(candidate.lineIndex)) {
+      return;
+    }
+
+    const reason =
+      candidate.score < 40
+        ? `점수 미달(${candidate.score})`
+        : "번호 순서에서 벗어남";
+
+    issues.push({
+      kind: "dropped",
+      message: `${candidate.lineIndex + 1}번째 줄이 빠졌어요 — ${reason}`,
+      lines: [shorten(lines[candidate.lineIndex])],
+    });
+  });
+
+  // 2) 번호가 건너뛰거나 겹친 곳
+  let previous: EpisodeCandidate | undefined;
+
+  finalList.forEach((candidate) => {
+    const n = candidate.number;
+
+    if (n !== undefined && previous?.number !== undefined) {
+      const p = previous.number;
+
+      if (n === p) {
+        issues.push({
+          kind: "duplicate",
+          message: `${p}번이 두 번 잡혔어요 (${previous.lineIndex + 1}, ${candidate.lineIndex + 1}번째 줄)`,
+          lines: [
+            shorten(lines[previous.lineIndex]),
+            shorten(lines[candidate.lineIndex]),
+          ],
+        });
+      } else if (n > p + 1) {
+        const missing = p + 1;
+        const pattern = new RegExp(`(^|[^0-9])${missing}\\s*화`);
+
+        const hints = lines
+          .slice(previous.lineIndex, candidate.lineIndex + 1)
+          .filter(
+            (l) => l.trim().length <= 80 && pattern.test(l)
+          )
+          .slice(0, 3)
+          .map(shorten);
+
+        issues.push({
+          kind: "gap",
+          message:
+            n - p - 1 === 1
+              ? `${missing}화가 없어요 (${p}화 다음이 ${n}화)`
+              : `${missing}~${n - 1}화가 없어요 (${p}화 다음이 ${n}화)`,
+          lines: hints.length
+            ? hints
+            : [`${missing}화가 들어간 줄을 찾지 못했어요`],
+        });
+      }
+    }
+
+    previous = candidate;
+  });
+
+  const last = finalList[finalList.length - 1];
+
+  return {
+    count: finalList.length,
+    lastNumber: last?.number ?? null,
+    issues: issues.slice(0, 30),
+  };
+}
