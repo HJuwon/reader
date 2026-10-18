@@ -11,6 +11,9 @@ import {
 	DEFAULT_RULE_KEY,
 	buildRuleOptions,
 	customRuleKey,
+	customRuleOptionKey,
+	encodeRuleOverride,
+	parseRuleOverride,
 	detectBestRule,
 	findRuleOption,
 	parseNovel,
@@ -133,6 +136,10 @@ export function useEpisodeRules({
 	const [ruleSource, setRuleSource] =
 		useState<RuleSource>("default");
 
+	/* 이 소설에 안 맞는 규칙까지 전부 펼쳐서 볼지 */
+	const [showAllRules, setShowAllRules] =
+		useState(false);
+
 	const ruleOptions = useMemo(
 		() => buildRuleOptions(episodeRules),
 		[episodeRules]
@@ -170,30 +177,56 @@ export function useEpisodeRules({
 			return;
 		}
 
+		setShowAllRules(false);
 		setPendingRuleKeys(selectedRuleKeys);
 		// 창을 열 때만 현재 적용 중인 규칙으로 되돌린다.
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [episodeRuleManagerOpen]);
 
-	const filteredRuleOptions = useMemo(() => {
-		const keyword = episodeRuleSearch
-			.trim()
-			.toLowerCase();
+	/*
+	 * 목록에 보여줄 규칙.
+	 *   - 검색어가 있으면 전체에서 검색
+	 *   - 없으면 이 소설에서 한 줄이라도 잡히는 규칙, 내가 추가한 규칙,
+	 *     지금 선택된 규칙만 보이고 나머지는 "안 맞는 규칙 N개 보기"로 접어 둔다.
+	 */
+	const keyword = episodeRuleSearch.trim().toLowerCase();
 
-		if (!keyword) {
+	const filteredRuleOptions = useMemo(() => {
+		if (keyword) {
+			return ruleOptions.filter(
+				(option) =>
+					option.label
+						.toLowerCase()
+						.includes(keyword) ||
+					(option.hint ?? "")
+						.toLowerCase()
+						.includes(keyword)
+			);
+		}
+
+		if (showAllRules || !ruleStats) {
 			return ruleOptions;
 		}
 
 		return ruleOptions.filter(
 			(option) =>
-				option.label
-					.toLowerCase()
-					.includes(keyword) ||
-				(option.hint ?? "")
-					.toLowerCase()
-					.includes(keyword)
+				option.kind === "custom" ||
+				selectedRuleKeys.includes(option.key) ||
+				pendingRuleKeys.includes(option.key) ||
+				(ruleStats[option.key]?.count ?? 0) > 0
 		);
-	}, [ruleOptions, episodeRuleSearch]);
+	}, [
+		ruleOptions,
+		keyword,
+		showAllRules,
+		ruleStats,
+		selectedRuleKeys,
+		pendingRuleKeys,
+	]);
+
+	const hiddenRuleCount = keyword
+		? 0
+		: ruleOptions.length - filteredRuleOptions.length;
 
 	const setRuleSelection = useCallback(
 		(selection: RuleSelection) => {
@@ -474,10 +507,16 @@ export function useEpisodeRules({
 
 				const nextOptions = buildRuleOptions(nextRules);
 
-				const option = findRuleOption(
-					nextOptions,
-					customRuleKey(addedRule.rule)
-				);
+				const option =
+					nextOptions.find(
+						(item) =>
+							item.ruleId !== undefined &&
+							item.ruleId === addedRule.id
+					) ??
+					findRuleOption(
+						nextOptions,
+						customRuleKey(addedRule.rule)
+					);
 
 				if (option) {
 					const matched = fileContent
@@ -582,8 +621,8 @@ export function useEpisodeRules({
 					return;
 				}
 
-				const removedKey = customRuleKey(
-					removed.rule
+				const removedKey = customRuleOptionKey(
+					removed.id ?? `text:${removed.rule}`
 				);
 
 				setPendingRuleKeys((previous) => {
@@ -665,6 +704,233 @@ export function useEpisodeRules({
 		]
 	);
 
+	/*
+	 * 규칙 수정.
+	 *   - 내가 추가한 규칙: 그 규칙의 글자를 바꾼다.
+	 *   - 기본 규칙: 고친 내용을 "대체 규칙"으로 저장하고, 목록에는 고친 글자로 보인다.
+	 * 모든 소설에 공통으로 바뀌고, 지금 이 소설에 적용 중이면 바로 다시 나눈다.
+	 */
+	const saveRuleEdit = useCallback(
+		async (
+			option: RuleOption,
+			text: string
+		): Promise<boolean> => {
+			const rule = text.trim();
+
+			if (!rule.includes("xxx")) {
+				setEpisodeRuleError(
+					"규칙에는 xxx가 포함되어야 합니다."
+				);
+				return false;
+			}
+
+			setEpisodeRuleSaving(true);
+			setEpisodeRuleError("");
+
+			try {
+				let nextRules: EpisodeRule[];
+
+				if (option.kind === "custom" && option.ruleId) {
+					const response = await fetch(
+						"/api/episode-rules",
+						{
+							method: "PUT",
+							headers: {
+								"Content-Type": "application/json",
+							},
+							body: JSON.stringify({
+								id: option.ruleId,
+								rule,
+							}),
+						}
+					);
+
+					const data = await response.json();
+
+					if (!response.ok) {
+						throw new Error(
+							extractErrorMessage(
+								data,
+								"회차 규칙을 수정하지 못했습니다."
+							)
+						);
+					}
+
+					const updated = data.data as EpisodeRule;
+
+					nextRules = episodeRules.map((item) =>
+						item.id === option.ruleId
+							? { ...item, rule: updated.rule }
+							: item
+					);
+				} else {
+					const encoded = encodeRuleOverride(
+						option.key,
+						rule
+					);
+
+					const existing = episodeRules.find(
+						(item) =>
+							parseRuleOverride(item.rule)
+								?.baseKey === option.key
+					);
+
+					const response = await fetch(
+						"/api/episode-rules",
+						{
+							method: existing?.id ? "PUT" : "POST",
+							headers: {
+								"Content-Type": "application/json",
+							},
+							body: JSON.stringify(
+								existing?.id
+									? { id: existing.id, rule: encoded }
+									: { rule: encoded }
+							),
+						}
+					);
+
+					const data = await response.json();
+
+					if (!response.ok) {
+						throw new Error(
+							extractErrorMessage(
+								data,
+								"회차 규칙을 수정하지 못했습니다."
+							)
+						);
+					}
+
+					const saved = data.data as EpisodeRule;
+
+					nextRules = existing
+						? episodeRules.map((item) =>
+								item.id === existing.id
+									? { ...item, rule: saved.rule }
+									: item
+							)
+						: [...episodeRules, saved];
+				}
+
+				setEpisodeRules(nextRules);
+
+				if (selectedRuleKeys.includes(option.key)) {
+					const nextOptions = buildRuleOptions(nextRules);
+
+					reparseWithOptions(
+						selectedRuleKeys
+							.map((key) =>
+								findRuleOption(nextOptions, key)
+							)
+							.filter(
+								(item): item is RuleOption => !!item
+							)
+					);
+				}
+
+				return true;
+			} catch (error) {
+				console.error("회차 규칙 수정 실패:", error);
+
+				setEpisodeRuleError(
+					error instanceof Error
+						? error.message
+						: "회차 규칙을 수정하지 못했습니다."
+				);
+
+				return false;
+			} finally {
+				setEpisodeRuleSaving(false);
+			}
+		},
+		[
+			episodeRules,
+			selectedRuleKeys,
+			reparseWithOptions,
+		]
+	);
+
+	/* 고쳐 쓰던 기본 규칙을 원래대로 되돌린다. */
+	const resetRuleEdit = useCallback(
+		async (option: RuleOption): Promise<boolean> => {
+			const existing = episodeRules.find(
+				(item) =>
+					parseRuleOverride(item.rule)?.baseKey ===
+					option.key
+			);
+
+			if (!existing?.id) {
+				return true;
+			}
+
+			setEpisodeRuleSaving(true);
+			setEpisodeRuleError("");
+
+			try {
+				const response = await fetch(
+					"/api/episode-rules",
+					{
+						method: "DELETE",
+						headers: {
+							"Content-Type": "application/json",
+						},
+						body: JSON.stringify({ id: existing.id }),
+					}
+				);
+
+				const data = await response.json();
+
+				if (!response.ok) {
+					throw new Error(
+						extractErrorMessage(
+							data,
+							"원래 규칙으로 되돌리지 못했습니다."
+						)
+					);
+				}
+
+				const nextRules = episodeRules.filter(
+					(item) => item.id !== existing.id
+				);
+
+				setEpisodeRules(nextRules);
+
+				if (selectedRuleKeys.includes(option.key)) {
+					const nextOptions = buildRuleOptions(nextRules);
+
+					reparseWithOptions(
+						selectedRuleKeys
+							.map((key) =>
+								findRuleOption(nextOptions, key)
+							)
+							.filter(
+								(item): item is RuleOption => !!item
+							)
+					);
+				}
+
+				return true;
+			} catch (error) {
+				console.error("규칙 되돌리기 실패:", error);
+
+				setEpisodeRuleError(
+					error instanceof Error
+						? error.message
+						: "원래 규칙으로 되돌리지 못했습니다."
+				);
+
+				return false;
+			} finally {
+				setEpisodeRuleSaving(false);
+			}
+		},
+		[
+			episodeRules,
+			selectedRuleKeys,
+			reparseWithOptions,
+		]
+	);
+
 	return {
 		episodeRules,
 		setEpisodeRules,
@@ -681,6 +947,9 @@ export function useEpisodeRules({
 
 		ruleOptions,
 		filteredRuleOptions,
+		hiddenRuleCount,
+		showAllRules,
+		setShowAllRules,
 		selectedRuleKeys,
 		selectedRuleOptions,
 		pendingRuleKeys,
@@ -695,5 +964,7 @@ export function useEpisodeRules({
 		loadEpisodeRules,
 		addEpisodeRule,
 		deleteEpisodeRule,
+		saveRuleEdit,
+		resetRuleEdit,
 	};
 }
