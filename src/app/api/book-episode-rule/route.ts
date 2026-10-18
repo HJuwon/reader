@@ -1,10 +1,16 @@
-
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 import { supabase } from "@/lib/supabase";
 
-export async function GET() {
+/**
+ * 소설(드라이브 파일)별 회차 규칙 선택 저장.
+ *
+ * 테이블: book_episode_rules
+ *   user_id, drive_file_id (복합 PK), rule_key, source, updated_at
+ */
+
+export async function GET(request: Request) {
   const session: any = await getServerSession(authOptions);
 
   if (!session?.user?.email) {
@@ -14,206 +20,34 @@ export async function GET() {
     );
   }
 
-  const userId = session.user.email;
+  const fileId = new URL(request.url).searchParams.get(
+    "fileId"
+  );
 
-  try {
-    const { data, error } = await supabase
-      .from("episode_rules")
-      .select("id,rule,created_at")
-      .eq("user_id", userId)
-      .order("created_at", {
-        ascending: true,
-      });
-
-    if (error) {
-      console.error(
-        "회차 규칙 조회 실패:",
-        error
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            "회차 규칙을 불러오지 못했습니다.",
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      data: data ?? [],
-    });
-  } catch (error) {
-    console.error(
-      "회차 규칙 조회 중 오류:",
-      error
+  if (!fileId) {
+    return NextResponse.json(
+      { error: "fileId가 필요합니다." },
+      { status: 400 }
     );
+  }
+
+  const { data, error } = await supabase
+    .from("book_episode_rules")
+    .select("rule_key,source")
+    .eq("user_id", session.user.email)
+    .eq("drive_file_id", fileId)
+    .maybeSingle();
+
+  if (error) {
+    console.error("소설별 회차 규칙 조회 실패:", error);
 
     return NextResponse.json(
-      {
-        error:
-          "회차 규칙을 불러오지 못했습니다.",
-      },
+      { error: "회차 규칙을 불러오지 못했습니다." },
       { status: 500 }
     );
   }
-}
 
-export async function POST(request: Request) {
-  const session: any = await getServerSession(authOptions);
-
-  if (!session?.user?.email) {
-    return NextResponse.json(
-      { error: "로그인이 필요합니다." },
-      { status: 401 }
-    );
-  }
-
-  const userId = session.user.email;
-
-  try {
-    const body = await request.json();
-
-    const rule =
-      typeof body.rule === "string"
-        ? body.rule.trim()
-        : "";
-
-    if (!rule) {
-      return NextResponse.json(
-        {
-          error:
-            "회차 규칙을 입력해주세요.",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!rule.includes("xxx")) {
-      return NextResponse.json(
-        {
-          error:
-            "회차 규칙에는 xxx가 포함되어야 합니다.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const { data, error } = await supabase
-      .from("episode_rules")
-      .upsert(
-        {
-          user_id: userId,
-          rule,
-        },
-        {
-          onConflict: "user_id,rule",
-        }
-      )
-      .select("id,rule,created_at")
-      .single();
-
-    if (error) {
-      console.error(
-        "회차 규칙 추가 실패:",
-        error
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            "회차 규칙을 추가하지 못했습니다.",
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      data,
-    });
-  } catch (error) {
-    console.error(
-      "회차 규칙 추가 중 오류:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        error:
-          "회차 규칙을 추가하지 못했습니다.",
-      },
-      { status: 500 }
-    );
-  }
-}
-
-export async function DELETE(
-  request: Request
-) {
-  const session: any = await getServerSession(authOptions);
-
-  if (!session?.user?.email) {
-    return NextResponse.json(
-      { error: "로그인이 필요합니다." },
-      { status: 401 }
-    );
-  }
-
-  const userId = session.user.email;
-
-  try {
-    const body = await request.json();
-
-    const id = body.id;
-
-    if (!id) {
-      return NextResponse.json(
-        {
-          error:
-            "삭제할 회차 규칙을 찾을 수 없습니다.",
-        },
-        { status: 400 }
-      );
-    }
-
-    const { error } = await supabase
-      .from("episode_rules")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", userId);
-
-    if (error) {
-      console.error(
-        "회차 규칙 삭제 실패:",
-        error
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            "회차 규칙을 삭제하지 못했습니다.",
-        },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-    });
-  } catch (error) {
-    console.error(
-      "회차 규칙 삭제 중 오류:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        error:
-          "회차 규칙을 삭제하지 못했습니다.",
-      },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({ data: data ?? null });
 }
 
 export async function PUT(request: Request) {
@@ -226,67 +60,52 @@ export async function PUT(request: Request) {
     );
   }
 
-  const userId = session.user.email;
-
   try {
     const body = await request.json();
 
-    const id = body.id;
+    const fileId =
+      typeof body.fileId === "string" ? body.fileId : "";
 
-    const rule =
-      typeof body.rule === "string"
-        ? body.rule.trim()
+    const ruleKey =
+      typeof body.ruleKey === "string"
+        ? body.ruleKey.trim()
         : "";
 
-    if (!id || !rule) {
+    if (!fileId || !ruleKey) {
       return NextResponse.json(
-        {
-          error: "수정할 회차 규칙을 찾을 수 없습니다.",
-        },
+        { error: "fileId와 ruleKey가 필요합니다." },
         { status: 400 }
       );
     }
 
-    if (!rule.includes("xxx")) {
-      return NextResponse.json(
+    const { error } = await supabase
+      .from("book_episode_rules")
+      .upsert(
         {
-          error: "회차 규칙에는 xxx가 포함되어야 합니다.",
+          user_id: session.user.email,
+          drive_file_id: fileId,
+          rule_key: ruleKey,
+          source: "manual",
+          updated_at: new Date().toISOString(),
         },
-        { status: 400 }
+        { onConflict: "user_id,drive_file_id" }
       );
-    }
-
-    const { data, error } = await supabase
-      .from("episode_rules")
-      .update({ rule })
-      .eq("id", id)
-      .eq("user_id", userId)
-      .select("id,rule,created_at")
-      .single();
 
     if (error) {
-      console.error("회차 규칙 수정 실패:", error);
-
-      // 같은 규칙이 이미 있을 때 (user_id, rule 중복)
-      if (error.code === "23505") {
-        return NextResponse.json(
-          { error: "같은 규칙이 이미 있습니다." },
-          { status: 409 }
-        );
-      }
+      console.error("소설별 회차 규칙 저장 실패:", error);
 
       return NextResponse.json(
-        { error: "회차 규칙을 수정하지 못했습니다." },
+        { error: "회차 규칙을 저장하지 못했습니다." },
         { status: 500 }
       );
     }
 
-    return NextResponse.json({ data });
+    return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("회차 규칙 수정 중 오류:", error);
+    console.error("소설별 회차 규칙 저장 중 오류:", error);
 
     return NextResponse.json(
-      { error: "회차 규칙을 수정하지 못했습니다." },
+      { error: "회차 규칙을 저장하지 못했습니다." },
       { status: 500 }
     );
   }
