@@ -219,8 +219,15 @@ export async function loadNovel(
       : null;
 
   // 삭제된 규칙은 걸러낸다.
-  const savedKeys = parseRuleKeys(savedKeysRaw).filter(
-    (key) => findRuleOption(ruleOptions, key)
+  // 예전 형식의 키(예: "custom:^* xxx화$")도 같은 규칙의 현재 키로 바꾼다.
+  const savedKeys = Array.from(
+    new Set(
+      parseRuleKeys(savedKeysRaw)
+        .map(
+          (key) => findRuleOption(ruleOptions, key)?.key
+        )
+        .filter((key): key is string => !!key)
+    )
   );
 
   let ruleSelection: RuleSelection;
