@@ -377,7 +377,7 @@ export function inspectParsing(
     const reason =
       candidate.score < 40
         ? `점수 미달(${candidate.score})`
-        : "번호 순서에서 벗어남";
+        : "번호 순서가 맞지 않아 회차에서 제외";
 
     issues.push({
       kind: "dropped",
@@ -387,67 +387,106 @@ export function inspectParsing(
   });
 
   // 2) 번호가 건너뛰거나 겹친 곳
-  //    규칙마다 번호 체계가 다르므로(예: 1부 "N화", 2부 "2부 N화") 규칙별로 따로 검사한다.
-  const groups = new Map<string, EpisodeCandidate[]>();
+  //   - 규칙 이름이 붙은 회차(예: "2부 1화")는 그 규칙 안에서만 번호를 본다.
+  //   - 일반 회차(예: "1화", "591화")는 앞의 2부·외전 회차를 포함해
+  //     "목록에 표시되는 번호" 흐름이 이어지는지 본다.
+  //     (1부 334화 → 2부 256화 → 591화 처럼 이어지면 정상)
+  const findHints = (
+    from: EpisodeCandidate,
+    to: EpisodeCandidate,
+    missing: number
+  ) => {
+    const pattern = new RegExp(`(^|[^0-9])${missing}\\s*화`);
+
+    const hints = lines
+      .slice(from.lineIndex, to.lineIndex + 1)
+      .filter((l) => l.trim().length <= 80 && pattern.test(l))
+      .slice(0, 3)
+      .map(shorten);
+
+    return hints.length
+      ? hints
+      : [`${missing}화가 들어간 줄을 찾지 못했어요`];
+  };
+
+  const rangeText = (from: number, to: number) =>
+    from === to ? `${from}화` : `${from}~${to}화`;
+
+  // 2-1) 규칙 이름이 붙은 회차: 규칙별로 따로 검사
+  const customLast = new Map<string, EpisodeCandidate>();
 
   finalList.forEach((candidate) => {
-    const list = groups.get(candidate.pattern) ?? [];
-    list.push(candidate);
-    groups.set(candidate.pattern, list);
+    if (!candidate.label || candidate.number === undefined) {
+      return;
+    }
+
+    const previous = customLast.get(candidate.pattern);
+    customLast.set(candidate.pattern, candidate);
+
+    if (!previous || previous.number === undefined) {
+      return;
+    }
+
+    const prefix = candidate.label.replace(/\s*\d+[^\d\s]*$/, "");
+    const p = previous.number;
+    const n = candidate.number;
+
+    if (n === p) {
+      issues.push({
+        kind: "duplicate",
+        message: `${prefix} ${p}화가 두 번 잡혔어요 (${previous.lineIndex + 1}, ${candidate.lineIndex + 1}번째 줄)`,
+        lines: [
+          shorten(lines[previous.lineIndex]),
+          shorten(lines[candidate.lineIndex]),
+        ],
+      });
+    } else if (n > p + 1) {
+      issues.push({
+        kind: "gap",
+        message: `${prefix} ${rangeText(p + 1, n - 1)}가 없어요 (${p}화 다음이 ${n}화)`,
+        lines: findHints(previous, candidate, p + 1),
+      });
+    }
   });
 
-  groups.forEach((group) => {
-    const name = group[0].label
-      ? group[0].label.replace(/\s*\d+[^\d\s]*$/, "")
-      : "";
-    const prefix = name ? `${name} ` : "";
+  // 2-2) 일반 회차: 2부·외전 번호까지 이어서 검사
+  let running = 0;
+  let runningFrom: EpisodeCandidate | undefined;
 
-    let previous: EpisodeCandidate | undefined;
+  finalList.forEach((candidate) => {
+    if (candidate.label) {
+      running += 1;
+      runningFrom = candidate;
+      return;
+    }
 
-    group.forEach((candidate) => {
-      const n = candidate.number;
+    const n = candidate.number;
 
-      if (n !== undefined && previous?.number !== undefined) {
-        const p = previous.number;
+    if (n === undefined) {
+      return;
+    }
 
-        if (n === p) {
-          issues.push({
-            kind: "duplicate",
-            message: `${prefix}${p}화가 두 번 잡혔어요 (${previous.lineIndex + 1}, ${candidate.lineIndex + 1}번째 줄)`,
-            lines: [
-              shorten(lines[previous.lineIndex]),
-              shorten(lines[candidate.lineIndex]),
-            ],
-          });
-        } else if (n > p + 1) {
-          const missing = p + 1;
-          const pattern = new RegExp(
-            `(^|[^0-9])${missing}\\s*화`
-          );
-
-          const hints = lines
-            .slice(previous.lineIndex, candidate.lineIndex + 1)
-            .filter(
-              (l) => l.trim().length <= 80 && pattern.test(l)
-            )
-            .slice(0, 3)
-            .map(shorten);
-
-          issues.push({
-            kind: "gap",
-            message:
-              n - p - 1 === 1
-                ? `${prefix}${missing}화가 없어요 (${p}화 다음이 ${n}화)`
-                : `${prefix}${missing}~${n - 1}화가 없어요 (${p}화 다음이 ${n}화)`,
-            lines: hints.length
-              ? hints
-              : [`${missing}화가 들어간 줄을 찾지 못했어요`],
-          });
-        }
+    if (running > 0 && runningFrom && n !== 1) {
+      if (n === running) {
+        issues.push({
+          kind: "duplicate",
+          message: `${n}화가 두 번 잡혔어요 (${runningFrom.lineIndex + 1}, ${candidate.lineIndex + 1}번째 줄)`,
+          lines: [
+            shorten(lines[runningFrom.lineIndex]),
+            shorten(lines[candidate.lineIndex]),
+          ],
+        });
+      } else if (n > running + 1) {
+        issues.push({
+          kind: "gap",
+          message: `${rangeText(running + 1, n - 1)}가 없어요 (${running}화 다음이 ${n}화)`,
+          lines: findHints(runningFrom, candidate, running + 1),
+        });
       }
+    }
 
-      previous = candidate;
-    });
+    running = n;
+    runningFrom = candidate;
   });
 
   const last = finalList[finalList.length - 1];
