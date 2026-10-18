@@ -31,6 +31,7 @@ import {
 	GLOBAL_SEARCH_MIN_LENGTH,
 } from "./hooks/useBodySearch";
 import { useContentEditor } from "./hooks/useContentEditor";
+import { useMarathonScroll } from "./hooks/useMarathonScroll";
 import { useEpisodeNavigation } from "./hooks/useEpisodeNavigation";
 import { useFileClose } from "./hooks/useFileClose";
 import { useReaderChrome } from "./hooks/useReaderChrome";
@@ -41,6 +42,12 @@ import { useHighlightRenderer } from "./hooks/useHighlightRenderer";
 
 import {
 	MAX_FONT_SIZE,
+	FONT_OPTIONS,
+	MIN_LINE_HEIGHT,
+	MAX_LINE_HEIGHT,
+	MIN_LETTER_SPACING,
+	MAX_LETTER_SPACING,
+	type FontKey,
 	MIN_FONT_SIZE,
 	THEMES,
 	useReaderSettings,
@@ -124,6 +131,15 @@ export default function DriveBrowser() {
 		setThemeKey,
 		fontSize,
 		setFontSize,
+		fontKey,
+		setFontKey,
+		fontFamily,
+		lineHeight,
+		setLineHeight,
+		letterSpacing,
+		setLetterSpacing,
+		marathon,
+		setMarathon,
 		settingsOpen,
 		setSettingsOpen,
 		theme,
@@ -233,9 +249,11 @@ export default function DriveBrowser() {
 	const {
 		editingContent,
 		editedText,
+		editedTitle,
 		savingEdit,
 		editError,
 		setEditedText,
+		setEditedTitle,
 		startEditingContent,
 		cancelEditingContent,
 		saveEditedContent,
@@ -315,6 +333,24 @@ export default function DriveBrowser() {
 		scrollPositionRef,
 		restoreScrollPositionRef,
 	});
+
+	/* 정주행: 본문 끝에서 한 번 더 내리면 다음 화로 */
+	const { progress: marathonProgress } =
+		useMarathonScroll({
+			enabled: marathon,
+			hasNext: Boolean(
+				parsedNovel &&
+					selectedEpisodeIndex <
+						parsedNovel.episodes.length - 1
+			),
+			disabled:
+				editingContent ||
+				episodeListOpen ||
+				settingsOpen ||
+				progressSaving,
+			onNext: goToNextEpisode,
+			resetKey: selectedEpisodeIndex,
+		});
 
 
 	/*
@@ -1509,6 +1545,34 @@ export default function DriveBrowser() {
 
 												{editingContent ? (
 													<div className="mx-auto mt-8 max-w-2xl">
+														<label
+															className="mb-1 block text-xs"
+															style={{ color: theme.muted }}
+														>
+															제목
+														</label>
+														<input
+															type="text"
+															value={editedTitle}
+															onChange={(event) =>
+																setEditedTitle(event.target.value)
+															}
+															disabled={savingEdit}
+															className="mb-3 w-full rounded-lg border px-4 py-3 outline-none focus:ring-2"
+															style={{
+																fontFamily,
+																fontSize: `${fontSize}px`,
+																color: theme.title,
+																borderColor: theme.divider,
+																backgroundColor: "transparent",
+															}}
+														/>
+														<p
+															className="mb-3 text-[11px]"
+															style={{ color: theme.muted }}
+														>
+															회차 규칙에 맞는 형식(예: 제목 앞의 번호)은 유지해 주세요.
+														</p>
 														<textarea
 															value={
 																editedText
@@ -1527,10 +1591,10 @@ export default function DriveBrowser() {
 															}
 															className="w-full resize-y whitespace-pre-wrap break-words rounded-lg border p-4 outline-none focus:ring-2"
 															style={{
-																fontFamily:
-																	SERIF,
+																fontFamily,
 																fontSize: `${fontSize}px`,
-																lineHeight: 2,
+																lineHeight,
+																letterSpacing: `${letterSpacing}em`,
 																color:
 																	theme.text,
 																minHeight:
@@ -1601,10 +1665,10 @@ export default function DriveBrowser() {
 															}
 															className="whitespace-pre-wrap break-words"
 															style={{
-																fontFamily:
-																	SERIF,
+																fontFamily,
 																fontSize: `${fontSize}px`,
-																lineHeight: 2,
+																lineHeight,
+																letterSpacing: `${letterSpacing}em`,
 																color:
 																	theme.text,
 																userSelect:
@@ -1639,6 +1703,26 @@ export default function DriveBrowser() {
 				)}
 			</section>
 
+
+			{marathon && marathonProgress > 0 && (
+				<div
+					className="pointer-events-none fixed inset-x-0 z-[55] flex justify-center"
+					style={{ bottom: "calc(6rem + env(safe-area-inset-bottom, 0px))" }}
+				>
+					<div
+						className="rounded-full px-4 py-2 text-xs shadow-lg"
+						style={{
+							backgroundColor: theme.title,
+							color: theme.bg,
+							opacity: 0.35 + marathonProgress * 0.65,
+						}}
+					>
+						{marathonProgress >= 1
+							? "다음 화로 이동 중…"
+							: "조금 더 내리면 다음 화"}
+					</div>
+				</div>
+			)}
 
 			{showHighlightButton &&
 				selectedTextForHighlight && (
@@ -1874,6 +1958,117 @@ export default function DriveBrowser() {
 
 
 						<p
+							className="mb-2 text-xs font-semibold"
+							style={{ color: theme.text }}
+						>
+							글꼴
+						</p>
+						<div className="mb-5 grid grid-cols-3 gap-2">
+							{(Object.keys(FONT_OPTIONS) as FontKey[]).map((key) => (
+								<button
+									key={key}
+									type="button"
+									onClick={() => setFontKey(key)}
+									className="rounded-lg px-2 py-2 text-xs transition"
+									style={{
+										fontFamily: FONT_OPTIONS[key].family,
+										color: key === fontKey ? theme.bg : theme.text,
+										backgroundColor:
+											key === fontKey ? theme.accent : "transparent",
+										border: `1px solid ${theme.divider}`,
+									}}
+								>
+									{FONT_OPTIONS[key].label}
+								</button>
+							))}
+						</div>
+						
+						<p
+							className="mb-2 text-xs font-semibold"
+							style={{ color: theme.text }}
+						>
+							줄 간격
+						</p>
+						<div className="mb-5 flex items-center gap-3">
+							<span className="shrink-0 text-xs" style={{ color: theme.muted }}>
+								좁게
+							</span>
+							<input
+								type="range"
+								min={MIN_LINE_HEIGHT}
+								max={MAX_LINE_HEIGHT}
+								step={0.1}
+								value={lineHeight}
+								onChange={(event) =>
+									setLineHeight(Number(event.target.value))
+								}
+								className="min-w-0 flex-1"
+								aria-label="줄 간격"
+							/>
+							<span className="shrink-0 text-xs" style={{ color: theme.muted }}>
+								넓게
+							</span>
+						</div>
+						
+						<p
+							className="mb-2 text-xs font-semibold"
+							style={{ color: theme.text }}
+						>
+							글자 간격
+						</p>
+						<div className="mb-5 flex items-center gap-3">
+							<span className="shrink-0 text-xs" style={{ color: theme.muted }}>
+								좁게
+							</span>
+							<input
+								type="range"
+								min={MIN_LETTER_SPACING}
+								max={MAX_LETTER_SPACING}
+								step={0.01}
+								value={letterSpacing}
+								onChange={(event) =>
+									setLetterSpacing(Number(event.target.value))
+								}
+								className="min-w-0 flex-1"
+								aria-label="글자 간격"
+							/>
+							<span className="shrink-0 text-xs" style={{ color: theme.muted }}>
+								넓게
+							</span>
+						</div>
+						
+						<div className="mb-5 flex items-center justify-between">
+							<p
+								className="text-xs font-semibold"
+								style={{ color: theme.text }}
+							>
+								정주행
+							</p>
+							<button
+								type="button"
+								role="switch"
+								aria-checked={marathon}
+								aria-label="정주행"
+								onClick={() => setMarathon((value) => !value)}
+								className="relative h-6 w-11 rounded-full transition"
+								style={{
+									backgroundColor: marathon ? theme.accent : theme.divider,
+								}}
+							>
+								<span
+									className="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all"
+									style={{ left: marathon ? "22px" : "2px" }}
+								/>
+							</button>
+						</div>
+						<p
+							className="-mt-3 mb-5 text-[11px]"
+							style={{ color: theme.muted }}
+						>
+							켜면 본문 끝에서 한 번 더 내릴 때 다음 화로 넘어가요.
+						</p>
+						
+												<p
 							className="mb-2 text-xs font-semibold"
 							style={{
 								color:
