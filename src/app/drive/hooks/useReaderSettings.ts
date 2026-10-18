@@ -83,6 +83,37 @@ export const THEMES: Record<
 	},
 };
 
+export type FontKey = "myeongjo" | "gothic" | "batang";
+
+export const FONT_OPTIONS: Record<
+	FontKey,
+	{ label: string; family: string }
+> = {
+	myeongjo: {
+		label: "명조",
+		family:
+			"'Noto Serif KR', 'Nanum Myeongjo', ui-serif, Georgia, serif",
+	},
+	gothic: {
+		label: "고딕",
+		family:
+			"'Noto Sans KR', 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif",
+	},
+	batang: {
+		label: "바탕",
+		family:
+			"'Batang', 'AppleMyungjo', 'Noto Serif KR', serif",
+	},
+};
+
+export const MIN_LINE_HEIGHT = 1.4;
+export const MAX_LINE_HEIGHT = 2.8;
+export const DEFAULT_LINE_HEIGHT = 2;
+
+export const MIN_LETTER_SPACING = -0.02;
+export const MAX_LETTER_SPACING = 0.1;
+export const DEFAULT_LETTER_SPACING = 0;
+
 export const MIN_FONT_SIZE = 14;
 export const MAX_FONT_SIZE = 22;
 export const DEFAULT_FONT_SIZE = 16;
@@ -95,6 +126,19 @@ export function useReaderSettings() {
 
 	const [fontSize, setFontSize] =
 		useState(DEFAULT_FONT_SIZE);
+
+	const [fontKey, setFontKey] =
+		useState<FontKey>("myeongjo");
+
+	const [lineHeight, setLineHeight] =
+		useState(DEFAULT_LINE_HEIGHT);
+
+	const [letterSpacing, setLetterSpacing] =
+		useState(DEFAULT_LETTER_SPACING);
+
+	/* 정주행: 본문 끝에서 한 번 더 내리면 다음 화로 넘어간다 */
+	const [marathon, setMarathon] =
+		useState(false);
 
 	const [settingsOpen, setSettingsOpen] =
 		useState(false);
@@ -144,6 +188,52 @@ export function useReaderSettings() {
 					)
 				);
 			}
+
+			if (
+				parsed.fontKey &&
+				FONT_OPTIONS[
+					parsed.fontKey as FontKey
+				]
+			) {
+				setFontKey(parsed.fontKey);
+			}
+
+			if (
+				typeof parsed.lineHeight ===
+				"number"
+			) {
+				setLineHeight(
+					Math.min(
+						MAX_LINE_HEIGHT,
+						Math.max(
+							MIN_LINE_HEIGHT,
+							parsed.lineHeight
+						)
+					)
+				);
+			}
+
+			if (
+				typeof parsed.letterSpacing ===
+				"number"
+			) {
+				setLetterSpacing(
+					Math.min(
+						MAX_LETTER_SPACING,
+						Math.max(
+							MIN_LETTER_SPACING,
+							parsed.letterSpacing
+						)
+					)
+				);
+			}
+
+			if (
+				typeof parsed.marathon ===
+				"boolean"
+			) {
+				setMarathon(parsed.marathon);
+			}
 		} catch {
 			// 기본값 사용
 		}
@@ -159,6 +249,10 @@ export function useReaderSettings() {
 				JSON.stringify({
 					themeKey,
 					fontSize,
+					fontKey,
+					lineHeight,
+					letterSpacing,
+					marathon,
 				})
 			);
 		} catch {
@@ -167,6 +261,10 @@ export function useReaderSettings() {
 	}, [
 		themeKey,
 		fontSize,
+		fontKey,
+		lineHeight,
+		letterSpacing,
+		marathon,
 	]);
 
 	return {
@@ -175,6 +273,20 @@ export function useReaderSettings() {
 
 		fontSize,
 		setFontSize,
+
+		fontKey,
+		setFontKey,
+		fontFamily:
+			FONT_OPTIONS[fontKey].family,
+
+		lineHeight,
+		setLineHeight,
+
+		letterSpacing,
+		setLetterSpacing,
+
+		marathon,
+		setMarathon,
 
 		settingsOpen,
 		setSettingsOpen,
