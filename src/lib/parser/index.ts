@@ -20,6 +20,74 @@ import type {
   ParsedNovel,
 } from "./types";
 
+/**
+ * 본문에 섞여 들어온 "번호만 그럴듯한 줄"을 걸러낸다.
+ *
+ * 회차 번호는 1, 2, 3… 으로 커져 가는 것이 정상이므로,
+ * 번호가 커지는 가장 긴 줄을 "진짜 회차"로 보고 나머지(예: 6화 뒤에 갑자기
+ * 나온 "3.")는 뺀다. 번호가 1로 돌아오면(권·외전 시작) 새로 시작한 것으로 본다.
+ * 회차 번호가 건너뛰는 것(1, 2, 4, 5)은 문제 삼지 않는다.
+ *
+ * 걸러내면 절반 넘게 사라질 만큼 번호가 불규칙하면 판단이 틀렸을 수 있으므로
+ * 원래 후보를 그대로 둔다.
+ */
+function pruneOutOfSequence(
+  candidates: EpisodeCandidate[]
+): EpisodeCandidate[] {
+  const numeric = candidates
+    .map((candidate, index) => ({
+      index,
+      number: candidate.number,
+    }))
+    .filter(
+      (item): item is { index: number; number: number } =>
+        item.number !== undefined
+    );
+
+  if (numeric.length < 3) {
+    return candidates;
+  }
+
+  const length = new Array<number>(numeric.length).fill(1);
+  const previous = new Array<number>(numeric.length).fill(-1);
+
+  for (let i = 0; i < numeric.length; i += 1) {
+    for (let j = 0; j < i; j += 1) {
+      const canFollow =
+        numeric[j].number < numeric[i].number ||
+        numeric[i].number === 1;
+
+      if (canFollow && length[j] + 1 > length[i]) {
+        length[i] = length[j] + 1;
+        previous[i] = j;
+      }
+    }
+  }
+
+  let end = 0;
+
+  for (let i = 1; i < numeric.length; i += 1) {
+    if (length[i] > length[end]) {
+      end = i;
+    }
+  }
+
+  if (length[end] * 2 < numeric.length) {
+    return candidates;
+  }
+
+  const keep = new Set<number>();
+
+  for (let i = end; i !== -1; i = previous[i]) {
+    keep.add(numeric[i].index);
+  }
+
+  return candidates.filter(
+    (candidate, index) =>
+      candidate.number === undefined || keep.has(index)
+  );
+}
+
 function selectForOption(
   lines: string[],
   option: RuleOption
@@ -28,7 +96,7 @@ function selectForOption(
 
   const scored = scoreCandidates(detected, lines);
 
-  return selectCandidates(scored);
+  return pruneOutOfSequence(selectCandidates(scored));
 }
 
 /**
@@ -61,8 +129,8 @@ function selectForOptions(
       merged.push(candidate);
     });
 
-  return selectCandidates(
-    scoreCandidates(merged, lines)
+  return pruneOutOfSequence(
+    selectCandidates(scoreCandidates(merged, lines))
   );
 }
 
@@ -129,16 +197,23 @@ export function detectBestRule(
   let bestSequential = 0;
   let bestCount = 0;
   let bestPriority = -1;
+  let bestSpecificity = -1;
 
-  // 같은 점수면 더 구체적인 규칙을 고른다.
-  // 내가 추가한 일반 규칙 > 기본 형식 > "아무 글자" 규칙(* 규칙, "제목 N화")
+  // 같은 점수일 때의 판단 순서
+  //   1) 정확도: 잡은 회차 중 번호가 이어지는 비율이 높은 쪽
+  //      (본문 줄을 덜 섞어 잡은 쪽. 예: "* xxx화$" > "* xxx화")
+  //   2) 우선순위: 내가 추가한 일반 규칙 > 기본 형식 > "아무 글자" 규칙
+  //   3) 구체성: 규칙 글자가 더 긴 쪽 (예: "#xxx화" > "#xxx")
   const priorityOf = (option: RuleOption) => {
-    if (option.kind === "custom") {
-      return option.rule?.includes("*") ? 1 : 3;
+    if (option.rule !== undefined) {
+      return option.rule.includes("*") ? 1 : 3;
     }
 
     return option.key === "builtin:titled_episode" ? 0 : 2;
   };
+
+  const specificityOf = (option: RuleOption) =>
+    (option.rule ?? "").length;
 
   options.forEach((option) => {
     const selected = selectForOption(lines, option);
@@ -171,20 +246,32 @@ export function detectBestRule(
       sequential,
     };
 
-    const priority = priorityOf(option);
+    if (sequential > 0) {
+      const priority = priorityOf(option);
+      const specificity = specificityOf(option);
 
-    if (
-      sequential > bestSequential ||
-      (sequential === bestSequential &&
-        sequential > 0 &&
-        (selected.length > bestCount ||
-          (selected.length === bestCount &&
-            priority > bestPriority)))
-    ) {
-      bestKey = option.key;
-      bestSequential = sequential;
-      bestCount = selected.length;
-      bestPriority = priority;
+      // 정확도 비교: sequential / count (곱셈으로 비교)
+      const precisionDiff =
+        sequential * bestCount -
+        bestSequential * selected.length;
+
+      const better =
+        bestKey === null ||
+        sequential > bestSequential ||
+        (sequential === bestSequential &&
+          (precisionDiff > 0 ||
+            (precisionDiff === 0 &&
+              (priority > bestPriority ||
+                (priority === bestPriority &&
+                  specificity > bestSpecificity)))));
+
+      if (better) {
+        bestKey = option.key;
+        bestSequential = sequential;
+        bestCount = selected.length;
+        bestPriority = priority;
+        bestSpecificity = specificity;
+      }
     }
   });
 
@@ -203,7 +290,10 @@ export {
   DEFAULT_RULE_OPTION,
   buildRuleOptions,
   customRuleKey,
+  customRuleOptionKey,
+  encodeRuleOverride,
   findRuleOption,
+  parseRuleOverride,
   parseRuleKeys,
   serializeRuleKeys,
 } from "./rules";
