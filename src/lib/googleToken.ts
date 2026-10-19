@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { getToken } from "next-auth/jwt";
 import { supabase } from "@/lib/supabase";
 
 /**
@@ -46,6 +48,31 @@ async function loadRefreshToken(email: string): Promise<string | null> {
 }
 
 /**
+ * 세션 쿠키(JWT)에 든 Google access token을 서버에서만 꺼낸다.
+ * (브라우저로 내려가는 세션 객체에는 토큰을 넣지 않는다.)
+ */
+async function getAccessTokenFromJwt(): Promise<string | null> {
+  try {
+    const store = await cookies();
+
+    const jwt = await getToken({
+      req: {
+        headers: {},
+        cookies: Object.fromEntries(
+          store.getAll().map((c) => [c.name, c.value]),
+        ),
+      } as any,
+    });
+
+    const token: unknown = jwt?.accessToken;
+
+    return typeof token === "string" ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Drive API용 access token을 돌려준다.
  * 저장된 refresh token이 없으면 세션에 들어있는 access token으로 대체한다.
  * 반환값이 null이면 다시 로그인해야 하는 상태다.
@@ -66,7 +93,7 @@ export async function getDriveAccessToken(
 
   if (!refreshToken) {
     // 저장된 refresh token이 없음 → 세션 토큰(1시간짜리)으로 최대한 버팀
-    return session?.accessToken ?? null;
+    return await getAccessTokenFromJwt();
   }
 
   const response = await fetch("https://oauth2.googleapis.com/token", {
