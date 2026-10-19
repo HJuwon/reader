@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { getDriveAccessToken } from "@/lib/googleToken";
+import { isValidDriveId } from "@/lib/driveId";
 
 export async function GET(request: Request) {
   const session: any = await getServerSession(authOptions);
@@ -13,6 +14,13 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const folderId = searchParams.get("folderId") || "root";
+
+  if (!isValidDriveId(folderId)) {
+    return Response.json(
+      { error: "folderId 형식이 올바르지 않습니다." },
+      { status: 400 }
+    );
+  }
 
   const q = `'${folderId}' in parents and trashed = false`;
 
