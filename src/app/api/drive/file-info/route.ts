@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { getDriveAccessToken } from "@/lib/googleToken";
+import { isValidDriveId } from "@/lib/driveId";
 
 export async function GET(request: Request) {
   const session: any = await getServerSession(authOptions);
@@ -20,6 +21,13 @@ export async function GET(request: Request) {
   if (!fileId) {
     return Response.json(
       { error: "fileId가 필요합니다." },
+      { status: 400 }
+    );
+  }
+
+  if (!isValidDriveId(fileId)) {
+    return Response.json(
+      { error: "fileId 형식이 올바르지 않습니다." },
       { status: 400 }
     );
   }
