@@ -227,9 +227,9 @@ export const authOptions: AuthOptions = {
       }
     },
 
-    async session({ session, token }: any) {
-      session.accessToken = token.accessToken;
-
+    async session({ session }: any) {
+      // 보안: Google access/refresh token은 브라우저로 내려보내지 않는다.
+      // (서버 API는 googleToken.ts에서 쿠키의 JWT를 직접 읽는다.)
       return session;
     },
   },
