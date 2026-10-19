@@ -1,6 +1,7 @@
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { getDriveAccessToken } from "@/lib/googleToken";
+import { isValidDriveId } from "@/lib/driveId";
 
 export async function GET(request: Request) {
   const session: any = await getServerSession(authOptions);
@@ -22,8 +23,15 @@ export async function GET(request: Request) {
     );
   }
 
+  if (!isValidDriveId(fileId)) {
+    return Response.json(
+      { error: "fileId 형식이 올바르지 않습니다." },
+      { status: 400 }
+    );
+  }
+
   const response = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -75,6 +83,13 @@ export async function PUT(request: Request) {
     );
   }
 
+  if (!isValidDriveId(fileId)) {
+    return Response.json(
+      { error: "fileId 형식이 올바르지 않습니다." },
+      { status: 400 }
+    );
+  }
+
   let body: any;
 
   try {
@@ -95,9 +110,46 @@ export async function PUT(request: Request) {
     );
   }
 
+  // 안전장치: 빈 내용이거나, 기존 파일보다 비정상적으로 짧아지면 저장하지 않는다.
+  // (편집 버그나 실수로 원본이 통째로 날아가는 것을 막기 위함)
+  if (content.trim().length === 0) {
+    return Response.json(
+      { error: "빈 내용은 저장할 수 없습니다." },
+      { status: 400 }
+    );
+  }
+
+  const newBytes = new TextEncoder().encode(content).length;
+
+  const infoResponse = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(
+      fileId
+    )}?fields=size`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (infoResponse.ok) {
+    const info = await infoResponse.json().catch(() => ({}));
+    const oldBytes = Number(info?.size ?? 0);
+
+    if (oldBytes >= 5000 && newBytes < oldBytes * 0.5) {
+      return Response.json(
+        {
+          error:
+            "저장할 내용이 기존 파일보다 절반 넘게 줄어 저장하지 않았습니다. 내용을 확인해 주세요.",
+        },
+        { status: 409 }
+      );
+    }
+  }
+
   // Google Drive의 media upload 엔드포인트로 파일 내용을 통째로 교체한다.
   const response = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
+    `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=media`,
     {
       method: "PATCH",
       headers: {
