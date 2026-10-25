@@ -32,6 +32,7 @@ import {
 } from "./hooks/useBodySearch";
 import { useContentEditor } from "./hooks/useContentEditor";
 import { useMarathonScroll } from "./hooks/useMarathonScroll";
+import ReaderSettingsPanel from "./components/ReaderSettingsPanel";
 import { useEpisodeNavigation } from "./hooks/useEpisodeNavigation";
 import { useFileClose } from "./hooks/useFileClose";
 import { useReaderChrome } from "./hooks/useReaderChrome";
@@ -41,17 +42,7 @@ import { useFileOpen } from "./hooks/useFileOpen";
 import { useHighlightRenderer } from "./hooks/useHighlightRenderer";
 
 import {
-	MAX_FONT_SIZE,
-	FONT_OPTIONS,
-	MIN_LINE_HEIGHT,
-	MAX_LINE_HEIGHT,
-	MIN_LETTER_SPACING,
-	MAX_LETTER_SPACING,
-	type FontKey,
-	MIN_FONT_SIZE,
-	THEMES,
 	useReaderSettings,
-	type ThemeKey,
 } from "./hooks/useReaderSettings";
 
 import {
@@ -62,9 +53,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	ChevronUp,
-	ListOrdered,
 	Loader2,
-	Pencil,
 	Search,
 	Settings,
 	X,
@@ -1783,361 +1772,27 @@ export default function DriveBrowser() {
 				}}
 			>
 				{settingsOpen && (
-					<div
-						className="w-64 max-w-full rounded-2xl p-5"
-						style={{
-							backgroundColor:
-								theme.bg,
-							color:
-								theme.title,
-							boxShadow:
-								"0 4px 20px rgba(0,0,0,0.18)",
-							border: `0.5px solid ${theme.divider}`,
-						}}
-					>
-						<div className="mb-4 flex items-center justify-between">
-							<p
-								className="text-sm font-semibold"
-								style={{
-									color:
-										theme.title,
-								}}
-							>
-								읽기 설정
-							</p>
-
-							<button
-								onClick={() =>
-									setSettingsOpen(
-										false
-									)
-								}
-								aria-label="설정 닫기"
-								className="hover:opacity-70"
-								style={{
-									color:
-										theme.muted,
-								}}
-							>
-								<X className="h-4 w-4" />
-							</button>
-						</div>
-
-
-						{!editingContent && (
-							<div className="mb-4 grid grid-cols-2 gap-2">
-								<button
-									type="button"
-									onClick={() =>
-										setEpisodeEditPanelOpen(
-											true
-										)
-									}
-									className="flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm transition hover:opacity-80"
-									style={{
-										color:
-											theme.title,
-										border: `1px solid ${theme.divider}`,
-										backgroundColor:
-											theme.bg,
-									}}
-								>
-									<ListOrdered className="h-4 w-4" />
-									회차 수정
-								</button>
-
-								<button
-									type="button"
-									onClick={
-										startEditingContent
-									}
-									className="flex w-full items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 text-sm transition hover:opacity-80"
-									style={{
-										color:
-											theme.title,
-										border: `1px solid ${theme.divider}`,
-										backgroundColor:
-											theme.bg,
-									}}
-								>
-									<Pencil className="h-4 w-4" />
-									본문 수정
-								</button>
-							</div>
-						)}
-
-
-						<p
-							className="mb-2 text-xs font-semibold"
-							style={{
-								color:
-									theme.text,
-							}}
-						>
-							글자 크기
-						</p>
-
-						<div className="mb-5 flex items-center gap-3">
-							<button
-								type="button"
-								onClick={() =>
-									setFontSize(
-										(size) =>
-											Math.max(
-												MIN_FONT_SIZE,
-												size -
-													1
-											)
-									)
-								}
-								disabled={
-									fontSize <=
-									MIN_FONT_SIZE
-								}
-								className="shrink-0 text-xs font-medium disabled:opacity-30"
-								style={{
-									color:
-										theme.text,
-								}}
-							>
-								가-
-							</button>
-
-							<input
-								type="range"
-								min={
-									MIN_FONT_SIZE
-								}
-								max={
-									MAX_FONT_SIZE
-								}
-								step={1}
-								value={
-									fontSize
-								}
-								onChange={(
-									event
-								) =>
-									setFontSize(
-										Number(
-											event
-												.target
-												.value
-										)
-									)
-								}
-								className="min-w-0 flex-1"
-								aria-label="글자 크기"
-							/>
-
-							<button
-								type="button"
-								onClick={() =>
-									setFontSize(
-										(size) =>
-											Math.min(
-												MAX_FONT_SIZE,
-												size +
-													1
-											)
-									)
-								}
-								disabled={
-									fontSize >=
-									MAX_FONT_SIZE
-								}
-								className="shrink-0 text-xs font-medium disabled:opacity-30"
-								style={{
-									color:
-										theme.text,
-								}}
-							>
-								가+
-							</button>
-						</div>
-
-
-						<p
-							className="mb-2 text-xs font-semibold"
-							style={{ color: theme.text }}
-						>
-							글꼴
-						</p>
-						<div className="mb-5 grid grid-cols-3 gap-2">
-							{(Object.keys(FONT_OPTIONS) as FontKey[]).map((key) => (
-								<button
-									key={key}
-									type="button"
-									onClick={() => setFontKey(key)}
-									className="rounded-lg px-2 py-2 text-xs transition"
-									style={{
-										fontFamily: FONT_OPTIONS[key].family,
-										color: key === fontKey ? theme.bg : theme.text,
-										backgroundColor:
-											key === fontKey ? theme.accent : "transparent",
-										border: `1px solid ${theme.divider}`,
-									}}
-								>
-									{FONT_OPTIONS[key].label}
-								</button>
-							))}
-						</div>
-						
-						<p
-							className="mb-2 text-xs font-semibold"
-							style={{ color: theme.text }}
-						>
-							줄 간격
-						</p>
-						<div className="mb-5 flex items-center gap-3">
-							<span className="shrink-0 text-xs" style={{ color: theme.muted }}>
-								좁게
-							</span>
-							<input
-								type="range"
-								min={MIN_LINE_HEIGHT}
-								max={MAX_LINE_HEIGHT}
-								step={0.1}
-								value={lineHeight}
-								onChange={(event) =>
-									setLineHeight(Number(event.target.value))
-								}
-								className="min-w-0 flex-1"
-								aria-label="줄 간격"
-							/>
-							<span className="shrink-0 text-xs" style={{ color: theme.muted }}>
-								넓게
-							</span>
-						</div>
-						
-						<p
-							className="mb-2 text-xs font-semibold"
-							style={{ color: theme.text }}
-						>
-							글자 간격
-						</p>
-						<div className="mb-5 flex items-center gap-3">
-							<span className="shrink-0 text-xs" style={{ color: theme.muted }}>
-								좁게
-							</span>
-							<input
-								type="range"
-								min={MIN_LETTER_SPACING}
-								max={MAX_LETTER_SPACING}
-								step={0.01}
-								value={letterSpacing}
-								onChange={(event) =>
-									setLetterSpacing(Number(event.target.value))
-								}
-								className="min-w-0 flex-1"
-								aria-label="글자 간격"
-							/>
-							<span className="shrink-0 text-xs" style={{ color: theme.muted }}>
-								넓게
-							</span>
-						</div>
-						
-						<div className="mb-5 flex items-center justify-between">
-							<p
-								className="text-xs font-semibold"
-								style={{ color: theme.text }}
-							>
-								정주행
-							</p>
-							<button
-								type="button"
-								role="switch"
-								aria-checked={marathon}
-								aria-label="정주행"
-								onClick={() => setMarathon((value) => !value)}
-								className="relative h-6 w-11 rounded-full transition"
-								style={{
-									backgroundColor: marathon ? theme.accent : theme.divider,
-								}}
-							>
-								<span
-									className="absolute top-0.5 h-5 w-5 rounded-full bg-white transition-all"
-									style={{ left: marathon ? "22px" : "2px" }}
-								/>
-							</button>
-						</div>
-						<p
-							className="-mt-3 mb-5 text-[11px]"
-							style={{ color: theme.muted }}
-						>
-							켜면 본문 끝에서 한 번 더 내릴 때 다음 화로 넘어가요.
-						</p>
-						
-												<p
-							className="mb-2 text-xs font-semibold"
-							style={{
-								color:
-									theme.text,
-							}}
-						>
-							배경색
-						</p>
-
-						<div className="flex items-center gap-3">
-							{(
-								Object.keys(
-									THEMES
-								) as ThemeKey[]
-							).map(
-								(key) => {
-									const t =
-										THEMES[
-											key
-										];
-
-									const isSelected =
-										key ===
-										themeKey;
-
-									return (
-										<button
-											key={
-												key
-											}
-											onClick={() =>
-												setThemeKey(
-													key
-												)
-											}
-											aria-label={
-												t.label
-											}
-											className="flex flex-col items-center gap-1"
-										>
-											<span
-												className="block h-8 w-8 rounded-full"
-												style={{
-													backgroundColor:
-														t.swatch,
-													boxShadow:
-														isSelected
-															? `0 0 0 2px ${t.accent}`
-															: `0 0 0 0.5px ${t.divider}`,
-												}}
-											/>
-
-											<span
-												className="text-[10px] font-medium"
-												style={{
-													color:
-														theme.text,
-												}}
-											>
-												{
-													t.label
-												}
-											</span>
-										</button>
-									);
-								}
-							)}
-						</div>
-					</div>
+					<ReaderSettingsPanel
+						theme={theme}
+						themeKey={themeKey}
+						setThemeKey={setThemeKey}
+						fontSize={fontSize}
+						setFontSize={setFontSize}
+						fontKey={fontKey}
+						setFontKey={setFontKey}
+						lineHeight={lineHeight}
+						setLineHeight={setLineHeight}
+						letterSpacing={letterSpacing}
+						setLetterSpacing={setLetterSpacing}
+						marathon={marathon}
+						setMarathon={setMarathon}
+						editingContent={editingContent}
+						onOpenEpisodeEdit={() =>
+							setEpisodeEditPanelOpen(true)
+						}
+						onEditContent={startEditingContent}
+						onClose={() => setSettingsOpen(false)}
+					/>
 				)}
 
 
