@@ -12,6 +12,11 @@ import {
 } from "@/lib/parser";
 
 import { getLines } from "@/lib/parser/normalize";
+import {
+  applyEpisodeEdit,
+  sliceEpisodeText,
+  type EpisodeEdit,
+} from "@/lib/parser/episodeEdit";
 
 type SelectedEpisode = ParsedNovel["episodes"][number];
 
@@ -93,27 +98,26 @@ export function useContentEditor({
       setEditError("");
 
       try {
-        const lines =
-          getLines(fileContent);
-
         // 제목 줄은 한 줄이어야 하므로 줄바꿈은 공백으로 바꾼다.
         const titleLine =
           editedTitle.replace(/\s*[\r\n]+\s*/g, " ");
 
-        const newLines = [
-          ...lines.slice(
-            0,
-            selectedEpisode.startLine
-          ),
+        // 책 전체가 아니라 고친 회차만 서버로 보낸다.
+        // (전체를 보내면 Vercel 요청 크기 제한에 걸린다)
+        const edit: EpisodeEdit = {
+          startLine: selectedEpisode.startLine,
+          endLine: selectedEpisode.endLine,
           titleLine,
-          ...editedText.split("\n"),
-          ...lines.slice(
-            selectedEpisode.endLine + 1
+          text: editedText,
+          expectedOld: sliceEpisodeText(
+            fileContent,
+            selectedEpisode.startLine,
+            selectedEpisode.endLine
           ),
-        ];
+        };
 
         const newFullText =
-          newLines.join("\n");
+          applyEpisodeEdit(fileContent, edit);
 
         const response =
           await fetch(
@@ -121,26 +125,33 @@ export function useContentEditor({
               selectedFile.id
             )}`,
             {
-              method: "PUT",
+              method: "PATCH",
               headers: {
                 "Content-Type":
                   "application/json",
               },
               body: JSON.stringify({
-                content: newFullText,
+                edit,
               }),
             }
           );
 
-        const data =
-          await response.json();
+        // 서버가 JSON이 아닌 오류(예: 크기 초과)를 돌려줘도 읽을 수 있게 한다.
+        const raw = await response.text();
+
+        let data: { error?: unknown } | null = null;
+
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          data = null;
+        }
 
         if (!response.ok) {
           throw new Error(
-            typeof data?.error ===
-              "string"
+            typeof data?.error === "string"
               ? data.error
-              : "본문 저장에 실패했습니다."
+              : `본문 저장에 실패했습니다. (오류 ${response.status})`
           );
         }
 
