@@ -11,12 +11,26 @@ type Pattern = {
 };
 
 /**
- * "1화에서 있었던 일이 떠올랐다." 처럼 줄 앞이 회차처럼 보이는 본문 문장을 걸러낸다.
+ * "3화 이후 그는 그곳을 떠나 다시는 돌아오지 않았다." 처럼
+ * 줄 앞이 회차처럼 보이는 본문 문장을 걸러낸다.
  *   - 제목이 너무 길다 (50자 초과)
- *   - 한글 뒤에 마침표로 끝난다 (문장의 끝)
+ *   - 한글 뒤에 마침표로 끝나면서 길이가 문장 수준이다
+ *
+ * 마침표로 끝나더라도 짧은 제목("1화 제목이다.")은 회차 제목으로 본다.
+ * (본문 줄이 잘못 잡혀도 번호 순서가 맞지 않으면 뒤에서 걸러진다)
  */
 function looksLikeSentence(title: string): boolean {
-  return title.length > 50 || /[가-힣]\.\s*$/.test(title);
+  if (title.length > 50) {
+    return true;
+  }
+
+  if (!/[가-힣]\.\s*$/.test(title)) {
+    return false;
+  }
+
+  const words = title.trim().split(/\s+/).length;
+
+  return title.length > 20 || words >= 4;
 }
 
 const patterns: Pattern[] = [
