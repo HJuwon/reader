@@ -1,5 +1,7 @@
 "use client";
 
+import { readJsonSafe } from "@/lib/safeJson";
+import PagedScrollList from "../components/PagedScrollList";
 import Link from "next/link";
 import BookCover from "../components/BookCover";
 import SubPageLayout from "../components/SubPageLayout";
@@ -53,7 +55,7 @@ export default function HistoryPage() {
       try {
         const response = await fetch("/api/books?include=rounds");
 
-        const data = await response.json();
+        const data = await readJsonSafe(response);
 
         if (!response.ok) {
           throw new Error(data?.error || "읽기 이력을 불러오지 못했습니다.");
@@ -157,8 +159,10 @@ export default function HistoryPage() {
           </p>
         </div>
       ) : (
-        <div className="mt-6 divide-y divide-line/70 rounded-2xl border border-line/70 bg-white/60">
-          {historyEntries.map((entry) => {
+        <PagedScrollList
+          items={historyEntries}
+          getKey={(entry) => entry.round.id}
+          renderItem={(entry) => {
             const progress = Math.min(
               100,
               Math.max(0, entry.round.progress ?? 0),
@@ -222,8 +226,8 @@ export default function HistoryPage() {
                 <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
               </Link>
             );
-          })}
-        </div>
+          }}
+        />
       )}
     </SubPageLayout>
   );

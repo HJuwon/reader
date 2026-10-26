@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonSafe } from "@/lib/safeJson";
 import {
   useCallback,
   useEffect,
@@ -168,7 +169,7 @@ export function useReadingProgress({
       async (
         fileId: string,
         title: string,
-        totalEpisodes: number
+        totalEpisodes?: number
       ): Promise<ReadingState | null> => {
         try {
           const response =
@@ -187,7 +188,7 @@ export function useReadingProgress({
             });
 
           const data =
-            await response.json();
+            await readJsonSafe(response);
 
           if (!response.ok) {
             throw new Error(
@@ -365,7 +366,7 @@ export function useReadingProgress({
             );
 
           const data =
-            await response.json();
+            await readJsonSafe(response);
 
           if (!response.ok) {
             throw new Error(
@@ -485,7 +486,7 @@ export function useReadingProgress({
             );
 
           const data =
-            await response.json();
+            await readJsonSafe(response);
 
           if (!response.ok) {
             throw new Error(

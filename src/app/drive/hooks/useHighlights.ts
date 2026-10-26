@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonSafe } from "@/lib/safeJson";
 import {
   useCallback,
   useEffect,
@@ -96,7 +97,7 @@ export function useHighlights({
             );
 
           const data =
-            await response.json();
+            await readJsonSafe(response);
 
           if (!response.ok) {
             throw new Error(
@@ -169,7 +170,7 @@ export function useHighlights({
             );
 
           const data =
-            await response.json();
+            await readJsonSafe(response);
 
           if (!response.ok) {
             throw new Error(

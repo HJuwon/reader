@@ -10,7 +10,10 @@ import type {
 	ParsedNovel,
 } from "@/lib/parser";
 
-import type { RuleSelection } from "../utils/novelLoader";
+import type {
+	LoadNovelOptions,
+	RuleSelection,
+} from "../utils/novelLoader";
 
 type DriveItem = {
 	id: string;
@@ -26,7 +29,8 @@ type UseFileOpenParams = {
 	highlightId: string | null;
 
 	loadNovelFile: (
-		fileId: string
+		fileId: string,
+		options?: LoadNovelOptions
 	) => Promise<{
 		file: DriveItem;
 		content: string;
@@ -70,7 +74,7 @@ type UseFileOpenParams = {
 	initializeReadingState: (
 		fileId: string,
 		fileName: string,
-		totalEpisodes: number
+		totalEpisodes?: number
 	) => Promise<{
 		progress: {
 			episode: number;
@@ -195,9 +199,31 @@ export function useFileOpen({
 			setError("");
 
 			try {
+				// 본문을 받는 동안 읽기 정보(저장된 위치 등)를 먼저 불러온다.
+				// 총 회차 수는 본문을 읽은 뒤에 알 수 있어서, 그때 따로 보낸다.
+				const early: {
+					promise: ReturnType<
+						typeof initializeReadingState
+					> | null;
+				} = { promise: null };
+
 				const result =
 					await loadNovelFile(
-						fileId!
+						fileId!,
+						{
+							onFileInfo: ({ name }) => {
+								early.promise =
+									initializeReadingState(
+										fileId!,
+										name
+									);
+
+								// 나중에 await 하기 전의 거절이 처리되지 않은 오류로 남지 않게 한다.
+								early.promise.catch(
+									() => undefined
+								);
+							},
+						}
 					);
 
 				if (cancelled) {
@@ -221,10 +247,6 @@ export function useFileOpen({
 					ruleSelection
 				);
 
-				console.log(
-					"PARSED NOVEL:",
-					parsed
-				);
 
 				setSelectedFile(
 					item
@@ -238,12 +260,35 @@ export function useFileOpen({
 					parsed
 				);
 
-				const readingState =
-					await initializeReadingState(
-						fileId!,
-						item.name,
-						parsed.episodes.length
-					);
+				let readingState = null;
+
+				if (early.promise) {
+					try {
+						readingState =
+							await early.promise;
+					} catch {
+						readingState = null;
+					}
+
+					// 총 회차 수를 서버에 알린다 (화면은 기다리지 않는다)
+					if (readingState) {
+						void initializeReadingState(
+							fileId!,
+							item.name,
+							parsed.episodes.length
+						).catch(() => undefined);
+					}
+				}
+
+				// 먼저 불러오지 못했으면 예전처럼 본문을 읽은 뒤에 다시 시도한다.
+				if (!readingState) {
+					readingState =
+						await initializeReadingState(
+							fileId!,
+							item.name,
+							parsed.episodes.length
+						);
+				}
 
 				if (cancelled) {
 					return;

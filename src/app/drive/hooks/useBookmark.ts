@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonSafe } from "@/lib/safeJson";
 import {
   useCallback,
   useState,
@@ -86,7 +87,7 @@ export function useBookmark({
             );
 
           const data =
-            await response.json();
+            await readJsonSafe(response);
 
           if (!response.ok) {
             throw new Error(
@@ -142,7 +143,7 @@ export function useBookmark({
               );
 
             const data =
-              await response.json();
+              await readJsonSafe(response);
 
             if (!response.ok) {
               throw new Error(
@@ -174,7 +175,7 @@ export function useBookmark({
               );
 
             const data =
-              await response.json();
+              await readJsonSafe(response);
 
             if (!response.ok) {
               throw new Error(

@@ -1,5 +1,7 @@
 "use client";
 
+import { readJsonSafe } from "@/lib/safeJson";
+import PagedScrollList from "../components/PagedScrollList";
 import Link from "next/link";
 import BookCover from "../components/BookCover";
 import SubPageLayout from "../components/SubPageLayout";
@@ -42,9 +44,9 @@ export default function BookmarksPage() {
         fetch("/api/books?fields=titles"),
       ]);
 
-      const bookmarkData = await bookmarkResponse.json();
+      const bookmarkData = await readJsonSafe(bookmarkResponse);
 
-      const booksData = await booksResponse.json();
+      const booksData = await readJsonSafe(booksResponse);
 
       if (!bookmarkResponse.ok) {
         throw new Error(bookmarkData?.error || "북마크를 불러오지 못했습니다.");
@@ -115,7 +117,7 @@ export default function BookmarksPage() {
       },
     );
 
-    const data = await response.json();
+    const data = await readJsonSafe(response);
 
     if (!response.ok) {
       throw new Error(data?.error || "북마크를 삭제하지 못했습니다.");
@@ -221,8 +223,10 @@ export default function BookmarksPage() {
           </p>
         </div>
       ) : (
-        <div className="mt-6 divide-y divide-line/70 rounded-2xl border border-line/70 bg-white/60">
-          {bookmarks.map((bookmark) => {
+        <PagedScrollList
+          items={bookmarks}
+          getKey={(bookmark) => bookmark.id}
+          renderItem={(bookmark) => {
             const selected = selectedBookmarks.includes(bookmark.id);
             const title = getBookTitle(bookmark.book_id);
 
@@ -283,8 +287,8 @@ export default function BookmarksPage() {
                 )}
               </div>
             );
-          })}
-        </div>
+          }}
+        />
       )}
     </SubPageLayout>
   );

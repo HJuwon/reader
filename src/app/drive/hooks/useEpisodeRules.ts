@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonSafe } from "@/lib/safeJson";
 import {
 	useCallback,
 	useEffect,
@@ -329,7 +330,7 @@ export function useEpisodeRules({
 				let data: unknown = null;
 
 				try {
-					data = await response.json();
+					data = await readJsonSafe(response);
 				} catch {
 					data = null;
 				}
@@ -418,7 +419,7 @@ export function useEpisodeRules({
 				"/api/episode-rules"
 			);
 
-			const data = await response.json();
+			const data = await readJsonSafe(response);
 
 			if (!response.ok) {
 				throw new Error(
@@ -481,7 +482,7 @@ export function useEpisodeRules({
 				}
 			);
 
-			const data = await response.json();
+			const data = await readJsonSafe(response);
 
 			if (!response.ok) {
 				throw new Error(
@@ -596,7 +597,7 @@ export function useEpisodeRules({
 					}
 				);
 
-				const data = await response.json();
+				const data = await readJsonSafe(response);
 
 				if (!response.ok) {
 					throw new Error(
@@ -745,7 +746,7 @@ export function useEpisodeRules({
 						}
 					);
 
-					const data = await response.json();
+					const data = await readJsonSafe(response);
 
 					if (!response.ok) {
 						throw new Error(
@@ -790,7 +791,7 @@ export function useEpisodeRules({
 						}
 					);
 
-					const data = await response.json();
+					const data = await readJsonSafe(response);
 
 					if (!response.ok) {
 						throw new Error(
@@ -878,7 +879,7 @@ export function useEpisodeRules({
 					}
 				);
 
-				const data = await response.json();
+				const data = await readJsonSafe(response);
 
 				if (!response.ok) {
 					throw new Error(

@@ -360,31 +360,14 @@ export function inspectParsing(
   const selected = selectCandidates(scored);
   const finalList = pruneOutOfSequence(selected);
 
-  const keptLines = new Set(
-    finalList.map((c) => c.lineIndex)
-  );
 
   const issues: InspectIssue[] = [];
   const shorten = (s: string) =>
     s.trim().length > 60 ? `${s.trim().slice(0, 60)}…` : s.trim();
 
-  // 1) 빠진 줄
-  scored.forEach((candidate) => {
-    if (keptLines.has(candidate.lineIndex)) {
-      return;
-    }
-
-    const reason =
-      candidate.score < 40
-        ? `점수 미달(${candidate.score})`
-        : "번호 순서가 맞지 않아 회차에서 제외";
-
-    issues.push({
-      kind: "dropped",
-      message: `${candidate.lineIndex + 1}번째 줄이 빠졌어요 — ${reason}`,
-      lines: [shorten(lines[candidate.lineIndex])],
-    });
-  });
+  // 1) 회차 줄처럼 보였지만 본문으로 판단해 제외된 줄(예: "-300장 더 지른다고…")은
+  //    정상적으로 걸러진 것이라 점검 결과에 보여 주지 않는다.
+  //    (번호가 비었거나 겹친 곳만 알려 준다)
 
   // 2) 번호가 건너뛰거나 겹친 곳
   //   - 규칙 이름이 붙은 회차(예: "2부 1화")는 그 규칙 안에서만 번호를 본다.

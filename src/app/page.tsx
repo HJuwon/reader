@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonSafe } from "@/lib/safeJson";
 import Link from "next/link";
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -227,7 +228,7 @@ export default function Home() {
 		try {
 			const response = await fetch("/api/books");
 
-			const data = await response.json();
+			const data = await readJsonSafe(response);
 
 			if (!response.ok) {
 				throw new Error(
@@ -483,7 +484,7 @@ export default function Home() {
 				}),
 			});
 
-			const data = await response.json();
+			const data = await readJsonSafe(response);
 
 			if (!response.ok) {
 				throw new Error(
@@ -543,7 +544,7 @@ export default function Home() {
 				}),
 			});
 
-			const data = await response.json();
+			const data = await readJsonSafe(response);
 
 			if (!response.ok) {
 				throw new Error(
@@ -1118,7 +1119,7 @@ export default function Home() {
 
 									try {
 										const response = await fetch("/api/books/sync");
-										const data = await response.json();
+										const data = await readJsonSafe(response);
 
 										if (!response.ok) {
 											throw new Error(

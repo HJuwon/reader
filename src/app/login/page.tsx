@@ -1,5 +1,6 @@
 "use client";
 
+import { readJsonSafe } from "@/lib/safeJson";
 import { useState, useEffect } from "react";
 import { Capacitor } from "@capacitor/core";
 import { signIn } from "next-auth/react";
@@ -16,7 +17,7 @@ async function initializeGoogleSignIn() {
     throw new Error("Google Client ID를 가져오지 못했습니다.");
   }
 
-  const data = await response.json();
+  const data = await readJsonSafe(response);
 
   if (!data.clientId) {
     throw new Error("Google Client ID가 없습니다.");
@@ -61,7 +62,6 @@ export default function LoginPage() {
 
       const result = await GoogleSignIn.signIn();
 
-      console.log("Google 로그인 결과:", result);
 
       const idToken = result.idToken;
       const accessToken = result.accessToken;

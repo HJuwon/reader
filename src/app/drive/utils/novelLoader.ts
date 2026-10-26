@@ -1,3 +1,4 @@
+import { readJsonSafe } from "@/lib/safeJson";
 import {
   DEFAULT_RULE_KEY,
   buildRuleOptions,
@@ -88,17 +89,60 @@ async function readJson(
   response: Response
 ): Promise<unknown> {
   try {
-    return await response.json();
+    return await readJsonSafe(response);
   } catch {
     return null;
   }
 }
 
+export type LoadNovelOptions = {
+  /**
+   * 파일 정보(이름)가 도착하면 본문을 다 받기 전에 먼저 알려 준다.
+   * 읽기 정보 불러오기를 본문 다운로드와 겹쳐서 시작하는 데 쓴다.
+   */
+  onFileInfo?: (info: { name: string }) => void;
+};
+
 export async function loadNovel(
-  fileId: string
+  fileId: string,
+  options: LoadNovelOptions = {}
 ): Promise<LoadedNovel> {
   const encodedFileId =
     encodeURIComponent(fileId);
+
+  const infoPromise = fetch(
+    `/api/drive/file-info?fileId=${encodedFileId}`
+  );
+
+  const filePromise = fetch(
+    `/api/drive/file?fileId=${encodedFileId}`
+  );
+
+  const rulesPromise = fetch("/api/episode-rules");
+
+  const savedRulePromise = fetch(
+    `/api/book-episode-rule?fileId=${encodedFileId}`
+  );
+
+  // 정보 응답은 작아서 먼저 오니, 이름을 알게 되는 즉시 알려 준다.
+  if (options.onFileInfo) {
+    const notify = options.onFileInfo;
+
+    void infoPromise
+      .then(async (response) => {
+        if (!response.ok) {
+          return;
+        }
+
+        const data = await readJson(response.clone());
+        const name = (data as { name?: unknown } | null)?.name;
+
+        if (typeof name === "string") {
+          notify({ name });
+        }
+      })
+      .catch(() => undefined);
+  }
 
   const [
     infoResponse,
@@ -106,16 +150,10 @@ export async function loadNovel(
     rulesResponse,
     savedRuleResponse,
   ] = await Promise.all([
-    fetch(
-      `/api/drive/file-info?fileId=${encodedFileId}`
-    ),
-    fetch(
-      `/api/drive/file?fileId=${encodedFileId}`
-    ),
-    fetch("/api/episode-rules"),
-    fetch(
-      `/api/book-episode-rule?fileId=${encodedFileId}`
-    ),
+    infoPromise,
+    filePromise,
+    rulesPromise,
+    savedRulePromise,
   ]);
 
   const [

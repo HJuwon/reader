@@ -553,10 +553,15 @@ export async function POST(
       );
     }
 
+    // total_episodes는 생략할 수 있다.
+    // (파일을 받는 동안 먼저 읽기 정보를 불러오고, 총 회차는 나중에 다시 보낸다)
+    const hasTotalEpisodes =
+      total_episodes !== undefined;
+
     if (
-      typeof total_episodes !==
-        "number" ||
-      total_episodes < 0
+      hasTotalEpisodes &&
+      (typeof total_episodes !== "number" ||
+        total_episodes < 0)
     ) {
       return Response.json(
         {
@@ -627,7 +632,7 @@ export async function POST(
           user_id: userId,
           drive_file_id,
           title,
-          total_episodes,
+          total_episodes: hasTotalEpisodes ? total_episodes : 0,
           last_episode: 0,
           progress: 0,
           status: "읽는 중",
@@ -672,10 +677,11 @@ export async function POST(
         error: updateBookError,
       } = await supabase
         .from("books")
-        .update({
-          title,
-          total_episodes,
-        })
+        .update(
+          hasTotalEpisodes
+            ? { title, total_episodes }
+            : { title }
+        )
         .eq("id", book.id)
         .eq("user_id", userId)
         .eq(

@@ -1,5 +1,7 @@
 "use client";
 
+import { readJsonSafe } from "@/lib/safeJson";
+import PagedScrollList from "../components/PagedScrollList";
 import Link from "next/link";
 import BookCover from "../components/BookCover";
 import SubPageLayout from "../components/SubPageLayout";
@@ -42,9 +44,9 @@ export default function HighlightsPage() {
         fetch("/api/books?fields=titles"),
       ]);
 
-      const highlightsData = await highlightsResponse.json();
+      const highlightsData = await readJsonSafe(highlightsResponse);
 
-      const booksData = await booksResponse.json();
+      const booksData = await readJsonSafe(booksResponse);
 
       if (!highlightsResponse.ok) {
         throw new Error(
@@ -114,7 +116,7 @@ export default function HighlightsPage() {
         },
       );
 
-      const data = await response.json();
+      const data = await readJsonSafe(response);
 
       if (!response.ok) {
         throw new Error(data?.error || "하이라이트를 삭제하지 못했습니다.");
@@ -163,8 +165,10 @@ export default function HighlightsPage() {
           </p>
         </div>
       ) : (
-        <div className="mt-6 divide-y divide-line/70 rounded-2xl border border-line/70 bg-white/60">
-          {highlights.map((highlight) => {
+        <PagedScrollList
+          items={highlights}
+          getKey={(highlight) => highlight.id}
+          renderItem={(highlight) => {
             const isDeleting = deletingId === highlight.id;
             const title = getBookTitle(highlight.book_id);
 
@@ -221,8 +225,8 @@ export default function HighlightsPage() {
                 </button>
               </div>
             );
-          })}
-        </div>
+          }}
+        />
       )}
     </SubPageLayout>
   );

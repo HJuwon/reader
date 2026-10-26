@@ -1,3 +1,4 @@
+import { readJsonSafe } from "@/lib/safeJson";
 import type { ParsedNovel } from "@/lib/parser";
 
 export type DriveItem = {
@@ -95,7 +96,7 @@ export function extractReadingError(
 export async function initializeReadingState(
   fileId: string,
   title: string,
-  totalEpisodes: number
+  totalEpisodes?: number
 ): Promise<ReadingState> {
   const response = await fetch(
     "/api/books",
@@ -115,7 +116,7 @@ export async function initializeReadingState(
   );
 
   const data =
-    await response.json();
+    await readJsonSafe(response);
 
   if (!response.ok) {
     throw new Error(
@@ -272,7 +273,7 @@ export async function saveReadingProgress(
     );
 
   const data =
-    await response.json();
+    await readJsonSafe(response);
 
   if (!response.ok) {
     throw new Error(
