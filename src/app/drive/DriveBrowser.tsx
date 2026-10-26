@@ -53,6 +53,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	ChevronUp,
+	List,
 	Loader2,
 	Search,
 	Settings,
@@ -541,6 +542,11 @@ export default function DriveBrowser() {
 			: true;
 
 
+	const topBarVisible =
+		chromeVisible ||
+		bodySearchOpen ||
+		episodeListOpen;
+
 	return (
 		<main
 			className="min-h-screen transition-colors"
@@ -551,204 +557,401 @@ export default function DriveBrowser() {
 					theme.title,
 			}}
 		>
+			{/* 상단 바: 본문을 탭하면 하단바와 함께 나타나고 사라진다 */}
 			<header
-				className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${
-					chromeVisible
-						? "max-h-40 opacity-100"
-						: "max-h-0 opacity-0"
+				className={`fixed inset-x-0 top-0 z-50 transition-[transform,opacity] duration-300 ease-out ${
+					topBarVisible
+						? "translate-y-0 opacity-100"
+						: "pointer-events-none -translate-y-full opacity-0"
 				}`}
+				style={{
+					backgroundColor: theme.bg,
+					borderBottom: `0.5px solid ${theme.divider}`,
+					paddingTop: "env(safe-area-inset-top, 0px)",
+				}}
 			>
-				<div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-6 md:px-8 md:py-8">
-					<div className="min-w-0">
-						<button
-							onClick={closeFile}
-							className="mb-3 flex items-center gap-2 text-sm hover:opacity-70"
-							style={{
-								color:
-									theme.muted,
-							}}
-						>
-							<ArrowLeft className="h-4 w-4" />
-							돌아가기
-						</button>
+				<div className="mx-auto flex max-w-5xl items-center gap-1 px-2 py-2 md:px-6">
+					<button
+						onClick={closeFile}
+						aria-label="돌아가기"
+						className="shrink-0 rounded-full p-2 transition hover:opacity-70"
+						style={{ color: theme.muted }}
+					>
+						<ArrowLeft className="h-5 w-5" />
+					</button>
 
+					<div className="min-w-0 flex-1 px-1">
 						<h1
-							className="truncate text-xl font-medium md:text-2xl"
-							style={{
-								fontFamily:
-									SERIF,
-							}}
+							className="truncate text-sm font-medium"
+							style={{ fontFamily: SERIF, color: theme.title }}
 						>
 							{selectedFile.name}
 						</h1>
+
+						<p
+							className="mt-0.5 text-[11px] tabular-nums"
+							style={{ color: theme.muted }}
+						>
+							{selectedEpisode
+								? `${selectedEpisode.episode}화`
+								: "-"}
+							{" / "}
+							{parsedNovel ? `${parsedNovel.totalEpisodes}화` : "-"}
+							{progressSaving && " · 저장 중..."}
+						</p>
 					</div>
 
-					{parsedNovel && (
-						<div className="ml-6 shrink-0 text-right">
-							<p
-								className="text-xs"
-								style={{
-									color:
-										theme.muted,
-								}}
-							>
-								전체 회차
-							</p>
-
-							<p className="font-medium">
-								{
-									parsedNovel.totalEpisodes
+					<div className="flex shrink-0 items-center">
+						<button
+							onClick={() => {
+								if (bodySearchOpen) {
+									setBodySearch("");
+									setBodySearchOpen(false);
+								} else {
+									setEpisodeListOpen(false);
+									setBodySearchOpen(true);
+									setBodySearchIndex(0);
 								}
-								화
-							</p>
+							}}
+							disabled={!parsedNovel}
+							aria-label="본문 검색"
+							aria-pressed={bodySearchOpen}
+							className="rounded-full p-2 transition hover:opacity-70 disabled:opacity-30"
+							style={{
+								color: bodySearchOpen ? theme.accent : theme.muted,
+							}}
+						>
+							<Search className="h-5 w-5" />
+						</button>
 
-							{progressSaving && (
-								<p
-									className="mt-1 text-[10px]"
-									style={{
-										color:
-											theme.muted,
-									}}
-								>
-									저장 중...
-								</p>
-							)}
-						</div>
-					)}
+						<button
+							onClick={toggleBookmark}
+							disabled={bookmarkLoading || !selectedEpisode}
+							aria-label={bookmarked ? "북마크 해제" : "북마크"}
+							aria-pressed={bookmarked}
+							className="rounded-full p-2 transition hover:opacity-70 disabled:opacity-30"
+							style={{
+								color: bookmarked ? theme.accent : theme.muted,
+							}}
+						>
+							<Bookmark
+								className="h-5 w-5"
+								fill={bookmarked ? "currentColor" : "none"}
+							/>
+						</button>
+
+						<button
+							onClick={() => {
+								if (!episodeListOpen && bodySearchOpen) {
+									setBodySearch("");
+									setBodySearchOpen(false);
+								}
+								setEpisodeListOpen((open) => !open);
+							}}
+							disabled={!parsedNovel}
+							aria-label="회차 목록"
+							aria-expanded={episodeListOpen}
+							className="rounded-full p-2 transition hover:opacity-70 disabled:opacity-30"
+							style={{
+								color: episodeListOpen ? theme.accent : theme.muted,
+							}}
+						>
+							<List className="h-5 w-5" />
+						</button>
+					</div>
 				</div>
-			</header>
 
+				{/* 본문 검색 */}
+				{bodySearchOpen && (
+					<div className="mx-auto max-w-5xl px-3 pb-3 md:px-6">
+														<div
+															className="flex min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1.5"
+															style={{
+																boxShadow: `0 0 0 0.5px ${theme.divider}`,
+															}}
+														>
+															<Search
+																className="h-3.5 w-3.5 shrink-0"
+																style={{
+																	color:
+																		theme.muted,
+																}}
+															/>
 
-			<section className="mx-auto max-w-5xl px-5 pb-24 md:px-8">
-				{!parsedNovel ? (
-					<div
-						className="px-6 py-14 text-center text-sm"
-						style={{
-							color:
-								theme.muted,
-						}}
-					>
-						파싱 결과를 불러오는 중...
+															<input
+																autoFocus
+																type="text"
+																value={
+																	bodySearch
+																}
+																onChange={(
+																	e
+																) =>
+																	setBodySearch(
+																		e
+																			.target
+																			.value
+																	)
+																}
+																onKeyDown={(
+																	e
+																) => {
+																	if (
+																		e.key ===
+																		"Enter"
+																	) {
+																		if (bodySearchScope === "all") {
+																			if (allSearchResults[0]) {
+																				handleSearchResultClick(
+																					allSearchResults[0].episodeIndex,
+																				);
+																			}
+																		} else {
+																			scrollToBodySearchMatch(1);
+																		}
+																	}
+
+																	if (
+																		e.key ===
+																		"Escape"
+																	) {
+																		setBodySearch(
+																			""
+																		);
+
+																		setBodySearchOpen(
+																			false
+																		);
+																	}
+																}}
+																placeholder={
+																bodySearchScope === "all"
+																	? "전체 회차에서 검색"
+																	: "본문에서 검색"
+															}
+																className="min-w-0 flex-1 bg-transparent text-sm outline-none"
+																style={{
+																	color:
+																		theme.title,
+																}}
+															/>
+
+															<button
+																onClick={() =>
+																	setBodySearchScope(
+																		bodySearchScope === "all"
+																			? "episode"
+																			: "all",
+																	)
+																}
+																aria-label="검색 범위 전환"
+																className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition hover:opacity-80"
+																style={{
+																	color:
+																		bodySearchScope === "all"
+																			? theme.accent
+																			: theme.muted,
+																	backgroundColor:
+																		bodySearchScope === "all"
+																			? `${theme.accent}22`
+																			: theme.divider,
+																}}
+															>
+																{bodySearchScope === "all"
+																	? "전체"
+																	: "이 화"}
+															</button>
+
+															{bodySearch.trim() && (
+																<span
+																	className="shrink-0 text-[11px] tabular-nums"
+																	style={{
+																		color:
+																			theme.muted,
+																	}}
+																>
+																	{bodySearchScope === "all"
+																	? allSearchPending ||
+																			bodySearch.trim().length <
+																				GLOBAL_SEARCH_MIN_LENGTH
+																		? ""
+																		: `${allSearchResults.length}개 화`
+																	: bodySearchMatches.length > 0
+																		? `${bodySearchIndex + 1}/${bodySearchMatches.length}`
+																		: "0/0"}
+																</span>
+															)}
+
+															<button
+																onClick={() =>
+																	scrollToBodySearchMatch(
+																		-1
+																	)
+																}
+																disabled={
+																	bodySearchMatches.length ===
+																	0
+																}
+																className={`shrink-0 rounded-full p-1 disabled:opacity-30 ${
+																	bodySearchScope === "all" ? "hidden" : ""
+																}`}
+																style={{
+																	color:
+																		theme.title,
+																}}
+																aria-label="이전 검색 결과"
+															>
+																<ChevronLeft className="h-4 w-4" />
+															</button>
+
+															<button
+																onClick={() =>
+																	scrollToBodySearchMatch(
+																		1
+																	)
+																}
+																disabled={
+																	bodySearchMatches.length ===
+																	0
+																}
+																className={`shrink-0 rounded-full p-1 disabled:opacity-30 ${
+																	bodySearchScope === "all" ? "hidden" : ""
+																}`}
+																style={{
+																	color:
+																		theme.title,
+																}}
+																aria-label="다음 검색 결과"
+															>
+																<ChevronRight className="h-4 w-4" />
+															</button>
+
+															<button
+																onClick={() => {
+																	setBodySearch(
+																		""
+																	);
+
+																	setBodySearchOpen(
+																		false
+																	);
+																}}
+																className="shrink-0 rounded-full p-1"
+																style={{
+																	color:
+																		theme.muted,
+																}}
+																aria-label="본문 검색 닫기"
+															>
+																<X className="h-4 w-4" />
+															</button>
+														</div>
+												{bodySearchOpen &&
+												bodySearchScope === "all" &&
+												bodySearch.trim() && (
+													<div
+														className="mt-2 max-h-80 overflow-y-auto overscroll-contain rounded-lg"
+														style={{
+															boxShadow: `0 0 0 0.5px ${theme.divider}`,
+														}}
+													>
+														{bodySearch.trim().length <
+														GLOBAL_SEARCH_MIN_LENGTH ? (
+															<p
+																className="px-3 py-3 text-xs"
+																style={{ color: theme.muted }}
+															>
+																{GLOBAL_SEARCH_MIN_LENGTH}글자 이상
+																입력해 주세요.
+															</p>
+														) : allSearchPending ? (
+															<p
+																className="px-3 py-3 text-xs"
+																style={{ color: theme.muted }}
+															>
+																검색 중…
+															</p>
+														) : allSearchResults.length === 0 ? (
+															<p
+																className="px-3 py-3 text-xs"
+																style={{ color: theme.muted }}
+															>
+																검색 결과가 없습니다.
+															</p>
+														) : (
+															<>
+																<p
+																	className="px-3 pt-2.5 pb-1 text-[11px]"
+																	style={{ color: theme.muted }}
+																>
+																	{allSearchResults.length}개 화에서
+																	총 {allSearchTotalCount}건
+																</p>
+
+																{allSearchResults.map((result) => (
+																	<button
+																		key={result.episodeIndex}
+																		onClick={() =>
+																			handleSearchResultClick(
+																				result.episodeIndex,
+																			)
+																		}
+																		className="block w-full px-3 py-2.5 text-left transition hover:opacity-80"
+																		style={{
+																			borderTop: `0.5px solid ${theme.divider}`,
+																		}}
+																	>
+																		<div className="flex items-center justify-between gap-2">
+																			<span
+																				className="min-w-0 truncate text-xs font-medium"
+																				style={{ color: theme.accent }}
+																			>
+																				{result.episode}화
+																				{result.title
+																					? ` · ${result.title}`
+																					: ""}
+																			</span>
+
+																			<span
+																				className="shrink-0 text-[11px] tabular-nums"
+																				style={{ color: theme.muted }}
+																			>
+																				{result.count}건
+																			</span>
+																		</div>
+
+																		<p
+																			className="mt-1 break-words text-sm leading-relaxed"
+																			style={{ color: theme.text }}
+																		>
+																			{result.hasMoreBefore && "…"}
+																			{result.before}
+																			<mark
+																				className="rounded-sm"
+																				style={{
+																					backgroundColor: `${theme.accent}33`,
+																					color: "inherit",
+																				}}
+																			>
+																				{result.match}
+																			</mark>
+																			{result.after}
+																			{result.hasMoreAfter && "…"}
+																		</p>
+																	</button>
+																))}
+															</>
+														)}
+													</div>
+												)}
 					</div>
-				) : parsedNovel.episodes.length ===
-					0 ? (
-					<div className="px-6 py-14 text-center">
-						<p
-							className="text-sm"
-							style={{
-								color:
-									theme.text,
-							}}
-						>
-							회차를 찾지 못했습니다.
-						</p>
+				)}
 
-						<p
-							className="mt-2 text-xs"
-							style={{
-								color:
-									theme.muted,
-							}}
-						>
-							원문은 정상적으로 가져왔지만
-							회차 구조를 인식하지 못했습니다.
-						</p>
-
-						<details className="mt-6 text-left">
-							<summary
-								className="cursor-pointer text-xs"
-								style={{
-									color:
-										theme.muted,
-								}}
-							>
-								원문 보기
-							</summary>
-
-							<pre
-								className="mt-4 whitespace-pre-wrap break-words text-sm leading-8"
-								style={{
-									fontFamily:
-										SERIF,
-									color:
-										theme.text,
-								}}
-							>
-								{fileContent}
-							</pre>
-						</details>
-					</div>
-				) : (
-					<>
-						<div className="mb-5">
-							<button
-								type="button"
-								onClick={() =>
-									setEpisodeListOpen(
-										(open) =>
-											!open
-									)
-								}
-								className="flex w-full items-center gap-2.5 rounded-full px-4 py-2.5 text-left transition hover:opacity-80"
-								style={{
-									backgroundColor:
-										theme.divider,
-								}}
-								aria-expanded={
-									episodeListOpen
-								}
-								aria-label="회차 목록 열기"
-							>
-								<span
-									className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium"
-									style={{
-										color:
-											theme.bg,
-										backgroundColor:
-											theme.accent,
-									}}
-								>
-									회차
-								</span>
-
-								{selectedEpisode && (
-									<span
-										className="min-w-0 flex-1 truncate text-sm"
-										style={{
-											fontFamily:
-												SERIF,
-											color:
-												theme.title,
-										}}
-									>
-										{
-											selectedEpisode.title
-										}
-									</span>
-								)}
-
-								{episodeListOpen ? (
-									<ChevronUp
-										className="ml-auto h-4 w-4 shrink-0"
-										style={{
-											color:
-												theme.muted,
-										}}
-									/>
-								) : (
-									<ChevronDown
-										className="ml-auto h-4 w-4 shrink-0"
-										style={{
-											color:
-												theme.muted,
-										}}
-									/>
-								)}
-							</button>
-
-							{episodeListOpen && (
+				{/* 회차 목록 */}
+				{parsedNovel && episodeListOpen && (
+					<div className="mx-auto max-w-5xl px-3 pb-3 md:px-6">
 								<div
-									className="mt-2 overflow-hidden rounded-[4px]"
+									className="overflow-hidden rounded-[4px]"
 									style={{
 										boxShadow: `0 0 0 0.5px ${theme.divider}`,
 									}}
@@ -965,8 +1168,78 @@ export default function DriveBrowser() {
 										)}
 									</div>
 								</div>
-							)}
-						</div>
+					</div>
+				)}
+			</header>
+
+
+			<section
+				className="mx-auto max-w-5xl px-5 pb-24 md:px-8"
+				style={{
+					paddingTop:
+						"calc(4.5rem + env(safe-area-inset-top, 0px))",
+				}}
+			>
+				{!parsedNovel ? (
+					<div
+						className="px-6 py-14 text-center text-sm"
+						style={{
+							color:
+								theme.muted,
+						}}
+					>
+						파싱 결과를 불러오는 중...
+					</div>
+				) : parsedNovel.episodes.length ===
+					0 ? (
+					<div className="px-6 py-14 text-center">
+						<p
+							className="text-sm"
+							style={{
+								color:
+									theme.text,
+							}}
+						>
+							회차를 찾지 못했습니다.
+						</p>
+
+						<p
+							className="mt-2 text-xs"
+							style={{
+								color:
+									theme.muted,
+							}}
+						>
+							원문은 정상적으로 가져왔지만
+							회차 구조를 인식하지 못했습니다.
+						</p>
+
+						<details className="mt-6 text-left">
+							<summary
+								className="cursor-pointer text-xs"
+								style={{
+									color:
+										theme.muted,
+								}}
+							>
+								원문 보기
+							</summary>
+
+							<pre
+								className="mt-4 whitespace-pre-wrap break-words text-sm leading-8"
+								style={{
+									fontFamily:
+										SERIF,
+									color:
+										theme.text,
+								}}
+							>
+								{fileContent}
+							</pre>
+						</details>
+					</div>
+				) : (
+					<>
 
 
 						<div className="grid grid-cols-1 gap-6">
@@ -1170,357 +1443,8 @@ export default function DriveBrowser() {
 												</h2>
 
 
-												<div className="mt-4 flex items-center gap-2">
-													<button
-														onClick={
-															toggleBookmark
-														}
-														disabled={
-															bookmarkLoading
-														}
-														aria-label={
-															bookmarked
-																? "북마크 해제"
-																: "북마크"
-														}
-														className={`flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition disabled:opacity-50 ${
-															bodySearchOpen
-																? "hidden sm:flex"
-																: ""
-														}`}
-														style={{
-															color:
-																bookmarked
-																	? theme.accent
-																	: theme.muted,
-															backgroundColor:
-																bookmarked
-																	? `${theme.accent}14`
-																	: theme.divider,
-														}}
-													>
-														<Bookmark
-															className="h-3.5 w-3.5"
-															fill={
-																bookmarked
-																	? "currentColor"
-																	: "none"
-															}
-														/>
-
-														{bookmarked
-															? "북마크됨"
-															: "북마크"}
-													</button>
 
 
-													{!bodySearchOpen ? (
-														<button
-															onClick={() => {
-																setBodySearchOpen(
-																	true
-																);
-
-																setBodySearchIndex(
-																	0
-																);
-															}}
-															className="flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs transition hover:opacity-80"
-															style={{
-																color:
-																	theme.muted,
-																backgroundColor:
-																	theme.divider,
-															}}
-														>
-															<Search className="h-3.5 w-3.5" />
-															본문 검색
-														</button>
-													) : (
-														<div
-															className="flex min-w-0 flex-1 items-center gap-2 rounded-full px-3 py-1.5"
-															style={{
-																boxShadow: `0 0 0 0.5px ${theme.divider}`,
-															}}
-														>
-															<Search
-																className="h-3.5 w-3.5 shrink-0"
-																style={{
-																	color:
-																		theme.muted,
-																}}
-															/>
-
-															<input
-																autoFocus
-																type="text"
-																value={
-																	bodySearch
-																}
-																onChange={(
-																	e
-																) =>
-																	setBodySearch(
-																		e
-																			.target
-																			.value
-																	)
-																}
-																onKeyDown={(
-																	e
-																) => {
-																	if (
-																		e.key ===
-																		"Enter"
-																	) {
-																		if (bodySearchScope === "all") {
-																			if (allSearchResults[0]) {
-																				handleSearchResultClick(
-																					allSearchResults[0].episodeIndex,
-																				);
-																			}
-																		} else {
-																			scrollToBodySearchMatch(1);
-																		}
-																	}
-
-																	if (
-																		e.key ===
-																		"Escape"
-																	) {
-																		setBodySearch(
-																			""
-																		);
-
-																		setBodySearchOpen(
-																			false
-																		);
-																	}
-																}}
-																placeholder={
-																bodySearchScope === "all"
-																	? "전체 회차에서 검색"
-																	: "본문에서 검색"
-															}
-																className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-																style={{
-																	color:
-																		theme.title,
-																}}
-															/>
-
-															<button
-																onClick={() =>
-																	setBodySearchScope(
-																		bodySearchScope === "all"
-																			? "episode"
-																			: "all",
-																	)
-																}
-																aria-label="검색 범위 전환"
-																className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium transition hover:opacity-80"
-																style={{
-																	color:
-																		bodySearchScope === "all"
-																			? theme.accent
-																			: theme.muted,
-																	backgroundColor:
-																		bodySearchScope === "all"
-																			? `${theme.accent}22`
-																			: theme.divider,
-																}}
-															>
-																{bodySearchScope === "all"
-																	? "전체"
-																	: "이 화"}
-															</button>
-
-															{bodySearch.trim() && (
-																<span
-																	className="shrink-0 text-[11px] tabular-nums"
-																	style={{
-																		color:
-																			theme.muted,
-																	}}
-																>
-																	{bodySearchScope === "all"
-																	? allSearchPending ||
-																			bodySearch.trim().length <
-																				GLOBAL_SEARCH_MIN_LENGTH
-																		? ""
-																		: `${allSearchResults.length}개 화`
-																	: bodySearchMatches.length > 0
-																		? `${bodySearchIndex + 1}/${bodySearchMatches.length}`
-																		: "0/0"}
-																</span>
-															)}
-
-															<button
-																onClick={() =>
-																	scrollToBodySearchMatch(
-																		-1
-																	)
-																}
-																disabled={
-																	bodySearchMatches.length ===
-																	0
-																}
-																className={`shrink-0 rounded-full p-1 disabled:opacity-30 ${
-																	bodySearchScope === "all" ? "hidden" : ""
-																}`}
-																style={{
-																	color:
-																		theme.title,
-																}}
-																aria-label="이전 검색 결과"
-															>
-																<ChevronLeft className="h-4 w-4" />
-															</button>
-
-															<button
-																onClick={() =>
-																	scrollToBodySearchMatch(
-																		1
-																	)
-																}
-																disabled={
-																	bodySearchMatches.length ===
-																	0
-																}
-																className={`shrink-0 rounded-full p-1 disabled:opacity-30 ${
-																	bodySearchScope === "all" ? "hidden" : ""
-																}`}
-																style={{
-																	color:
-																		theme.title,
-																}}
-																aria-label="다음 검색 결과"
-															>
-																<ChevronRight className="h-4 w-4" />
-															</button>
-
-															<button
-																onClick={() => {
-																	setBodySearch(
-																		""
-																	);
-
-																	setBodySearchOpen(
-																		false
-																	);
-																}}
-																className="shrink-0 rounded-full p-1"
-																style={{
-																	color:
-																		theme.muted,
-																}}
-																aria-label="본문 검색 닫기"
-															>
-																<X className="h-4 w-4" />
-															</button>
-														</div>
-													)}
-												</div>
-
-
-												{bodySearchOpen &&
-												bodySearchScope === "all" &&
-												bodySearch.trim() && (
-													<div
-														className="mt-2 max-h-80 overflow-y-auto overscroll-contain rounded-lg"
-														style={{
-															boxShadow: `0 0 0 0.5px ${theme.divider}`,
-														}}
-													>
-														{bodySearch.trim().length <
-														GLOBAL_SEARCH_MIN_LENGTH ? (
-															<p
-																className="px-3 py-3 text-xs"
-																style={{ color: theme.muted }}
-															>
-																{GLOBAL_SEARCH_MIN_LENGTH}글자 이상
-																입력해 주세요.
-															</p>
-														) : allSearchPending ? (
-															<p
-																className="px-3 py-3 text-xs"
-																style={{ color: theme.muted }}
-															>
-																검색 중…
-															</p>
-														) : allSearchResults.length === 0 ? (
-															<p
-																className="px-3 py-3 text-xs"
-																style={{ color: theme.muted }}
-															>
-																검색 결과가 없습니다.
-															</p>
-														) : (
-															<>
-																<p
-																	className="px-3 pt-2.5 pb-1 text-[11px]"
-																	style={{ color: theme.muted }}
-																>
-																	{allSearchResults.length}개 화에서
-																	총 {allSearchTotalCount}건
-																</p>
-
-																{allSearchResults.map((result) => (
-																	<button
-																		key={result.episodeIndex}
-																		onClick={() =>
-																			handleSearchResultClick(
-																				result.episodeIndex,
-																			)
-																		}
-																		className="block w-full px-3 py-2.5 text-left transition hover:opacity-80"
-																		style={{
-																			borderTop: `0.5px solid ${theme.divider}`,
-																		}}
-																	>
-																		<div className="flex items-center justify-between gap-2">
-																			<span
-																				className="min-w-0 truncate text-xs font-medium"
-																				style={{ color: theme.accent }}
-																			>
-																				{result.episode}화
-																				{result.title
-																					? ` · ${result.title}`
-																					: ""}
-																			</span>
-
-																			<span
-																				className="shrink-0 text-[11px] tabular-nums"
-																				style={{ color: theme.muted }}
-																			>
-																				{result.count}건
-																			</span>
-																		</div>
-
-																		<p
-																			className="mt-1 break-words text-sm leading-relaxed"
-																			style={{ color: theme.text }}
-																		>
-																			{result.hasMoreBefore && "…"}
-																			{result.before}
-																			<mark
-																				className="rounded-sm"
-																				style={{
-																					backgroundColor: `${theme.accent}33`,
-																					color: "inherit",
-																				}}
-																			>
-																				{result.match}
-																			</mark>
-																			{result.after}
-																			{result.hasMoreAfter && "…"}
-																		</p>
-																	</button>
-																))}
-															</>
-														)}
-													</div>
-												)}
 
 
 												{editError && (
