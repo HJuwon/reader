@@ -76,25 +76,33 @@ export default function HistoryPage() {
     loadHistory();
   }, []);
 
-  // 책 × 회독 조합을 하나의 읽기 기록 항목으로 펼친다.
+  // 소설당 한 칸: 회독이 여러 개여도 가장 최근 회독 하나만 보여 준다.
   const historyEntries = useMemo<HistoryEntry[]>(() => {
     const entries: HistoryEntry[] = [];
 
     for (const book of books) {
       const rounds = book.rounds ?? [];
 
-      for (const round of rounds) {
-        // 아직 시작만 하고 진행이 없는 회독은 이력에서 제외
-        if (
-          (round.episode ?? 0) === 0 &&
-          (round.progress ?? 0) === 0 &&
-          round.status !== "completed"
-        ) {
-          continue;
-        }
+      // 아직 시작만 하고 진행이 없는 회독은 이력에서 제외
+      const visibleRounds = rounds.filter(
+        (round) =>
+          !(
+            (round.episode ?? 0) === 0 &&
+            (round.progress ?? 0) === 0 &&
+            round.status !== "completed"
+          ),
+      );
 
-        entries.push({ book, round });
+      if (visibleRounds.length === 0) {
+        continue;
       }
+
+      // 회독 번호가 가장 큰 것 = 가장 최근 회독
+      const latest = visibleRounds.reduce((a, b) =>
+        b.round > a.round ? b : a,
+      );
+
+      entries.push({ book, round: latest });
     }
 
     return entries.sort((a, b) => {
@@ -161,7 +169,7 @@ export default function HistoryPage() {
       ) : (
         <PagedScrollList
           items={historyEntries}
-          getKey={(entry) => entry.round.id}
+          getKey={(entry) => entry.book.id}
           renderItem={(entry) => {
             const progress = Math.min(
               100,
@@ -171,7 +179,7 @@ export default function HistoryPage() {
 
             return (
               <Link
-                key={entry.round.id}
+                key={entry.book.id}
                 href={getReaderUrl(entry)}
                 className="flex items-center gap-3.5 px-4 py-3.5 transition hover:bg-card"
               >
