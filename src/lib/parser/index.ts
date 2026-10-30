@@ -14,9 +14,7 @@ import {
 } from "./rules";
 
 import type {
-  Episode,
   EpisodeCandidate,
-  EpisodeRule,
   ParsedNovel,
 } from "./types";
 
