@@ -115,7 +115,7 @@ export async function loadNovel(
   );
 
   const filePromise = fetch(
-    `/api/drive/file?fileId=${encodedFileId}`
+    `/api/drive/file?fileId=${encodedFileId}&raw=1`
   );
 
   const rulesPromise = fetch("/api/episode-rules");
@@ -156,14 +156,18 @@ export async function loadNovel(
     savedRulePromise,
   ]);
 
+  // 본문(fileResponse)은 JSON이 아니라 글자 그대로 오므로 따로 읽는다.
+  // 오류일 때만 JSON(오류 문구)으로 온다.
   const [
     infoData,
-    fileData,
+    fileContentOrError,
     rulesData,
     savedRuleData,
   ] = await Promise.all([
     readJson(infoResponse),
-    readJson(fileResponse),
+    fileResponse.ok
+      ? fileResponse.text()
+      : readJson(fileResponse),
     readJson(rulesResponse),
     readJson(savedRuleResponse),
   ]);
@@ -180,7 +184,7 @@ export async function loadNovel(
   if (!fileResponse.ok) {
     throw new Error(
       extractErrorMessage(
-        fileData,
+        fileContentOrError,
         "파일을 가져오지 못했습니다."
       )
     );
@@ -194,8 +198,8 @@ export async function loadNovel(
     size?: unknown;
   };
 
-  const file = fileData as {
-    content?: unknown;
+  const file = {
+    content: fileContentOrError,
   };
 
   if (
