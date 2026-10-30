@@ -57,6 +57,18 @@ export async function GET(request: Request) {
     );
   }
 
+  // raw=1: 드라이브에서 받는 대로 바로 폰으로 흘려보낸다.
+  // (예전에는 서버가 파일을 다 받은 뒤에야 JSON으로 감싸 보내서,
+  //  "드라이브 → 서버"와 "서버 → 폰"이 차례로 일어났다. 이제는 겹쳐서 일어난다.)
+  if (searchParams.get("raw") === "1") {
+    return new Response(response.body, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "private, no-store",
+      },
+    });
+  }
+
   const content = await response.text();
 
   return Response.json({
