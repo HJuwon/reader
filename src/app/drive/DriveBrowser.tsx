@@ -10,10 +10,7 @@ import { useHighlightSelection } from "./hooks/useHighlightSelection";
 
 import { useBookmark } from "./hooks/useBookmark";
 
-import type {
-	EpisodeRule,
-	ParsedNovel,
-} from "@/lib/parser";
+import type { ParsedNovel } from "@/lib/parser";
 import { inspectParsing, type InspectResult } from "@/lib/parser";
 
 import {
@@ -197,7 +194,6 @@ export default function DriveBrowser() {
 	 * 회차 규칙
 	 */
 	const {
-		episodeRules,
 		setEpisodeRules,
 		episodeRuleInput,
 		setEpisodeRuleInput,
@@ -397,7 +393,6 @@ export default function DriveBrowser() {
 
 	const {
 		selectedTextForHighlight,
-		selectedHighlightRange,
 		showHighlightButton,
 		handleTextSelection,
 		savePendingHighlight,
@@ -1243,169 +1238,6 @@ export default function DriveBrowser() {
 
 
 						<div className="grid grid-cols-1 gap-6">
-							<aside className="hidden">
-								<div className="sticky top-8">
-									<div
-										className="mb-4 flex items-center gap-2 rounded-[4px] px-3 py-2"
-										style={{
-											boxShadow: `0 0 0 0.5px ${theme.divider}`,
-										}}
-									>
-										<Search
-											className="h-4 w-4 shrink-0"
-											style={{
-												color:
-													theme.muted,
-											}}
-										/>
-
-										<input
-											type="text"
-											value={
-												episodeSearch
-											}
-											onChange={(
-												e
-											) =>
-												setEpisodeSearch(
-													e
-														.target
-														.value
-												)
-											}
-											placeholder="회차 검색"
-											className="min-w-0 flex-1 bg-transparent text-sm outline-none"
-											style={{
-												color:
-													theme.title,
-											}}
-										/>
-
-										{episodeSearch && (
-											<button
-												onClick={() =>
-													setEpisodeSearch(
-														""
-													)
-												}
-												className="shrink-0"
-												style={{
-													color:
-														theme.muted,
-												}}
-												aria-label="회차 검색어 지우기"
-											>
-												<X className="h-3.5 w-3.5" />
-											</button>
-										)}
-									</div>
-
-									<p
-										className="mb-3 px-1 text-xs"
-										style={{
-											color:
-												theme.muted,
-										}}
-									>
-										{episodeSearch
-											? `${filteredEpisodes.length}개 회차`
-											: `전체 ${parsedNovel.totalEpisodes}화`}
-									</p>
-
-									<div className="max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
-										{filteredEpisodes.length ===
-										0 ? (
-											<p
-												className="px-2 py-6 text-center text-xs"
-												style={{
-													color:
-														theme.muted,
-												}}
-											>
-												검색 결과가 없습니다.
-											</p>
-										) : (
-											filteredEpisodes.map(
-												(
-													episode
-												) => {
-													const index =
-														parsedNovel.episodes.indexOf(
-															episode
-														);
-
-													const isSelected =
-														index ===
-														selectedEpisodeIndex;
-
-													return (
-														<button
-															key={`${episode.startLine}-${index}`}
-															onClick={() =>
-																changeEpisode(
-																	index
-																)
-															}
-															disabled={
-																progressSaving
-															}
-															className="flex w-full items-start gap-2.5 rounded-r-[4px] py-2.5 pl-2.5 pr-2 text-left transition disabled:opacity-50"
-															style={{
-																color:
-																	isSelected
-																		? theme.title
-																		: theme.muted,
-																borderLeft: `2px solid ${
-																	isSelected
-																		? theme.accent
-																		: "transparent"
-																}`,
-																backgroundColor:
-																	isSelected
-																		? `${theme.accent}0c`
-																		: "transparent",
-															}}
-														>
-															<span
-																className="mt-0.5 shrink-0 text-[11px] tabular-nums"
-																style={{
-																	color:
-																		isSelected
-																			? theme.accent
-																			: theme.muted,
-																	opacity:
-																		isSelected
-																			? 1
-																			: 0.7,
-																}}
-															>
-																{episode.label ?? `${episode.episode}화`}
-															</span>
-
-															<p
-																className="min-w-0 truncate text-sm"
-																style={{
-																	fontFamily:
-																		SERIF,
-																	fontWeight:
-																		isSelected
-																			? 500
-																			: 400,
-																}}
-															>
-																{
-																	episode.title
-																}
-															</p>
-														</button>
-													);
-												}
-											)
-										)}
-									</div>
-								</div>
-							</aside>
-
 
 							<article>
 								{selectedEpisode ? (
